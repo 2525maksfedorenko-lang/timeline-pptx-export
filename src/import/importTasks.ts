@@ -1,0 +1,71 @@
+import type { TimelineItem } from '../types/timeline';
+
+const REQUIRED_STRING_FIELDS: (keyof TimelineItem)[] = ['id', 'label', 'start', 'end'];
+
+function validateItem(raw: unknown, index: number): TimelineItem {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+    throw new Error(`Task at index ${index} is not an object.`);
+  }
+
+  const record = raw as Record<string, unknown>;
+
+  for (const field of REQUIRED_STRING_FIELDS) {
+    if (typeof record[field] !== 'string' || record[field] === '') {
+      throw new Error(`Task at index ${index} is missing a valid "${field}" field.`);
+    }
+  }
+
+  if (record.progress !== undefined && typeof record.progress !== 'number') {
+    throw new Error(`Task at index ${index} has an invalid "progress" field (expected a number).`);
+  }
+
+  if (record.group !== undefined && typeof record.group !== 'string') {
+    throw new Error(`Task at index ${index} has an invalid "group" field (expected a string).`);
+  }
+
+  if (record.color !== undefined && typeof record.color !== 'string') {
+    throw new Error(`Task at index ${index} has an invalid "color" field (expected a string).`);
+  }
+
+  if (record.parentId !== undefined && typeof record.parentId !== 'string') {
+    throw new Error(`Task at index ${index} has an invalid "parentId" field (expected a string).`);
+  }
+
+  if (record.milestone !== undefined && typeof record.milestone !== 'boolean') {
+    throw new Error(`Task at index ${index} has an invalid "milestone" field (expected a boolean).`);
+  }
+
+  if (record.includeInExport !== undefined && typeof record.includeInExport !== 'boolean') {
+    throw new Error(`Task at index ${index} has an invalid "includeInExport" field (expected a boolean).`);
+  }
+
+  if (
+    record.dependencies !== undefined &&
+    (!Array.isArray(record.dependencies) || !record.dependencies.every((dep) => typeof dep === 'string'))
+  ) {
+    throw new Error(`Task at index ${index} has an invalid "dependencies" field (expected an array of strings).`);
+  }
+
+  return record as unknown as TimelineItem;
+}
+
+/** Parses and validates a JSON string as an array of TimelineItem, throwing a
+ * descriptive error on the first invalid entry rather than importing partial data. */
+export function parseImportedTasks(json: string): TimelineItem[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(json);
+  } catch {
+    throw new Error('The file is not valid JSON.');
+  }
+
+  if (!Array.isArray(parsed)) {
+    throw new Error('The JSON file must contain an array of tasks.');
+  }
+
+  if (parsed.length === 0) {
+    throw new Error('The JSON file contains no tasks.');
+  }
+
+  return parsed.map((item, index) => validateItem(item, index));
+}
