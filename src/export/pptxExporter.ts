@@ -1,214 +1,174 @@
 import pptxgen from 'pptxgenjs';
-import { useTimelineStore, type ExportOptions } from '../store/timelineStore';
-import type { TaskComment, TimelineItem } from '../types/timeline';
-import { BASE_PX_PER_DAY, getDateRange, getItemBar } from './dateScale';
+import { useTimelineStore } from '../store/timelineStore';
+import { buildExportSlides, type DetailSlideModel, type OverviewSlideModel } from './timelineExportModel';
+import { COLORS, FOOTER_TEXT, PPTX_FONT_FACE } from './theme';
+import {
+  BAR_HEIGHT_IN,
+  BAR_RADIUS_IN,
+  CONTENT_WIDTH_IN,
+  CONTENT_X_IN,
+  FOOTER_HEIGHT_IN,
+  HEADER_HEIGHT_IN,
+  LIST_ROW_HEIGHT_IN,
+  PAGE_HEIGHT_IN,
+  PAGE_WIDTH_IN,
+  ROW_LABEL_HEIGHT_IN,
+} from './slideLayout';
 
-const SLIDE_TITLE_COLOR = '1e293b';
-const SLIDE_SUBHEAD_COLOR = '475569';
-const SLIDE_TEXT_COLOR = '334155';
-const TRACK_COLOR = 'e2e8f0';
-const DEFAULT_BAR_COLOR = '3b82f6';
+type PptxSlide = ReturnType<pptxgen['addSlide']>;
 
-const CHART_X_IN = 0.5;
-const CHART_Y_IN = 1.3;
-const CHART_WIDTH_IN = 9;
-const ROW_HEIGHT_IN = 0.45;
-const BAR_HEIGHT_IN = 0.32;
+function drawChrome(slide: PptxSlide, title: string) {
+  slide.background = { color: COLORS.slideBg };
 
-function toHexColor(color: string | undefined) {
-  return (color ?? `#${DEFAULT_BAR_COLOR}`).replace('#', '');
-}
-
-function clampProgress(progress: number | undefined) {
-  return Math.min(100, Math.max(0, progress ?? 0));
-}
-
-function buildOverviewSlide(pptx: pptxgen, parentItems: TimelineItem[]) {
-  const slide = pptx.addSlide();
-  slide.addText('Timeline Overview', {
-    x: 0.5,
-    y: 0.3,
-    w: CHART_WIDTH_IN,
-    h: 0.6,
+  slide.addShape('rect', {
+    x: 0,
+    y: 0,
+    w: PAGE_WIDTH_IN,
+    h: HEADER_HEIGHT_IN,
+    fill: { color: COLORS.navy },
+    line: { color: COLORS.navy },
+  });
+  slide.addText(title, {
+    x: CONTENT_X_IN,
+    y: 0,
+    w: CONTENT_WIDTH_IN,
+    h: HEADER_HEIGHT_IN,
     fontSize: 24,
     bold: true,
-    color: SLIDE_TITLE_COLOR,
+    color: COLORS.lightText,
+    fontFace: PPTX_FONT_FACE,
+    valign: 'middle',
   });
 
-  if (parentItems.length === 0) {
-    slide.addText('No tasks to display.', {
-      x: 0.5,
-      y: CHART_Y_IN,
-      w: CHART_WIDTH_IN,
-      h: 0.4,
-      fontSize: 14,
-      color: SLIDE_SUBHEAD_COLOR,
-    });
-    return;
-  }
+  const footerY = PAGE_HEIGHT_IN - FOOTER_HEIGHT_IN;
+  slide.addShape('rect', {
+    x: 0,
+    y: footerY,
+    w: PAGE_WIDTH_IN,
+    h: FOOTER_HEIGHT_IN,
+    fill: { color: COLORS.border },
+    line: { color: COLORS.border },
+  });
+  slide.addText(FOOTER_TEXT, {
+    x: CONTENT_X_IN,
+    y: footerY,
+    w: CONTENT_WIDTH_IN,
+    h: FOOTER_HEIGHT_IN,
+    fontSize: 8,
+    color: COLORS.footerText,
+    fontFace: PPTX_FONT_FACE,
+    valign: 'middle',
+    align: 'right',
+  });
+}
 
-  const { minDate, totalDays } = getDateRange(parentItems);
-  const totalWidthPx = totalDays * BASE_PX_PER_DAY;
-  const scale = CHART_WIDTH_IN / totalWidthPx;
+function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel) {
+  drawChrome(slide, model.title);
 
-  parentItems.forEach((item, index) => {
-    const { left, width } = getItemBar(item, minDate, BASE_PX_PER_DAY);
-    const y = CHART_Y_IN + index * ROW_HEIGHT_IN;
-    const progress = clampProgress(item.progress);
-    const color = toHexColor(item.color);
-    const barX = CHART_X_IN + left * scale;
-    const barWidth = Math.max(width * scale, 0.15);
-
+  model.bars.forEach((bar) => {
     slide.addShape('roundRect', {
-      x: barX,
-      y,
-      w: barWidth,
+      x: bar.barX,
+      y: bar.barY,
+      w: bar.trackWidth,
       h: BAR_HEIGHT_IN,
-      fill: { color: TRACK_COLOR },
-      line: { color: TRACK_COLOR },
+      rectRadius: BAR_RADIUS_IN,
+      fill: { color: COLORS.border },
+      line: { color: COLORS.border },
     });
 
-    if (progress > 0) {
+    if (bar.fillWidth > 0) {
       slide.addShape('roundRect', {
-        x: barX,
-        y,
-        w: Math.max((barWidth * progress) / 100, 0.05),
+        x: bar.barX,
+        y: bar.barY,
+        w: bar.fillWidth,
         h: BAR_HEIGHT_IN,
-        fill: { color },
-        line: { color },
+        rectRadius: BAR_RADIUS_IN,
+        fill: { color: bar.color },
+        line: { color: bar.color },
       });
     }
 
-    slide.addText(`${item.label}  ${progress}%`, {
-      x: barX,
-      y,
-      w: Math.max(barWidth, 1.5),
-      h: BAR_HEIGHT_IN,
-      fontSize: 10,
-      color: SLIDE_TITLE_COLOR,
-      valign: 'middle',
-      margin: 2,
+    slide.addText(bar.label, {
+      x: bar.barX,
+      y: bar.labelY,
+      w: CONTENT_WIDTH_IN - (bar.barX - CONTENT_X_IN),
+      h: ROW_LABEL_HEIGHT_IN,
+      fontSize: 11,
+      bold: true,
+      color: COLORS.navy,
+      fontFace: PPTX_FONT_FACE,
     });
   });
 }
 
-function getCommentsForSlide(
-  comments: TaskComment[],
-  taskId: string,
-  mode: ExportOptions['commentMode'],
-): TaskComment[] {
-  const taskComments = comments.filter((comment) => comment.taskId === taskId);
+function drawDetailSlide(slide: PptxSlide, model: DetailSlideModel) {
+  drawChrome(slide, model.title);
 
-  if (mode === 'none' || taskComments.length === 0) return [];
-
-  if (mode === 'pinned') {
-    return taskComments.filter((comment) => comment.isPinned);
-  }
-
-  if (mode === 'latest') {
-    const [latest] = [...taskComments].sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-    );
-    return latest ? [latest] : [];
-  }
-
-  return taskComments;
-}
-
-function buildDetailSlide(
-  pptx: pptxgen,
-  parent: TimelineItem,
-  children: TimelineItem[],
-  relevantComments: TaskComment[],
-) {
-  const slide = pptx.addSlide();
-  slide.addText(parent.label, {
-    x: 0.5,
-    y: 0.3,
-    w: CHART_WIDTH_IN,
-    h: 0.5,
-    fontSize: 22,
-    bold: true,
-    color: SLIDE_TITLE_COLOR,
-  });
-
-  let y = 1.1;
-
-  if (children.length > 0) {
+  if (model.subtasksHeadingY !== undefined) {
     slide.addText('Subtasks', {
-      x: 0.5,
-      y,
-      w: CHART_WIDTH_IN,
-      h: 0.3,
+      x: CONTENT_X_IN,
+      y: model.subtasksHeadingY,
+      w: CONTENT_WIDTH_IN,
+      h: ROW_LABEL_HEIGHT_IN,
       fontSize: 14,
       bold: true,
-      color: SLIDE_SUBHEAD_COLOR,
+      color: COLORS.navy,
+      fontFace: PPTX_FONT_FACE,
     });
-    y += 0.35;
-
-    children.forEach((child) => {
-      const progress = clampProgress(child.progress);
-      slide.addText(`${child.label}  —  ${child.start} → ${child.end}  —  ${progress}%`, {
-        x: 0.7,
-        y,
-        w: 8.3,
-        h: 0.3,
-        fontSize: 12,
-        color: SLIDE_TEXT_COLOR,
-      });
-      y += 0.32;
-    });
-
-    y += 0.2;
   }
 
-  if (relevantComments.length > 0) {
+  model.subtasks.forEach((row) => {
+    slide.addText(row.text, {
+      x: CONTENT_X_IN + 0.2,
+      y: row.y,
+      w: CONTENT_WIDTH_IN - 0.2,
+      h: LIST_ROW_HEIGHT_IN,
+      fontSize: 12,
+      color: COLORS.navy,
+      fontFace: PPTX_FONT_FACE,
+    });
+  });
+
+  if (model.commentsHeadingY !== undefined) {
     slide.addText('Comments', {
-      x: 0.5,
-      y,
-      w: CHART_WIDTH_IN,
-      h: 0.3,
+      x: CONTENT_X_IN,
+      y: model.commentsHeadingY,
+      w: CONTENT_WIDTH_IN,
+      h: ROW_LABEL_HEIGHT_IN,
       fontSize: 14,
       bold: true,
-      color: SLIDE_SUBHEAD_COLOR,
-    });
-    y += 0.35;
-
-    relevantComments.forEach((comment) => {
-      const date = new Date(comment.createdAt).toLocaleDateString();
-      const prefix = comment.isPinned ? '\u{1F4CC} ' : '';
-      slide.addText(`${prefix}${comment.body} (${date})`, {
-        x: 0.7,
-        y,
-        w: 8.3,
-        h: 0.4,
-        fontSize: 11,
-        color: SLIDE_TEXT_COLOR,
-      });
-      y += 0.4;
+      color: COLORS.navy,
+      fontFace: PPTX_FONT_FACE,
     });
   }
+
+  model.comments.forEach((row) => {
+    slide.addText(row.text, {
+      x: CONTENT_X_IN + 0.2,
+      y: row.y,
+      w: CONTENT_WIDTH_IN - 0.2,
+      h: LIST_ROW_HEIGHT_IN,
+      fontSize: 11,
+      color: COLORS.navy,
+      fontFace: PPTX_FONT_FACE,
+    });
+  });
 }
 
 export function exportTimelineToPptx(): void {
   const { items, exportOptions, comments } = useTimelineStore.getState();
-
-  const exportableItems = items.filter((item) => item.includeInExport !== false);
-  const parentItems = exportableItems.filter((item) => item.parentId === undefined);
+  const slides = buildExportSlides(items, comments, exportOptions.commentMode);
 
   const pptx = new pptxgen();
   pptx.layout = 'LAYOUT_16x9';
 
-  buildOverviewSlide(pptx, parentItems);
-
-  parentItems.forEach((parent) => {
-    const children = exportableItems.filter((item) => item.parentId === parent.id);
-    const parentComments = comments.filter((comment) => comment.taskId === parent.id);
-
-    if (children.length === 0 && parentComments.length === 0) return;
-
-    const relevantComments = getCommentsForSlide(comments, parent.id, exportOptions.commentMode);
-    buildDetailSlide(pptx, parent, children, relevantComments);
+  slides.forEach((slideModel) => {
+    const slide = pptx.addSlide();
+    if (slideModel.kind === 'overview') {
+      drawOverviewSlide(slide, slideModel);
+    } else {
+      drawDetailSlide(slide, slideModel);
+    }
   });
 
   pptx.writeFile({ fileName: 'timeline-export.pptx' }).catch((error) => {
