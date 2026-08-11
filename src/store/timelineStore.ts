@@ -1,6 +1,14 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { TaskComment, Timeline, TimelineItem } from '../types/timeline';
+import {
+  deletePlan as deletePlanFromDb,
+  getAllPlans,
+  savePlan as persistPlan,
+  type SavedPlan,
+} from './planStorage';
+
+export type { SavedPlan };
 
 export interface ExportOptions {
   theme: string;
@@ -14,15 +22,6 @@ export interface UiState {
   selectedItemId: string | null;
   zoomLevel: number;
   editingItemId: string | null;
-}
-
-export interface SavedPlan {
-  id: string;
-  name: string;
-  title: string;
-  items: TimelineItem[];
-  exportOptions: ExportOptions;
-  updatedAt: string;
 }
 
 interface TimelineStore {
@@ -46,14 +45,13 @@ interface TimelineStore {
   setZoomLevel: (zoomLevel: number) => void;
   setEditingItem: (id: string | null) => void;
 
-  // saved_plans: local browser storage of multiple plans, switchable by id.
-  plans: SavedPlan[];
+  // Multiple plans, persisted locally in IndexedDB (see planStorage.ts).
   activePlanId: string | null;
-  savePlan: (name?: string) => void;
-  createPlan: (name: string) => void;
-  loadPlan: (id: string) => void;
-  renamePlan: (id: string, name: string) => void;
-  deletePlan: (id: string) => void;
+  savedPlans: SavedPlan[];
+  loadPlans: () => Promise<void>;
+  saveCurrentAsPlan: (name: string) => Promise<void>;
+  switchToPlan: (id: string) => Promise<void>;
+  deletePlan: (id: string) => Promise<void>;
 }
 
 const DEFAULT_EXPORT_OPTIONS: ExportOptions = {
@@ -164,22 +162,13 @@ const mockComments: TaskComment[] = [
   },
 ];
 
-const initialPlan: SavedPlan = {
-  id: 'plan-1',
-  name: 'Демо-проект',
-  title: 'Демо-проект',
-  items: mockItems,
-  exportOptions: DEFAULT_EXPORT_OPTIONS,
-  updatedAt: new Date().toISOString(),
-};
-
 export const useTimelineStore = create<TimelineStore>()(
   persist(
-    (set) => ({
-      title: initialPlan.title,
+    (set, get) => ({
+      title: 'Демо-проект',
       setTitle: (title) => set({ title }),
 
-      items: initialPlan.items,
+      items: mockItems,
       addItem: (item) => set((state) => ({ items: [...state.items, item] })),
       updateItem: (id, patch) =>
         set((state) => ({
@@ -193,7 +182,7 @@ export const useTimelineStore = create<TimelineStore>()(
       removeComment: (id) =>
         set((state) => ({ comments: state.comments.filter((comment) => comment.id !== id) })),
 
-      exportOptions: initialPlan.exportOptions,
+      exportOptions: DEFAULT_EXPORT_OPTIONS,
       updateExportOptions: (patch) =>
         set((state) => ({ exportOptions: { ...state.exportOptions, ...patch } })),
 
@@ -202,95 +191,144 @@ export const useTimelineStore = create<TimelineStore>()(
       setZoomLevel: (zoomLevel) => set((state) => ({ ui: { ...state.ui, zoomLevel } })),
       setEditingItem: (id) => set((state) => ({ ui: { ...state.ui, editingItemId: id } })),
 
-      plans: [initialPlan],
-      activePlanId: initialPlan.id,
+      activePlanId: null,
+      savedPlans: [],
 
-      savePlan: (name) =>
-        set((state) => {
-          const updatedAt = new Date().toISOString();
-          const activePlan = state.plans.find((plan) => plan.id === state.activePlanId);
+      loadPlans: async () => {
+        const plans = await getAllPlans();
 
-          if (activePlan) {
-            return {
-              plans: state.plans.map((plan) =>
-                plan.id === activePlan.id
-                  ? {
-                      ...plan,
-                      name: name ?? plan.name,
-                      title: state.title,
-                      items: state.items,
-                      exportOptions: state.exportOptions,
-                      updatedAt,
-                    }
-                  : plan,
-              ),
-            };
-          }
-
-          const newPlan: SavedPlan = {
+        if (plans.length === 0) {
+          const state = get();
+          const now = new Date().toISOString();
+          const defaultPlan: SavedPlan = {
             id: crypto.randomUUID(),
-            name: name ?? state.title,
-            title: state.title,
+            name: state.title || 'Демо-проект',
             items: state.items,
             exportOptions: state.exportOptions,
-            updatedAt,
+            createdAt: now,
+            updatedAt: now,
           };
-          return { plans: [...state.plans, newPlan], activePlanId: newPlan.id };
-        }),
+          await persistPlan(defaultPlan);
+          set({ savedPlans: [defaultPlan], activePlanId: defaultPlan.id });
+          return;
+        }
 
-      createPlan: (name) =>
-        set((state) => {
-          const newPlan: SavedPlan = {
-            id: crypto.randomUUID(),
-            name,
-            title: name,
-            items: [],
-            exportOptions: DEFAULT_EXPORT_OPTIONS,
+        const state = get();
+        const persistedActivePlan = plans.find((plan) => plan.id === state.activePlanId);
+
+        if (persistedActivePlan) {
+          // localStorage already restored the latest items/exportOptions for this plan
+          // (possibly newer than the last IndexedDB flush) — keep them and just sync
+          // IndexedDB, instead of overwriting current state with a stale snapshot.
+          const hasDrift =
+            JSON.stringify(persistedActivePlan.items) !== JSON.stringify(state.items) ||
+            JSON.stringify(persistedActivePlan.exportOptions) !== JSON.stringify(state.exportOptions);
+
+          if (!hasDrift) {
+            set({ savedPlans: plans });
+            return;
+          }
+
+          const refreshedPlan: SavedPlan = {
+            ...persistedActivePlan,
+            items: state.items,
+            exportOptions: state.exportOptions,
             updatedAt: new Date().toISOString(),
           };
-          return {
-            plans: [...state.plans, newPlan],
-            activePlanId: newPlan.id,
-            title: newPlan.title,
-            items: newPlan.items,
-            exportOptions: newPlan.exportOptions,
-            ui: DEFAULT_UI,
-          };
-        }),
+          await persistPlan(refreshedPlan);
+          set({
+            savedPlans: plans.map((plan) => (plan.id === refreshedPlan.id ? refreshedPlan : plan)),
+          });
+          return;
+        }
 
-      loadPlan: (id) =>
-        set((state) => {
-          const plan = state.plans.find((p) => p.id === id);
-          if (!plan) return state;
-          return {
-            activePlanId: plan.id,
-            title: plan.title,
-            items: plan.items,
-            exportOptions: plan.exportOptions,
-            ui: DEFAULT_UI,
-          };
-        }),
+        const fallbackPlan = plans[0];
+        set({
+          savedPlans: plans,
+          activePlanId: fallbackPlan.id,
+          title: fallbackPlan.name,
+          items: fallbackPlan.items,
+          exportOptions: fallbackPlan.exportOptions,
+        });
+      },
 
-      renamePlan: (id, name) =>
-        set((state) => ({
-          plans: state.plans.map((plan) => (plan.id === id ? { ...plan, name } : plan)),
-        })),
+      saveCurrentAsPlan: async (name) => {
+        const state = get();
+        const now = new Date().toISOString();
+        const existing = state.savedPlans.find((plan) => plan.name === name);
 
-      deletePlan: (id) =>
-        set((state) => {
-          const remaining = state.plans.filter((plan) => plan.id !== id);
-          if (state.activePlanId !== id) {
-            return { plans: remaining };
-          }
-          const next = remaining[0] ?? null;
-          return {
-            plans: remaining,
-            activePlanId: next?.id ?? null,
-            title: next?.title ?? '',
-            items: next?.items ?? [],
-            exportOptions: next?.exportOptions ?? DEFAULT_EXPORT_OPTIONS,
+        const plan: SavedPlan = existing
+          ? { ...existing, items: state.items, exportOptions: state.exportOptions, updatedAt: now }
+          : {
+              id: crypto.randomUUID(),
+              name,
+              items: state.items,
+              exportOptions: state.exportOptions,
+              createdAt: now,
+              updatedAt: now,
+            };
+
+        await persistPlan(plan);
+        set((current) => ({
+          savedPlans: existing
+            ? current.savedPlans.map((p) => (p.id === plan.id ? plan : p))
+            : [...current.savedPlans, plan],
+          activePlanId: plan.id,
+          title: plan.name,
+        }));
+      },
+
+      switchToPlan: async (id) => {
+        const state = get();
+        if (id === state.activePlanId) return;
+
+        const targetPlan = state.savedPlans.find((plan) => plan.id === id);
+        if (!targetPlan) return;
+
+        // Flush in-progress edits on the outgoing plan before switching away.
+        const outgoingPlan = state.savedPlans.find((plan) => plan.id === state.activePlanId);
+        if (outgoingPlan) {
+          const flushedPlan: SavedPlan = {
+            ...outgoingPlan,
+            items: state.items,
+            exportOptions: state.exportOptions,
+            updatedAt: new Date().toISOString(),
           };
-        }),
+          await persistPlan(flushedPlan);
+          set((current) => ({
+            savedPlans: current.savedPlans.map((p) => (p.id === flushedPlan.id ? flushedPlan : p)),
+          }));
+        }
+
+        set({
+          activePlanId: targetPlan.id,
+          title: targetPlan.name,
+          items: targetPlan.items,
+          exportOptions: targetPlan.exportOptions,
+          ui: DEFAULT_UI,
+        });
+      },
+
+      deletePlan: async (id) => {
+        await deletePlanFromDb(id);
+        const state = get();
+        const remaining = state.savedPlans.filter((plan) => plan.id !== id);
+
+        if (state.activePlanId !== id) {
+          set({ savedPlans: remaining });
+          return;
+        }
+
+        const next = remaining[0] ?? null;
+        set({
+          savedPlans: remaining,
+          activePlanId: next?.id ?? null,
+          title: next?.name ?? '',
+          items: next?.items ?? [],
+          exportOptions: next?.exportOptions ?? DEFAULT_EXPORT_OPTIONS,
+          ui: DEFAULT_UI,
+        });
+      },
     }),
     {
       name: 'timeline-pptx-export-storage',
@@ -299,7 +337,6 @@ export const useTimelineStore = create<TimelineStore>()(
         items: state.items,
         comments: state.comments,
         exportOptions: state.exportOptions,
-        plans: state.plans,
         activePlanId: state.activePlanId,
       }),
     },

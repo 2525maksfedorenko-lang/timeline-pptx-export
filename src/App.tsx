@@ -1,6 +1,7 @@
-import { useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { GanttChart } from './components/GanttChart'
 import { ExportSettingsPanel } from './components/ExportSettingsPanel'
+import { PlanSwitcher } from './components/PlanSwitcher'
 import { exportTimelineToPptx } from './export/pptxExporter'
 import { exportTimelineToPdf } from './export/pdfExporter'
 import { parseImportedTasks } from './import/importTasks'
@@ -9,6 +10,11 @@ import { useTimelineStore } from './store/timelineStore'
 function App() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const addItem = useTimelineStore((state) => state.addItem)
+  const loadPlans = useTimelineStore((state) => state.loadPlans)
+
+  useEffect(() => {
+    void loadPlans()
+  }, [loadPlans])
 
   const handleImportClick = () => {
     fileInputRef.current?.click()
@@ -71,6 +77,7 @@ function App() {
           </button>
         </div>
       </div>
+      <PlanSwitcher />
       <ExportSettingsPanel />
       <GanttChart />
     </div>
