@@ -1,9 +1,12 @@
+import { GanttChart } from './components/GanttChart'
+
 function App() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50">
-      <h1 className="text-3xl font-semibold text-slate-800">
+    <div className="min-h-screen bg-slate-50 p-8">
+      <h1 className="mb-6 text-3xl font-semibold text-slate-800">
         Timeline PPTX Export
       </h1>
+      <GanttChart />
     </div>
   )
 }
