@@ -1,4 +1,5 @@
 import { GanttChart } from './components/GanttChart'
+import { ExportSettingsPanel } from './components/ExportSettingsPanel'
 import { exportTimelineToPptx } from './export/pptxExporter'
 import { exportTimelineToPdf } from './export/pdfExporter'
 
@@ -26,6 +27,7 @@ function App() {
           </button>
         </div>
       </div>
+      <ExportSettingsPanel />
       <GanttChart />
     </div>
   )
