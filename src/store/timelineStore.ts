@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import type { TaskComment, Timeline, TimelineItem } from '../types/timeline';
 
 export interface ExportOptions {
@@ -172,120 +173,135 @@ const initialPlan: SavedPlan = {
   updatedAt: new Date().toISOString(),
 };
 
-export const useTimelineStore = create<TimelineStore>((set) => ({
-  title: initialPlan.title,
-  setTitle: (title) => set({ title }),
+export const useTimelineStore = create<TimelineStore>()(
+  persist(
+    (set) => ({
+      title: initialPlan.title,
+      setTitle: (title) => set({ title }),
 
-  items: initialPlan.items,
-  addItem: (item) => set((state) => ({ items: [...state.items, item] })),
-  updateItem: (id, patch) =>
-    set((state) => ({
-      items: state.items.map((item) => (item.id === id ? { ...item, ...patch } : item)),
-    })),
-  removeItem: (id) =>
-    set((state) => ({ items: state.items.filter((item) => item.id !== id) })),
+      items: initialPlan.items,
+      addItem: (item) => set((state) => ({ items: [...state.items, item] })),
+      updateItem: (id, patch) =>
+        set((state) => ({
+          items: state.items.map((item) => (item.id === id ? { ...item, ...patch } : item)),
+        })),
+      removeItem: (id) =>
+        set((state) => ({ items: state.items.filter((item) => item.id !== id) })),
 
-  comments: mockComments,
-  addComment: (comment) => set((state) => ({ comments: [...state.comments, comment] })),
-  removeComment: (id) =>
-    set((state) => ({ comments: state.comments.filter((comment) => comment.id !== id) })),
+      comments: mockComments,
+      addComment: (comment) => set((state) => ({ comments: [...state.comments, comment] })),
+      removeComment: (id) =>
+        set((state) => ({ comments: state.comments.filter((comment) => comment.id !== id) })),
 
-  exportOptions: initialPlan.exportOptions,
-  updateExportOptions: (patch) =>
-    set((state) => ({ exportOptions: { ...state.exportOptions, ...patch } })),
+      exportOptions: initialPlan.exportOptions,
+      updateExportOptions: (patch) =>
+        set((state) => ({ exportOptions: { ...state.exportOptions, ...patch } })),
 
-  ui: DEFAULT_UI,
-  selectItem: (id) => set((state) => ({ ui: { ...state.ui, selectedItemId: id } })),
-  setZoomLevel: (zoomLevel) => set((state) => ({ ui: { ...state.ui, zoomLevel } })),
-  setEditingItem: (id) => set((state) => ({ ui: { ...state.ui, editingItemId: id } })),
+      ui: DEFAULT_UI,
+      selectItem: (id) => set((state) => ({ ui: { ...state.ui, selectedItemId: id } })),
+      setZoomLevel: (zoomLevel) => set((state) => ({ ui: { ...state.ui, zoomLevel } })),
+      setEditingItem: (id) => set((state) => ({ ui: { ...state.ui, editingItemId: id } })),
 
-  plans: [initialPlan],
-  activePlanId: initialPlan.id,
+      plans: [initialPlan],
+      activePlanId: initialPlan.id,
 
-  savePlan: (name) =>
-    set((state) => {
-      const updatedAt = new Date().toISOString();
-      const activePlan = state.plans.find((plan) => plan.id === state.activePlanId);
+      savePlan: (name) =>
+        set((state) => {
+          const updatedAt = new Date().toISOString();
+          const activePlan = state.plans.find((plan) => plan.id === state.activePlanId);
 
-      if (activePlan) {
-        return {
-          plans: state.plans.map((plan) =>
-            plan.id === activePlan.id
-              ? {
-                  ...plan,
-                  name: name ?? plan.name,
-                  title: state.title,
-                  items: state.items,
-                  exportOptions: state.exportOptions,
-                  updatedAt,
-                }
-              : plan,
-          ),
-        };
-      }
+          if (activePlan) {
+            return {
+              plans: state.plans.map((plan) =>
+                plan.id === activePlan.id
+                  ? {
+                      ...plan,
+                      name: name ?? plan.name,
+                      title: state.title,
+                      items: state.items,
+                      exportOptions: state.exportOptions,
+                      updatedAt,
+                    }
+                  : plan,
+              ),
+            };
+          }
 
-      const newPlan: SavedPlan = {
-        id: crypto.randomUUID(),
-        name: name ?? state.title,
+          const newPlan: SavedPlan = {
+            id: crypto.randomUUID(),
+            name: name ?? state.title,
+            title: state.title,
+            items: state.items,
+            exportOptions: state.exportOptions,
+            updatedAt,
+          };
+          return { plans: [...state.plans, newPlan], activePlanId: newPlan.id };
+        }),
+
+      createPlan: (name) =>
+        set((state) => {
+          const newPlan: SavedPlan = {
+            id: crypto.randomUUID(),
+            name,
+            title: name,
+            items: [],
+            exportOptions: DEFAULT_EXPORT_OPTIONS,
+            updatedAt: new Date().toISOString(),
+          };
+          return {
+            plans: [...state.plans, newPlan],
+            activePlanId: newPlan.id,
+            title: newPlan.title,
+            items: newPlan.items,
+            exportOptions: newPlan.exportOptions,
+            ui: DEFAULT_UI,
+          };
+        }),
+
+      loadPlan: (id) =>
+        set((state) => {
+          const plan = state.plans.find((p) => p.id === id);
+          if (!plan) return state;
+          return {
+            activePlanId: plan.id,
+            title: plan.title,
+            items: plan.items,
+            exportOptions: plan.exportOptions,
+            ui: DEFAULT_UI,
+          };
+        }),
+
+      renamePlan: (id, name) =>
+        set((state) => ({
+          plans: state.plans.map((plan) => (plan.id === id ? { ...plan, name } : plan)),
+        })),
+
+      deletePlan: (id) =>
+        set((state) => {
+          const remaining = state.plans.filter((plan) => plan.id !== id);
+          if (state.activePlanId !== id) {
+            return { plans: remaining };
+          }
+          const next = remaining[0] ?? null;
+          return {
+            plans: remaining,
+            activePlanId: next?.id ?? null,
+            title: next?.title ?? '',
+            items: next?.items ?? [],
+            exportOptions: next?.exportOptions ?? DEFAULT_EXPORT_OPTIONS,
+          };
+        }),
+    }),
+    {
+      name: 'timeline-pptx-export-storage',
+      partialize: (state) => ({
         title: state.title,
         items: state.items,
+        comments: state.comments,
         exportOptions: state.exportOptions,
-        updatedAt,
-      };
-      return { plans: [...state.plans, newPlan], activePlanId: newPlan.id };
-    }),
-
-  createPlan: (name) =>
-    set((state) => {
-      const newPlan: SavedPlan = {
-        id: crypto.randomUUID(),
-        name,
-        title: name,
-        items: [],
-        exportOptions: DEFAULT_EXPORT_OPTIONS,
-        updatedAt: new Date().toISOString(),
-      };
-      return {
-        plans: [...state.plans, newPlan],
-        activePlanId: newPlan.id,
-        title: newPlan.title,
-        items: newPlan.items,
-        exportOptions: newPlan.exportOptions,
-        ui: DEFAULT_UI,
-      };
-    }),
-
-  loadPlan: (id) =>
-    set((state) => {
-      const plan = state.plans.find((p) => p.id === id);
-      if (!plan) return state;
-      return {
-        activePlanId: plan.id,
-        title: plan.title,
-        items: plan.items,
-        exportOptions: plan.exportOptions,
-        ui: DEFAULT_UI,
-      };
-    }),
-
-  renamePlan: (id, name) =>
-    set((state) => ({
-      plans: state.plans.map((plan) => (plan.id === id ? { ...plan, name } : plan)),
-    })),
-
-  deletePlan: (id) =>
-    set((state) => {
-      const remaining = state.plans.filter((plan) => plan.id !== id);
-      if (state.activePlanId !== id) {
-        return { plans: remaining };
-      }
-      const next = remaining[0] ?? null;
-      return {
-        plans: remaining,
-        activePlanId: next?.id ?? null,
-        title: next?.title ?? '',
-        items: next?.items ?? [],
-        exportOptions: next?.exportOptions ?? DEFAULT_EXPORT_OPTIONS,
-      };
-    }),
-}));
+        plans: state.plans,
+        activePlanId: state.activePlanId,
+      }),
+    },
+  ),
+);
