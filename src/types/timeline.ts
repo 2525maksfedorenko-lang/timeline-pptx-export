@@ -8,6 +8,8 @@ export interface TimelineItem {
   color?: string;
   dependencies?: string[];
   milestone?: boolean;
+  parentId?: string;
+  includeInExport?: boolean;
 }
 
 export interface Timeline {
