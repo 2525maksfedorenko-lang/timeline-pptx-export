@@ -17,3 +17,11 @@ export interface Timeline {
   items: TimelineItem[];
   scale: 'days' | 'weeks' | 'months';
 }
+
+export interface TaskComment {
+  id: string;
+  taskId: string;
+  body: string;
+  isPinned?: boolean;
+  createdAt: string;
+}

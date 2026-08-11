@@ -1,11 +1,12 @@
 import { create } from 'zustand';
-import type { Timeline, TimelineItem } from '../types/timeline';
+import type { TaskComment, Timeline, TimelineItem } from '../types/timeline';
 
 export interface ExportOptions {
   theme: string;
   scale: Timeline['scale'];
   showProgress: boolean;
   showDependencies: boolean;
+  commentMode: 'latest' | 'pinned' | 'all' | 'none';
 }
 
 export interface UiState {
@@ -32,6 +33,10 @@ interface TimelineStore {
   updateItem: (id: string, patch: Partial<TimelineItem>) => void;
   removeItem: (id: string) => void;
 
+  comments: TaskComment[];
+  addComment: (comment: TaskComment) => void;
+  removeComment: (id: string) => void;
+
   exportOptions: ExportOptions;
   updateExportOptions: (patch: Partial<ExportOptions>) => void;
 
@@ -55,6 +60,7 @@ const DEFAULT_EXPORT_OPTIONS: ExportOptions = {
   scale: 'days',
   showProgress: true,
   showDependencies: true,
+  commentMode: 'latest',
 };
 
 const DEFAULT_UI: UiState = {
@@ -103,6 +109,58 @@ const mockItems: TimelineItem[] = [
     color: '#ef4444',
     dependencies: ['3'],
   },
+  {
+    id: '3a',
+    label: 'Backend API',
+    start: '2026-08-08',
+    end: '2026-08-14',
+    progress: 50,
+    group: 'Phase 2',
+    color: '#f59e0b',
+    parentId: '3',
+  },
+  {
+    id: '3b',
+    label: 'Frontend UI',
+    start: '2026-08-12',
+    end: '2026-08-20',
+    progress: 20,
+    group: 'Phase 2',
+    color: '#f59e0b',
+    parentId: '3',
+  },
+  {
+    id: '5',
+    label: 'Internal Notes',
+    start: '2026-08-01',
+    end: '2026-08-02',
+    progress: 100,
+    group: 'Internal',
+    color: '#94a3b8',
+    includeInExport: false,
+  },
+];
+
+const mockComments: TaskComment[] = [
+  {
+    id: 'c1',
+    taskId: '2',
+    body: 'Initial design review looks good, ready for sign-off.',
+    isPinned: true,
+    createdAt: '2026-08-05T10:00:00.000Z',
+  },
+  {
+    id: 'c2',
+    taskId: '2',
+    body: 'Updated color palette per client feedback.',
+    createdAt: '2026-08-07T09:30:00.000Z',
+  },
+  {
+    id: 'c3',
+    taskId: '3',
+    body: 'Backend API contracts finalized with the mobile team.',
+    createdAt: '2026-08-10T14:00:00.000Z',
+  },
 ];
 
 const initialPlan: SavedPlan = {
@@ -126,6 +184,11 @@ export const useTimelineStore = create<TimelineStore>((set) => ({
     })),
   removeItem: (id) =>
     set((state) => ({ items: state.items.filter((item) => item.id !== id) })),
+
+  comments: mockComments,
+  addComment: (comment) => set((state) => ({ comments: [...state.comments, comment] })),
+  removeComment: (id) =>
+    set((state) => ({ comments: state.comments.filter((comment) => comment.id !== id) })),
 
   exportOptions: initialPlan.exportOptions,
   updateExportOptions: (patch) =>

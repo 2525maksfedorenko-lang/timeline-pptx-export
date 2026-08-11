@@ -1,8 +1,7 @@
 import { useRef } from 'react';
 import type { TimelineItem } from '../types/timeline';
 import { useTimelineStore } from '../store/timelineStore';
-
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
+import { getItemBar, shiftIsoDate } from '../export/dateScale';
 
 interface GanttRowProps {
   item: TimelineItem;
@@ -15,25 +14,12 @@ interface DragState {
   startLeft: number;
 }
 
-function daysBetween(from: Date, to: Date) {
-  return Math.round((to.getTime() - from.getTime()) / MS_PER_DAY);
-}
-
-function shiftIsoDate(iso: string, days: number) {
-  const date = new Date(iso);
-  date.setUTCDate(date.getUTCDate() + days);
-  return date.toISOString().slice(0, 10);
-}
-
 export function GanttRow({ item, minDate, pxPerDay }: GanttRowProps) {
   const updateItem = useTimelineStore((state) => state.updateItem);
   const barRef = useRef<HTMLDivElement>(null);
   const dragState = useRef<DragState | null>(null);
 
-  const startOffsetDays = daysBetween(minDate, new Date(item.start));
-  const durationDays = Math.max(1, daysBetween(new Date(item.start), new Date(item.end)) + 1);
-  const left = startOffsetDays * pxPerDay;
-  const width = durationDays * pxPerDay;
+  const { left, width } = getItemBar(item, minDate, pxPerDay);
   const progress = Math.min(100, Math.max(0, item.progress ?? 0));
 
   const handleMouseDown = (event: React.MouseEvent) => {
