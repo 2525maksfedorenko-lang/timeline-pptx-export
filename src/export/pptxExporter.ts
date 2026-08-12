@@ -1,10 +1,17 @@
 import pptxgen from 'pptxgenjs';
 import { useTimelineStore } from '../store/timelineStore';
-import { buildExportSlides, type DetailSlideModel, type OverviewSlideModel } from './timelineExportModel';
+import {
+  buildExportSlides,
+  type DetailSlideModel,
+  type OverviewSlideModel,
+  type SummarySlideModel,
+} from './timelineExportModel';
 import { COLORS, FOOTER_TEXT, PPTX_FONT_FACE } from './theme';
 import {
   BAR_HEIGHT_IN,
   BAR_RADIUS_IN,
+  CONTENT_BOTTOM_IN,
+  CONTENT_TOP_IN,
   CONTENT_WIDTH_IN,
   CONTENT_X_IN,
   FOOTER_HEIGHT_IN,
@@ -179,6 +186,79 @@ function drawDetailSlide(slide: PptxSlide, model: DetailSlideModel) {
   });
 }
 
+const SUMMARY_CHART_WIDTH_IN = 4.2;
+const SUMMARY_CHART_GAP_IN = 0.4;
+const SUMMARY_STAT_GAP_IN = 0.3;
+
+function drawSummarySlide(slide: PptxSlide, model: SummarySlideModel) {
+  drawChrome(slide, model.title);
+
+  const chartH = CONTENT_BOTTOM_IN - CONTENT_TOP_IN;
+
+  if (model.segments.length > 0) {
+    slide.addChart(
+      'doughnut',
+      [
+        {
+          name: 'Status',
+          labels: model.segments.map((segment) => segment.label),
+          values: model.segments.map((segment) => segment.count),
+        },
+      ],
+      {
+        x: CONTENT_X_IN,
+        y: CONTENT_TOP_IN,
+        w: SUMMARY_CHART_WIDTH_IN,
+        h: chartH,
+        chartColors: model.segments.map((segment) => segment.color),
+        holeSize: 55,
+        showLegend: true,
+        legendPos: 'b',
+        legendColor: COLORS.navy,
+        legendFontFace: PPTX_FONT_FACE,
+        legendFontSize: 10,
+        showPercent: true,
+        showValue: false,
+        showLabel: false,
+        dataLabelColor: COLORS.lightText,
+        dataLabelFontFace: PPTX_FONT_FACE,
+        dataLabelFontSize: 9,
+        dataBorder: { color: COLORS.slideBg, pt: 1 },
+      },
+    );
+  }
+
+  const statsX = CONTENT_X_IN + SUMMARY_CHART_WIDTH_IN + SUMMARY_CHART_GAP_IN;
+  const statsW = CONTENT_WIDTH_IN - SUMMARY_CHART_WIDTH_IN - SUMMARY_CHART_GAP_IN;
+  const statH = (chartH - SUMMARY_STAT_GAP_IN * (model.stats.length - 1)) / model.stats.length;
+
+  model.stats.forEach((stat, index) => {
+    const y = CONTENT_TOP_IN + index * (statH + SUMMARY_STAT_GAP_IN);
+
+    slide.addText(stat.label, {
+      x: statsX,
+      y,
+      w: statsW,
+      h: 0.3,
+      fontSize: 12,
+      color: COLORS.footerText,
+      fontFace: PPTX_FONT_FACE,
+    });
+
+    slide.addText(stat.value, {
+      x: statsX,
+      y: y + 0.3,
+      w: statsW,
+      h: statH - 0.3,
+      fontSize: 28,
+      bold: true,
+      color: COLORS.navy,
+      fontFace: PPTX_FONT_FACE,
+      valign: 'top',
+    });
+  });
+}
+
 export function exportTimelineToPptx(): void {
   const { items, exportOptions, comments } = useTimelineStore.getState();
   const slides = buildExportSlides(items, comments, exportOptions.commentMode);
@@ -190,8 +270,10 @@ export function exportTimelineToPptx(): void {
     const slide = pptx.addSlide();
     if (slideModel.kind === 'overview') {
       drawOverviewSlide(slide, slideModel);
-    } else {
+    } else if (slideModel.kind === 'detail') {
       drawDetailSlide(slide, slideModel);
+    } else {
+      drawSummarySlide(slide, slideModel);
     }
   });
 

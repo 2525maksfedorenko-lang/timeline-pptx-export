@@ -1,11 +1,17 @@
 import { jsPDF } from 'jspdf';
 import type { TextOptionsLight } from 'jspdf';
 import { useTimelineStore } from '../store/timelineStore';
-import { buildExportSlides, type DetailSlideModel, type OverviewSlideModel } from './timelineExportModel';
+import {
+  buildExportSlides,
+  type DetailSlideModel,
+  type OverviewSlideModel,
+  type SummarySlideModel,
+} from './timelineExportModel';
 import { COLORS, FOOTER_TEXT, PDF_FONT_FACE, withHash } from './theme';
 import {
   BAR_HEIGHT_IN,
   BAR_RADIUS_IN,
+  CONTENT_TOP_IN,
   CONTENT_WIDTH_IN,
   CONTENT_X_IN,
   FOOTER_HEIGHT_IN,
@@ -122,6 +128,64 @@ function drawDetailSlide(doc: jsPDF, model: DetailSlideModel) {
   });
 }
 
+const SUMMARY_BAR_HEIGHT_IN = 0.45;
+const SUMMARY_LEGEND_GAP_IN = 0.25;
+const SUMMARY_CHIP_SIZE_IN = 0.14;
+const SUMMARY_STATS_GAP_IN = 0.55;
+
+function drawSummarySlide(doc: jsPDF, model: SummarySlideModel) {
+  drawChrome(doc, model.title);
+
+  const barY = CONTENT_TOP_IN;
+  const total = model.segments.reduce((sum, segment) => sum + segment.count, 0);
+
+  if (total > 0) {
+    let cursorX = CONTENT_X_IN;
+    model.segments.forEach((segment) => {
+      const segmentWidth = (segment.count / total) * CONTENT_WIDTH_IN;
+      doc.setFillColor(withHash(segment.color));
+      doc.rect(cursorX, barY, segmentWidth, SUMMARY_BAR_HEIGHT_IN, 'F');
+      cursorX += segmentWidth;
+    });
+  } else {
+    doc.setFillColor(withHash(COLORS.border));
+    doc.rect(CONTENT_X_IN, barY, CONTENT_WIDTH_IN, SUMMARY_BAR_HEIGHT_IN, 'F');
+  }
+
+  const legendY = barY + SUMMARY_BAR_HEIGHT_IN + SUMMARY_LEGEND_GAP_IN;
+  const legendColWidth = CONTENT_WIDTH_IN / Math.max(model.segments.length, 1);
+
+  doc.setFont(PDF_FONT_FACE, 'normal');
+  doc.setFontSize(10);
+  model.segments.forEach((segment, index) => {
+    const itemX = CONTENT_X_IN + index * legendColWidth;
+    doc.setFillColor(withHash(segment.color));
+    doc.rect(itemX, legendY, SUMMARY_CHIP_SIZE_IN, SUMMARY_CHIP_SIZE_IN, 'F');
+
+    doc.setTextColor(withHash(COLORS.navy));
+    drawText(doc, `${segment.label} — ${segment.count} (${segment.percent}%)`, itemX + SUMMARY_CHIP_SIZE_IN + 0.08, legendY + SUMMARY_CHIP_SIZE_IN / 2, {
+      baseline: 'middle',
+    });
+  });
+
+  const statsY = legendY + SUMMARY_STATS_GAP_IN;
+  const statColWidth = CONTENT_WIDTH_IN / model.stats.length;
+
+  model.stats.forEach((stat, index) => {
+    const x = CONTENT_X_IN + index * statColWidth;
+
+    doc.setFont(PDF_FONT_FACE, 'normal');
+    doc.setFontSize(11);
+    doc.setTextColor(withHash(COLORS.footerText));
+    drawText(doc, stat.label, x, statsY, { baseline: 'top' });
+
+    doc.setFont(PDF_FONT_FACE, 'bold');
+    doc.setFontSize(22);
+    doc.setTextColor(withHash(COLORS.navy));
+    drawText(doc, stat.value, x, statsY + 0.3, { baseline: 'top' });
+  });
+}
+
 export function exportTimelineToPdf(): void {
   const { items, exportOptions, comments } = useTimelineStore.getState();
   const slides = buildExportSlides(items, comments, exportOptions.commentMode);
@@ -137,8 +201,10 @@ export function exportTimelineToPdf(): void {
 
     if (slideModel.kind === 'overview') {
       drawOverviewSlide(doc, slideModel);
-    } else {
+    } else if (slideModel.kind === 'detail') {
       drawDetailSlide(doc, slideModel);
+    } else {
+      drawSummarySlide(doc, slideModel);
     }
   });
 

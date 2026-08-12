@@ -1,5 +1,12 @@
 import type { ExportOptions } from '../store/timelineStore';
-import { getTaskStatus, TASK_STATUS_COLORS, TASK_STATUS_LABELS, type TaskComment, type TimelineItem } from '../types/timeline';
+import {
+  getTaskStatus,
+  TASK_STATUS_COLORS,
+  TASK_STATUS_LABELS,
+  type TaskComment,
+  type TaskStatus,
+  type TimelineItem,
+} from '../types/timeline';
 import { markdownToPlainLines } from '../utils/renderMarkdown';
 import { BASE_PX_PER_DAY, getDateRange, getItemBar, groupItemsForExport } from './dateScale';
 import { statusColor } from './theme';
@@ -59,7 +66,58 @@ export interface DetailSlideModel {
   comments: CommentRowModel[];
 }
 
-export type ExportSlideModel = OverviewSlideModel | DetailSlideModel;
+export interface SummarySegmentModel {
+  status: TaskStatus;
+  label: string;
+  color: string;
+  count: number;
+  percent: number;
+}
+
+export interface SummaryStatModel {
+  label: string;
+  value: string;
+}
+
+export interface SummarySlideModel {
+  kind: 'summary';
+  title: string;
+  segments: SummarySegmentModel[];
+  stats: SummaryStatModel[];
+}
+
+export type ExportSlideModel = OverviewSlideModel | DetailSlideModel | SummarySlideModel;
+
+const STATUS_ORDER: TaskStatus[] = ['todo', 'in_progress', 'done', 'blocked'];
+
+function buildSummarySlide(items: TimelineItem[]): SummarySlideModel {
+  const counts: Record<TaskStatus, number> = { todo: 0, in_progress: 0, done: 0, blocked: 0 };
+  items.forEach((item) => {
+    counts[getTaskStatus(item)] += 1;
+  });
+
+  const total = items.length;
+  const segments: SummarySegmentModel[] = STATUS_ORDER.filter((status) => counts[status] > 0).map((status) => ({
+    status,
+    label: TASK_STATUS_LABELS[status],
+    color: TASK_STATUS_COLORS[status],
+    count: counts[status],
+    percent: total > 0 ? Math.round((counts[status] / total) * 100) : 0,
+  }));
+
+  const completedPercent = total > 0 ? Math.round((counts.done / total) * 100) : 0;
+
+  return {
+    kind: 'summary',
+    title: 'Summary',
+    segments,
+    stats: [
+      { label: 'Total tasks', value: `${total}` },
+      { label: 'Completed', value: `${counts.done} (${completedPercent}%)` },
+      { label: 'At risk (blocked)', value: `${counts.blocked}` },
+    ],
+  };
+}
 
 function buildOverviewSlide(parentItems: TimelineItem[], title: string): OverviewSlideModel {
   const bars: OverviewBarModel[] = [];
@@ -207,6 +265,8 @@ export function buildExportSlides(
     const relevantComments = getCommentsForSlide(comments, parent.id, commentMode);
     slides.push(buildDetailSlide(parent, children, relevantComments));
   });
+
+  slides.push(buildSummarySlide(exportableItems));
 
   return slides;
 }
