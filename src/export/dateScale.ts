@@ -47,3 +47,15 @@ export function getItemBar(item: TimelineItem, minDate: Date, pxPerDay: number):
     width: durationDays * pxPerDay,
   };
 }
+
+/** Splits an already-filtered, parent-level item list into ordered chunks so
+ * export overview slides stay readable instead of cramming every bar onto one. */
+export function groupItemsForExport(items: TimelineItem[], maxBarsPerSlide = 20): TimelineItem[][] {
+  if (items.length === 0) return [];
+
+  const groups: TimelineItem[][] = [];
+  for (let i = 0; i < items.length; i += maxBarsPerSlide) {
+    groups.push(items.slice(i, i + maxBarsPerSlide));
+  }
+  return groups;
+}

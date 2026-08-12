@@ -1,7 +1,7 @@
 import type { ExportOptions } from '../store/timelineStore';
 import { getTaskStatus, TASK_STATUS_COLORS, TASK_STATUS_LABELS, type TaskComment, type TimelineItem } from '../types/timeline';
 import { markdownToPlainLines } from '../utils/renderMarkdown';
-import { BASE_PX_PER_DAY, getDateRange, getItemBar } from './dateScale';
+import { BASE_PX_PER_DAY, getDateRange, getItemBar, groupItemsForExport } from './dateScale';
 import { statusColor } from './theme';
 import {
   CONTENT_TOP_IN,
@@ -61,7 +61,7 @@ export interface DetailSlideModel {
 
 export type ExportSlideModel = OverviewSlideModel | DetailSlideModel;
 
-function buildOverviewSlide(parentItems: TimelineItem[]): OverviewSlideModel {
+function buildOverviewSlide(parentItems: TimelineItem[], title: string): OverviewSlideModel {
   const bars: OverviewBarModel[] = [];
 
   if (parentItems.length > 0) {
@@ -93,7 +93,21 @@ function buildOverviewSlide(parentItems: TimelineItem[]): OverviewSlideModel {
     });
   }
 
-  return { kind: 'overview', title: 'Timeline Overview', bars };
+  return { kind: 'overview', title, bars };
+}
+
+const MAX_OVERVIEW_BARS_PER_SLIDE = 20;
+
+function buildOverviewSlides(parentItems: TimelineItem[]): OverviewSlideModel[] {
+  const groups = groupItemsForExport(parentItems, MAX_OVERVIEW_BARS_PER_SLIDE);
+
+  if (groups.length <= 1) {
+    return [buildOverviewSlide(parentItems, 'Timeline Overview')];
+  }
+
+  return groups.map((group, index) =>
+    buildOverviewSlide(group, `Timeline Overview (${index + 1}/${groups.length})`),
+  );
 }
 
 function buildDetailSlide(
@@ -182,7 +196,7 @@ export function buildExportSlides(
   const exportableItems = items.filter((item) => item.includeInExport !== false);
   const parentItems = exportableItems.filter((item) => item.parentId === undefined);
 
-  const slides: ExportSlideModel[] = [buildOverviewSlide(parentItems)];
+  const slides: ExportSlideModel[] = [...buildOverviewSlides(parentItems)];
 
   parentItems.forEach((parent) => {
     const children = exportableItems.filter((item) => item.parentId === parent.id);
