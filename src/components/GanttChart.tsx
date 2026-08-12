@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useTimelineStore } from '../store/timelineStore';
 import { GanttRow } from './GanttRow';
+import { AddTaskForm } from './AddTaskForm';
 import { BASE_PX_PER_DAY, MS_PER_DAY, getDateRange } from '../export/dateScale';
 
 function formatDay(date: Date) {
@@ -26,23 +27,29 @@ export function GanttChart() {
   const totalWidth = days.length * pxPerDay;
 
   return (
-    <div className="w-full overflow-x-auto rounded-lg border border-slate-200 bg-white">
-      <div style={{ width: totalWidth }}>
-        <div className="flex border-b border-slate-200 bg-slate-50">
-          {days.map((day) => (
-            <div
-              key={day.toISOString()}
-              className="flex-shrink-0 border-r border-slate-100 py-2 text-center text-[11px] text-slate-500"
-              style={{ width: pxPerDay }}
-            >
-              {formatDay(day)}
-            </div>
-          ))}
-        </div>
-        <div>
-          {items.map((item) => (
-            <GanttRow key={item.id} item={item} minDate={minDate} pxPerDay={pxPerDay} />
-          ))}
+    <div>
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-[#1E2B38]">Timeline</h2>
+        <AddTaskForm />
+      </div>
+      <div className="w-full overflow-x-auto rounded-lg border border-slate-200 bg-white">
+        <div style={{ width: totalWidth }}>
+          <div className="flex border-b border-slate-200 bg-slate-50">
+            {days.map((day) => (
+              <div
+                key={day.toISOString()}
+                className="flex-shrink-0 border-r border-slate-100 py-2 text-center text-[11px] text-slate-500"
+                style={{ width: pxPerDay }}
+              >
+                {formatDay(day)}
+              </div>
+            ))}
+          </div>
+          <div>
+            {items.map((item) => (
+              <GanttRow key={item.id} item={item} minDate={minDate} pxPerDay={pxPerDay} />
+            ))}
+          </div>
         </div>
       </div>
     </div>
