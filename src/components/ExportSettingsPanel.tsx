@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTimelineStore, type ExportOptions } from '../store/timelineStore';
-import { getTaskStatus, TASK_STATUS_LABELS, type TaskStatus, type TimelineItem } from '../types/timeline';
+import { getTaskStatus, TASK_STATUS_LABELS, type SortMode, type TaskStatus, type TimelineItem } from '../types/timeline';
 import { toHtml } from '../utils/renderMarkdown';
 
 const COMMENT_BODY_CLASSES =
@@ -20,6 +20,13 @@ const COMMENT_MODE_OPTIONS: { value: ExportOptions['commentMode']; label: string
 const TASK_STATUS_OPTIONS: { value: TaskStatus; label: string }[] = (
   Object.keys(TASK_STATUS_LABELS) as TaskStatus[]
 ).map((value) => ({ value, label: TASK_STATUS_LABELS[value] }));
+
+const SORT_MODE_OPTIONS: { value: SortMode; label: string }[] = [
+  { value: 'status', label: 'Status' },
+  { value: 'date', label: 'Start date' },
+  { value: 'parent', label: 'Parent group' },
+  { value: 'progress', label: 'Progress' },
+];
 
 interface ItemRow {
   item: TimelineItem;
@@ -53,6 +60,7 @@ export function ExportSettingsPanel() {
   const updateItem = useTimelineStore((state) => state.updateItem);
   const comments = useTimelineStore((state) => state.comments);
   const commentMode = useTimelineStore((state) => state.exportOptions.commentMode);
+  const sortMode = useTimelineStore((state) => state.exportOptions.sortMode);
   const updateExportOptions = useTimelineStore((state) => state.updateExportOptions);
 
   const rows = buildOrderedRows(items);
@@ -65,14 +73,34 @@ export function ExportSettingsPanel() {
 
   return (
     <div className="mb-6 rounded-lg border border-[#E5E5E1] bg-white">
-      <button
-        type="button"
-        onClick={() => setIsOpen((open) => !open)}
-        className="flex w-full items-center justify-between px-4 py-3 text-left"
-      >
-        <span className="text-sm font-semibold text-[#1E2B38]">Export settings</span>
-        <span className="text-[#1E2B38]">{isOpen ? '▲' : '▼'}</span>
-      </button>
+      <div className="flex items-center justify-between px-4 py-3">
+        <button
+          type="button"
+          onClick={() => setIsOpen((open) => !open)}
+          className="flex items-center gap-2 text-left"
+        >
+          <span className="text-sm font-semibold text-[#1E2B38]">Export settings</span>
+          <span className="text-[#1E2B38]">{isOpen ? '▲' : '▼'}</span>
+        </button>
+
+        <div className="flex items-center gap-2">
+          <label htmlFor="sort-mode-select" className="text-xs font-medium text-slate-500">
+            Sort by
+          </label>
+          <select
+            id="sort-mode-select"
+            value={sortMode}
+            onChange={(event) => updateExportOptions({ sortMode: event.target.value as SortMode })}
+            className="rounded-md border border-[#E5E5E1] px-2 py-1 text-sm text-[#1E2B38] focus:border-[#2A9D90] focus:outline-none"
+          >
+            {SORT_MODE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
 
       {isOpen && (
         <div className="border-t border-[#E5E5E1] px-4 py-4">

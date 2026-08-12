@@ -3,6 +3,7 @@ import { useTimelineStore } from '../store/timelineStore';
 import { GanttRow } from './GanttRow';
 import { AddTaskForm } from './AddTaskForm';
 import { BASE_PX_PER_DAY, MS_PER_DAY, getDateRange } from '../export/dateScale';
+import { sortItems } from '../utils/sortItems';
 
 function formatDay(date: Date) {
   return date.toLocaleDateString('en-US', { day: '2-digit', month: 'short' });
@@ -10,9 +11,11 @@ function formatDay(date: Date) {
 
 export function GanttChart() {
   const items = useTimelineStore((state) => state.items);
+  const sortMode = useTimelineStore((state) => state.exportOptions.sortMode);
   const zoomLevel = useTimelineStore((state) => state.ui.zoomLevel);
 
   const pxPerDay = BASE_PX_PER_DAY * zoomLevel;
+  const sortedItems = useMemo(() => sortItems(items, sortMode), [items, sortMode]);
 
   const { minDate, days } = useMemo(() => {
     const { minDate: min, totalDays } = getDateRange(items);
@@ -46,7 +49,7 @@ export function GanttChart() {
             ))}
           </div>
           <div>
-            {items.map((item) => (
+            {sortedItems.map((item) => (
               <GanttRow key={item.id} item={item} minDate={minDate} pxPerDay={pxPerDay} />
             ))}
           </div>

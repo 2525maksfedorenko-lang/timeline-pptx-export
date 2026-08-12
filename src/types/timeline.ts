@@ -1,5 +1,7 @@
 export type TaskStatus = 'todo' | 'in_progress' | 'done' | 'blocked';
 
+export type SortMode = 'date' | 'status' | 'parent' | 'progress';
+
 export const DEFAULT_TASK_STATUS: TaskStatus = 'todo';
 
 // Hex values are stored without a leading '#' to match pptxgenjs's expected

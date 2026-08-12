@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { TaskComment, Timeline, TimelineItem } from '../types/timeline';
+import type { SortMode, TaskComment, Timeline, TimelineItem } from '../types/timeline';
 import {
   deletePlan as deletePlanFromDb,
   getAllPlans,
@@ -16,6 +16,7 @@ export interface ExportOptions {
   showProgress: boolean;
   showDependencies: boolean;
   commentMode: 'latest' | 'pinned' | 'all' | 'none';
+  sortMode: SortMode;
 }
 
 export interface UiState {
@@ -60,6 +61,7 @@ export const DEFAULT_EXPORT_OPTIONS: ExportOptions = {
   showProgress: true,
   showDependencies: true,
   commentMode: 'latest',
+  sortMode: 'status',
 };
 
 const DEFAULT_UI: UiState = {
