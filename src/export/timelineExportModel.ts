@@ -10,13 +10,14 @@ import {
 import { markdownToPlainLines } from '../utils/renderMarkdown';
 import { clampProgress } from '../utils/clampProgress';
 import { buildTaskHierarchy } from '../utils/taskHierarchy';
-import { BASE_PX_PER_DAY, getDateRange, getItemBar, groupItemsForExport } from './dateScale';
+import { BASE_PX_PER_DAY, MS_PER_DAY, formatShortDate, getDateRange, getItemBar } from './dateScale';
 import { statusColor } from './theme';
 import {
   CONTENT_HEIGHT_IN,
   CONTENT_TOP_IN,
   CONTENT_X_IN,
   CONTENT_WIDTH_IN,
+  GROUP_HEADER_HEIGHT_IN,
   LIST_ROW_HEIGHT_IN,
   PARENT_SECTION_GAP_IN,
   ROW_GAP_IN,
@@ -37,9 +38,23 @@ export interface OverviewBarModel {
   fillWidth: number;
 }
 
+export interface OverviewGroupHeaderModel {
+  label: string;
+  color: string;
+  y: number;
+}
+
+export interface OverviewDateTickModel {
+  label: string;
+  x: number;
+}
+
 export interface OverviewSlideModel {
   kind: 'overview';
   title: string;
+  dateAxisY: number;
+  dateTicks: OverviewDateTickModel[];
+  groupHeaders: OverviewGroupHeaderModel[];
   bars: OverviewBarModel[];
 }
 
@@ -124,21 +139,57 @@ function buildSummarySlide(items: TimelineItem[]): SummarySlideModel {
   };
 }
 
-function buildOverviewSlide(parentItems: TimelineItem[], title: string): OverviewSlideModel {
-  const bars: OverviewBarModel[] = [];
+const OVERVIEW_DATE_TICK_COUNT = 6;
 
-  if (parentItems.length > 0) {
-    const { minDate, totalDays } = getDateRange(parentItems);
+/** Evenly spaced date labels across the slide's date range (there isn't
+ * room for one label per day like the on-screen day header, since an
+ * overview slide can span months in ~9in of width). */
+function buildDateTicks(minDate: Date, totalDays: number, scale: number): OverviewDateTickModel[] {
+  const tickCount = Math.max(1, Math.min(OVERVIEW_DATE_TICK_COUNT, totalDays));
+
+  return Array.from({ length: tickCount }, (_, i) => {
+    const dayOffset = tickCount === 1 ? 0 : Math.round((i * (totalDays - 1)) / (tickCount - 1));
+    const tickDate = new Date(minDate.getTime() + dayOffset * MS_PER_DAY);
+    return {
+      label: formatShortDate(tickDate),
+      x: CONTENT_X_IN + dayOffset * BASE_PX_PER_DAY * scale,
+    };
+  });
+}
+
+/** Lays out one overview page: a repeating date-scale axis at the top,
+ * then each bar, with a status-group heading inserted wherever `headerAt`
+ * says one is needed (either a real status change, or a repeated heading
+ * because the previous page ended mid-group). */
+function buildOverviewSlide(
+  pageItems: TimelineItem[],
+  headerAt: Map<number, TaskStatus>,
+  title: string,
+): OverviewSlideModel {
+  const bars: OverviewBarModel[] = [];
+  const groupHeaders: OverviewGroupHeaderModel[] = [];
+  const dateAxisY = CONTENT_TOP_IN;
+  let dateTicks: OverviewDateTickModel[] = [];
+
+  if (pageItems.length > 0) {
+    const { minDate, totalDays } = getDateRange(pageItems);
     const totalWidthPx = totalDays * BASE_PX_PER_DAY;
     const scale = CONTENT_WIDTH_IN / totalWidthPx;
+    dateTicks = buildDateTicks(minDate, totalDays, scale);
 
-    parentItems.forEach((item, index) => {
+    let y = CONTENT_TOP_IN + GROUP_HEADER_HEIGHT_IN;
+
+    pageItems.forEach((item, index) => {
+      const headerStatus = headerAt.get(index);
+      if (headerStatus !== undefined) {
+        groupHeaders.push({ label: TASK_STATUS_LABELS[headerStatus], color: TASK_STATUS_COLORS[headerStatus], y });
+        y += GROUP_HEADER_HEIGHT_IN;
+      }
+
       const { left, width } = getItemBar(item, minDate, BASE_PX_PER_DAY);
       const progress = clampProgress(item.progress ?? 0);
-      const y = CONTENT_TOP_IN + index * ROW_HEIGHT_IN;
       const barX = CONTENT_X_IN + left * scale;
       const trackWidth = Math.max(width * scale, 0.15);
-
       const status = getTaskStatus(item);
 
       bars.push({
@@ -152,31 +203,82 @@ function buildOverviewSlide(parentItems: TimelineItem[], title: string): Overvie
         trackWidth,
         fillWidth: progress > 0 ? Math.max((trackWidth * progress) / 100, 0.05) : 0,
       });
+
+      y += ROW_HEIGHT_IN;
     });
   }
 
-  return { kind: 'overview', title, bars };
+  return { kind: 'overview', title, dateAxisY, dateTicks, groupHeaders, bars };
 }
 
-// How many task rows actually fit on one overview slide, computed from real
-// geometry instead of a guessed count. Each row is now a single merged
-// label+bar line (ROW_HEIGHT_IN = BAR_HEIGHT_IN + ROW_GAP_IN, see
-// slideLayout.ts), so:
-//   CONTENT_HEIGHT_IN = CONTENT_BOTTOM_IN - CONTENT_TOP_IN = 5.25 - 1.14375 = 4.10625in
-//   ROW_HEIGHT_IN     = BAR_HEIGHT_IN + ROW_GAP_IN          = 0.28 + 0.04   = 0.32in
-//   4.10625 / 0.32 = 12.83 -> floor to 12 whole rows, leaving
-//   4.10625 - 12 * 0.32 = 0.26625in of margin (no row is cut off mid-bar).
-const MAX_OVERVIEW_BARS_PER_SLIDE = Math.floor(CONTENT_HEIGHT_IN / ROW_HEIGHT_IN);
+interface OverviewPage {
+  items: TimelineItem[];
+  headerAt: Map<number, TaskStatus>;
+}
+
+// Real per-page height budget for the overview: every page reserves one
+// GROUP_HEADER_HEIGHT_IN row for the repeating date-scale axis, and each
+// status-group heading costs another GROUP_HEADER_HEIGHT_IN on top of its
+// bars' own ROW_HEIGHT_IN. Computed, not guessed:
+//   CONTENT_HEIGHT_IN       = 4.10625in
+//   date axis reservation   = GROUP_HEADER_HEIGHT_IN = 0.26in
+//   budget for headers+bars = 4.10625 - 0.26 = 3.84625in
+const OVERVIEW_ROWS_HEIGHT_BUDGET_IN = CONTENT_HEIGHT_IN - GROUP_HEADER_HEIGHT_IN;
+
+/** Paginates parent items onto overview pages by real measured height
+ * (date axis + status headings + bars), inserting a status-group heading
+ * above the first bar of each run of same-status bars — and repeating that
+ * heading at the top of a new page if a group gets split across pages, so
+ * no bar is ever shown without a visible status heading above it. */
+function paginateOverviewItems(parentItems: TimelineItem[]): OverviewPage[] {
+  if (parentItems.length === 0) return [];
+
+  const pages: OverviewPage[] = [];
+  let currentItems: TimelineItem[] = [];
+  let currentHeaderAt = new Map<number, TaskStatus>();
+  let usedHeight = 0;
+  let lastStatus: TaskStatus | undefined;
+
+  parentItems.forEach((item) => {
+    const status = getTaskStatus(item);
+    const isNewGroup = status !== lastStatus;
+    const rowHeight = ROW_HEIGHT_IN + (isNewGroup ? GROUP_HEADER_HEIGHT_IN : 0);
+
+    if (currentItems.length > 0 && usedHeight + rowHeight > OVERVIEW_ROWS_HEIGHT_BUDGET_IN) {
+      pages.push({ items: currentItems, headerAt: currentHeaderAt });
+      currentItems = [];
+      currentHeaderAt = new Map();
+      usedHeight = 0;
+
+      // Starting a fresh page mid-group: repeat the heading so this bar is
+      // never shown without one, even though its status didn't change.
+      currentHeaderAt.set(0, status);
+      usedHeight += GROUP_HEADER_HEIGHT_IN;
+    } else if (isNewGroup) {
+      currentHeaderAt.set(currentItems.length, status);
+      usedHeight += GROUP_HEADER_HEIGHT_IN;
+    }
+
+    currentItems.push(item);
+    usedHeight += ROW_HEIGHT_IN;
+    lastStatus = status;
+  });
+
+  if (currentItems.length > 0) pages.push({ items: currentItems, headerAt: currentHeaderAt });
+
+  return pages;
+}
 
 function buildOverviewSlides(parentItems: TimelineItem[]): OverviewSlideModel[] {
-  const groups = groupItemsForExport(parentItems, MAX_OVERVIEW_BARS_PER_SLIDE);
+  const pages = paginateOverviewItems(parentItems);
 
-  if (groups.length <= 1) {
-    return [buildOverviewSlide(parentItems, 'Timeline Overview')];
+  if (pages.length <= 1) {
+    const headerAt = pages[0]?.headerAt ?? new Map<number, TaskStatus>();
+    return [buildOverviewSlide(parentItems, headerAt, 'Timeline Overview')];
   }
 
-  return groups.map((group, index) =>
-    buildOverviewSlide(group, `Timeline Overview (${index + 1}/${groups.length})`),
+  return pages.map((page, index) =>
+    buildOverviewSlide(page.items, page.headerAt, `Timeline Overview (${index + 1}/${pages.length})`),
   );
 }
 

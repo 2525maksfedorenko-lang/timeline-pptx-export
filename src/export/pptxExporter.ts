@@ -8,6 +8,7 @@ import {
   type OverviewSlideModel,
   type SummarySlideModel,
 } from './timelineExportModel';
+import { EXPORT_LINK_DISPLAY, getExportQrCodeDataUrl } from './qrCode';
 import { COLORS, FOOTER_TEXT, PPTX_FONT_FACE } from './theme';
 import {
   BAR_HEIGHT_IN,
@@ -18,6 +19,7 @@ import {
   CONTENT_WIDTH_IN,
   CONTENT_X_IN,
   FOOTER_HEIGHT_IN,
+  GROUP_HEADER_HEIGHT_IN,
   HEADER_HEIGHT_IN,
   LIST_ROW_HEIGHT_IN,
   PAGE_HEIGHT_IN,
@@ -74,6 +76,43 @@ function drawChrome(slide: PptxSlide, title: string) {
 
 function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel) {
   drawChrome(slide, model.title);
+
+  model.dateTicks.forEach((tick) => {
+    slide.addText(tick.label, {
+      x: tick.x,
+      y: model.dateAxisY,
+      w: 1,
+      h: GROUP_HEADER_HEIGHT_IN,
+      fontSize: 8,
+      color: COLORS.footerText,
+      fontFace: PPTX_FONT_FACE,
+      valign: 'middle',
+    });
+  });
+
+  if (model.dateTicks.length > 0) {
+    slide.addShape('line', {
+      x: CONTENT_X_IN,
+      y: model.dateAxisY + GROUP_HEADER_HEIGHT_IN,
+      w: CONTENT_WIDTH_IN,
+      h: 0,
+      line: { color: COLORS.border, width: 0.75 },
+    });
+  }
+
+  model.groupHeaders.forEach((header) => {
+    slide.addText(header.label, {
+      x: CONTENT_X_IN,
+      y: header.y,
+      w: CONTENT_WIDTH_IN,
+      h: GROUP_HEADER_HEIGHT_IN,
+      fontSize: 12,
+      bold: true,
+      color: header.color,
+      fontFace: PPTX_FONT_FACE,
+      valign: 'middle',
+    });
+  });
 
   model.bars.forEach((bar) => {
     slide.addShape('roundRect', {
@@ -206,11 +245,14 @@ function drawDetailSlide(slide: PptxSlide, model: DetailSlideModel) {
   });
 }
 
-const SUMMARY_CHART_WIDTH_IN = 4.2;
-const SUMMARY_CHART_GAP_IN = 0.4;
+const SUMMARY_CHART_WIDTH_IN = 3.6;
+const SUMMARY_CHART_GAP_IN = 0.3;
 const SUMMARY_STAT_GAP_IN = 0.3;
+const SUMMARY_STATS_WIDTH_IN = 3.0;
+const SUMMARY_QR_GAP_IN = 0.3;
+const SUMMARY_QR_SIZE_IN = 1.4;
 
-function drawSummarySlide(slide: PptxSlide, model: SummarySlideModel) {
+function drawSummarySlide(slide: PptxSlide, model: SummarySlideModel, qrCodeDataUrl: string) {
   drawChrome(slide, model.title);
 
   const chartH = CONTENT_BOTTOM_IN - CONTENT_TOP_IN;
@@ -249,7 +291,7 @@ function drawSummarySlide(slide: PptxSlide, model: SummarySlideModel) {
   }
 
   const statsX = CONTENT_X_IN + SUMMARY_CHART_WIDTH_IN + SUMMARY_CHART_GAP_IN;
-  const statsW = CONTENT_WIDTH_IN - SUMMARY_CHART_WIDTH_IN - SUMMARY_CHART_GAP_IN;
+  const statsW = SUMMARY_STATS_WIDTH_IN;
   const statH = (chartH - SUMMARY_STAT_GAP_IN * (model.stats.length - 1)) / model.stats.length;
 
   model.stats.forEach((stat, index) => {
@@ -277,15 +319,39 @@ function drawSummarySlide(slide: PptxSlide, model: SummarySlideModel) {
       valign: 'top',
     });
   });
+
+  const qrX = statsX + statsW + SUMMARY_QR_GAP_IN;
+  const qrColumnWidth = CONTENT_X_IN + CONTENT_WIDTH_IN - qrX;
+  const qrImageX = qrX + (qrColumnWidth - SUMMARY_QR_SIZE_IN) / 2;
+
+  slide.addImage({
+    data: qrCodeDataUrl,
+    x: qrImageX,
+    y: CONTENT_TOP_IN,
+    w: SUMMARY_QR_SIZE_IN,
+    h: SUMMARY_QR_SIZE_IN,
+  });
+
+  slide.addText(EXPORT_LINK_DISPLAY, {
+    x: qrX,
+    y: CONTENT_TOP_IN + SUMMARY_QR_SIZE_IN + 0.1,
+    w: qrColumnWidth,
+    h: 0.3,
+    fontSize: 8,
+    color: COLORS.footerText,
+    fontFace: PPTX_FONT_FACE,
+    align: 'center',
+  });
 }
 
-export function exportTimelineToPptx(
+export async function exportTimelineToPptx(
   items: TimelineItem[],
   exportOptions: ExportOptions,
   comments: TaskComment[],
-): void {
+): Promise<void> {
   const sortedItems = sortItems(items, exportOptions.sortMode);
   const slides = buildExportSlides(sortedItems, comments, exportOptions.commentMode);
+  const qrCodeDataUrl = await getExportQrCodeDataUrl();
 
   const pptx = new pptxgen();
   pptx.layout = 'LAYOUT_16x9';
@@ -297,11 +363,11 @@ export function exportTimelineToPptx(
     } else if (slideModel.kind === 'detail') {
       drawDetailSlide(slide, slideModel);
     } else {
-      drawSummarySlide(slide, slideModel);
+      drawSummarySlide(slide, slideModel, qrCodeDataUrl);
     }
   });
 
-  pptx.writeFile({ fileName: 'timeline-export.pptx' }).catch((error) => {
+  await pptx.writeFile({ fileName: 'timeline-export.pptx' }).catch((error) => {
     console.error('Failed to export timeline to PowerPoint', error);
   });
 }

@@ -9,6 +9,7 @@ import {
   type OverviewSlideModel,
   type SummarySlideModel,
 } from './timelineExportModel';
+import { EXPORT_LINK_DISPLAY, getExportQrCodeDataUrl } from './qrCode';
 import { COLORS, FOOTER_TEXT, PDF_FONT_FACE, withHash } from './theme';
 import {
   BAR_HEIGHT_IN,
@@ -18,6 +19,7 @@ import {
   CONTENT_WIDTH_IN,
   CONTENT_X_IN,
   FOOTER_HEIGHT_IN,
+  GROUP_HEADER_HEIGHT_IN,
   HEADER_HEIGHT_IN,
   PAGE_HEIGHT_IN,
   PAGE_WIDTH_IN,
@@ -64,6 +66,27 @@ function drawChrome(doc: jsPDF, title: string) {
 
 function drawOverviewSlide(doc: jsPDF, model: OverviewSlideModel) {
   drawChrome(doc, model.title);
+
+  doc.setFont(PDF_FONT_FACE, 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(withHash(COLORS.footerText));
+  model.dateTicks.forEach((tick) => {
+    drawText(doc, tick.label, tick.x, model.dateAxisY + GROUP_HEADER_HEIGHT_IN / 2, { baseline: 'middle' });
+  });
+
+  if (model.dateTicks.length > 0) {
+    doc.setDrawColor(withHash(COLORS.border));
+    doc.setLineWidth(0.01);
+    const axisLineY = model.dateAxisY + GROUP_HEADER_HEIGHT_IN;
+    doc.line(CONTENT_X_IN, axisLineY, CONTENT_X_IN + CONTENT_WIDTH_IN, axisLineY);
+  }
+
+  model.groupHeaders.forEach((header) => {
+    doc.setFont(PDF_FONT_FACE, 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(withHash(header.color));
+    drawText(doc, header.label, CONTENT_X_IN, header.y + GROUP_HEADER_HEIGHT_IN / 2, { baseline: 'middle' });
+  });
 
   model.bars.forEach((bar) => {
     doc.setFillColor(withHash(COLORS.border));
@@ -146,8 +169,10 @@ const SUMMARY_BAR_HEIGHT_IN = 0.45;
 const SUMMARY_LEGEND_GAP_IN = 0.25;
 const SUMMARY_CHIP_SIZE_IN = 0.14;
 const SUMMARY_STATS_GAP_IN = 0.55;
+const SUMMARY_QR_GAP_ABOVE_IN = 0.9;
+const SUMMARY_QR_SIZE_IN = 1.3;
 
-function drawSummarySlide(doc: jsPDF, model: SummarySlideModel) {
+function drawSummarySlide(doc: jsPDF, model: SummarySlideModel, qrCodeDataUrl: string) {
   drawChrome(doc, model.title);
 
   const barY = CONTENT_TOP_IN;
@@ -198,15 +223,28 @@ function drawSummarySlide(doc: jsPDF, model: SummarySlideModel) {
     doc.setTextColor(withHash(COLORS.navy));
     drawText(doc, stat.value, x, statsY + 0.3, { baseline: 'top' });
   });
+
+  const qrY = statsY + SUMMARY_QR_GAP_ABOVE_IN;
+  const qrX = CONTENT_X_IN + (CONTENT_WIDTH_IN - SUMMARY_QR_SIZE_IN) / 2;
+  doc.addImage(qrCodeDataUrl, 'PNG', qrX, qrY, SUMMARY_QR_SIZE_IN, SUMMARY_QR_SIZE_IN);
+
+  doc.setFont(PDF_FONT_FACE, 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(withHash(COLORS.footerText));
+  drawText(doc, EXPORT_LINK_DISPLAY, CONTENT_X_IN + CONTENT_WIDTH_IN / 2, qrY + SUMMARY_QR_SIZE_IN + 0.15, {
+    align: 'center',
+    baseline: 'top',
+  });
 }
 
-export function exportTimelineToPdf(
+export async function exportTimelineToPdf(
   items: TimelineItem[],
   exportOptions: ExportOptions,
   comments: TaskComment[],
-): void {
+): Promise<void> {
   const sortedItems = sortItems(items, exportOptions.sortMode);
   const slides = buildExportSlides(sortedItems, comments, exportOptions.commentMode);
+  const qrCodeDataUrl = await getExportQrCodeDataUrl();
 
   const doc = new jsPDF({
     orientation: 'landscape',
@@ -222,7 +260,7 @@ export function exportTimelineToPdf(
     } else if (slideModel.kind === 'detail') {
       drawDetailSlide(doc, slideModel);
     } else {
-      drawSummarySlide(doc, slideModel);
+      drawSummarySlide(doc, slideModel, qrCodeDataUrl);
     }
   });
 

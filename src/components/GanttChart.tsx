@@ -2,12 +2,8 @@ import { useMemo } from 'react';
 import { useTimelineStore } from '../store/timelineStore';
 import { GanttRow } from './GanttRow';
 import { AddTaskForm } from './AddTaskForm';
-import { BASE_PX_PER_DAY, MS_PER_DAY, getDateRange } from '../export/dateScale';
+import { BASE_PX_PER_DAY, MS_PER_DAY, formatShortDate, getDateRange } from '../export/dateScale';
 import { sortItems } from '../utils/sortItems';
-
-function formatDay(date: Date) {
-  return date.toLocaleDateString('en-US', { day: '2-digit', month: 'short' });
-}
 
 export function GanttChart() {
   const items = useTimelineStore((state) => state.items);
@@ -44,7 +40,7 @@ export function GanttChart() {
                 className="flex-shrink-0 border-r border-slate-100 py-2 text-center text-[11px] text-slate-500"
                 style={{ width: pxPerDay }}
               >
-                {formatDay(day)}
+                {formatShortDate(day)}
               </div>
             ))}
           </div>

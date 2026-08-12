@@ -25,14 +25,14 @@ function App() {
         <div className="flex gap-3">
           <button
             type="button"
-            onClick={() => exportTimelineToPptx(items, exportOptions, comments)}
+            onClick={() => void exportTimelineToPptx(items, exportOptions, comments)}
             className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700"
           >
             Export to PowerPoint
           </button>
           <button
             type="button"
-            onClick={() => exportTimelineToPdf(items, exportOptions, comments)}
+            onClick={() => void exportTimelineToPdf(items, exportOptions, comments)}
             className="rounded-md bg-slate-700 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-slate-800"
           >
             Export as PDF

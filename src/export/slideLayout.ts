@@ -31,6 +31,11 @@ export const BAR_LABEL_PADDING_IN = 0.06;
 // next bar. = 0.28 + 0.04 = 0.32in
 export const ROW_HEIGHT_IN = BAR_HEIGHT_IN + ROW_GAP_IN;
 
+// Small heading-weight row, reused for: the status-group headers stacked
+// above each run of same-status bars on the overview slide, and that
+// slide's repeating date-scale axis row. = 0.22 + 0.04 = 0.26in
+export const GROUP_HEADER_HEIGHT_IN = ROW_LABEL_HEIGHT_IN + ROW_GAP_IN;
+
 export const LIST_ROW_HEIGHT_IN = 0.32;
 export const SECTION_GAP_IN = 0.2;
 // Gap between one parent's whole subtasks/comments block and the next

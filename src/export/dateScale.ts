@@ -13,6 +13,12 @@ export function shiftIsoDate(iso: string, days: number) {
   return date.toISOString().slice(0, 10);
 }
 
+/** "Sep 01" — shared by the on-screen day header and the export overview's
+ * date-scale axis, so both formats always agree. */
+export function formatShortDate(date: Date): string {
+  return date.toLocaleDateString('en-US', { day: '2-digit', month: 'short' });
+}
+
 export interface DateRange {
   minDate: Date;
   maxDate: Date;
@@ -46,16 +52,4 @@ export function getItemBar(item: TimelineItem, minDate: Date, pxPerDay: number):
     left: startOffsetDays * pxPerDay,
     width: durationDays * pxPerDay,
   };
-}
-
-/** Splits an already-filtered, parent-level item list into ordered chunks so
- * export overview slides stay readable instead of cramming every bar onto one. */
-export function groupItemsForExport(items: TimelineItem[], maxBarsPerSlide = 20): TimelineItem[][] {
-  if (items.length === 0) return [];
-
-  const groups: TimelineItem[][] = [];
-  for (let i = 0; i < items.length; i += maxBarsPerSlide) {
-    groups.push(items.slice(i, i + maxBarsPerSlide));
-  }
-  return groups;
 }
