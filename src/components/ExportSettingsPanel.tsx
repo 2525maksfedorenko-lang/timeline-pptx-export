@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTimelineStore, type ExportOptions } from '../store/timelineStore';
-import type { TimelineItem } from '../types/timeline';
+import { getTaskStatus, TASK_STATUS_LABELS, type TaskStatus, type TimelineItem } from '../types/timeline';
 
 const COMMENT_MODE_OPTIONS: { value: ExportOptions['commentMode']; label: string }[] = [
   { value: 'latest', label: 'Latest comment only' },
@@ -8,6 +8,10 @@ const COMMENT_MODE_OPTIONS: { value: ExportOptions['commentMode']; label: string
   { value: 'all', label: 'All comments' },
   { value: 'none', label: 'No comments' },
 ];
+
+const TASK_STATUS_OPTIONS: { value: TaskStatus; label: string }[] = (
+  Object.keys(TASK_STATUS_LABELS) as TaskStatus[]
+).map((value) => ({ value, label: TASK_STATUS_LABELS[value] }));
 
 interface ItemRow {
   item: TimelineItem;
@@ -91,7 +95,20 @@ export function ExportSettingsPanel() {
                   }
                   className="h-4 w-4 rounded border-[#E5E5E1] text-[#2A9D90] focus:ring-[#2A9D90]"
                 />
-                <span className="text-sm text-[#1E2B38]">{item.label}</span>
+                <span className="flex-1 truncate text-sm text-[#1E2B38]">{item.label}</span>
+                <select
+                  value={getTaskStatus(item)}
+                  onChange={(event) =>
+                    updateItem(item.id, { status: event.target.value as TaskStatus })
+                  }
+                  className="rounded border border-[#E5E5E1] px-1.5 py-0.5 text-xs text-[#1E2B38] focus:border-[#2A9D90] focus:outline-none"
+                >
+                  {TASK_STATUS_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
               </li>
             ))}
           </ul>

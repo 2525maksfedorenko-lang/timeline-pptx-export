@@ -69,6 +69,13 @@ function drawOverviewSlide(doc: jsPDF, model: OverviewSlideModel) {
     doc.setFontSize(11);
     doc.setTextColor(withHash(COLORS.navy));
     drawText(doc, bar.label, bar.barX, bar.labelY, { baseline: 'top' });
+
+    doc.setFontSize(9);
+    doc.setTextColor(withHash(bar.statusColor));
+    drawText(doc, bar.statusText, CONTENT_X_IN + CONTENT_WIDTH_IN, bar.labelY, {
+      baseline: 'top',
+      align: 'right',
+    });
   });
 }
 
@@ -87,6 +94,14 @@ function drawDetailSlide(doc: jsPDF, model: DetailSlideModel) {
     doc.setFontSize(12);
     doc.setTextColor(withHash(COLORS.navy));
     drawText(doc, row.text, CONTENT_X_IN + 0.2, row.y, { baseline: 'top' });
+
+    doc.setFont(PDF_FONT_FACE, 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(withHash(row.statusColor));
+    drawText(doc, row.statusText, CONTENT_X_IN + CONTENT_WIDTH_IN, row.y, {
+      baseline: 'top',
+      align: 'right',
+    });
   });
 
   if (model.commentsHeadingY !== undefined) {

@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import type { TimelineItem } from '../types/timeline';
+import { getTaskStatus, TASK_STATUS_COLORS, TASK_STATUS_LABELS, type TimelineItem } from '../types/timeline';
 import { useTimelineStore } from '../store/timelineStore';
 import { getItemBar, shiftIsoDate } from '../export/dateScale';
 
@@ -21,6 +21,7 @@ export function GanttRow({ item, minDate, pxPerDay }: GanttRowProps) {
 
   const { left, width } = getItemBar(item, minDate, pxPerDay);
   const progress = Math.min(100, Math.max(0, item.progress ?? 0));
+  const status = getTaskStatus(item);
 
   const handleMouseDown = (event: React.MouseEvent) => {
     event.preventDefault();
@@ -71,6 +72,11 @@ export function GanttRow({ item, minDate, pxPerDay }: GanttRowProps) {
           style={{ width: `${progress}%`, backgroundColor: item.color ?? '#3b82f6' }}
         />
         <span className="absolute inset-0 flex items-center gap-1 truncate px-2 text-xs font-medium text-slate-900">
+          <span
+            className="h-2 w-2 flex-shrink-0 rounded-full"
+            style={{ backgroundColor: `#${TASK_STATUS_COLORS[status]}` }}
+            title={TASK_STATUS_LABELS[status]}
+          />
           {item.label}
           {item.progress != null && <span className="text-slate-600">({item.progress}%)</span>}
         </span>

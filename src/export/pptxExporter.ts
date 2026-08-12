@@ -98,6 +98,18 @@ function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel) {
       color: COLORS.navy,
       fontFace: PPTX_FONT_FACE,
     });
+
+    slide.addText(bar.statusText, {
+      x: CONTENT_X_IN,
+      y: bar.labelY,
+      w: CONTENT_WIDTH_IN,
+      h: ROW_LABEL_HEIGHT_IN,
+      fontSize: 9,
+      bold: true,
+      color: bar.statusColor,
+      fontFace: PPTX_FONT_FACE,
+      align: 'right',
+    });
   });
 }
 
@@ -126,6 +138,18 @@ function drawDetailSlide(slide: PptxSlide, model: DetailSlideModel) {
       fontSize: 12,
       color: COLORS.navy,
       fontFace: PPTX_FONT_FACE,
+    });
+
+    slide.addText(row.statusText, {
+      x: CONTENT_X_IN,
+      y: row.y,
+      w: CONTENT_WIDTH_IN,
+      h: LIST_ROW_HEIGHT_IN,
+      fontSize: 10,
+      bold: true,
+      color: row.statusColor,
+      fontFace: PPTX_FONT_FACE,
+      align: 'right',
     });
   });
 

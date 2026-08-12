@@ -1,5 +1,5 @@
 import type { ExportOptions } from '../store/timelineStore';
-import type { TaskComment, TimelineItem } from '../types/timeline';
+import { getTaskStatus, TASK_STATUS_COLORS, TASK_STATUS_LABELS, type TaskComment, type TimelineItem } from '../types/timeline';
 import { BASE_PX_PER_DAY, getDateRange, getItemBar } from './dateScale';
 import { statusColor } from './theme';
 import {
@@ -21,6 +21,8 @@ export interface OverviewBarModel {
   id: string;
   label: string;
   color: string;
+  statusText: string;
+  statusColor: string;
   labelY: number;
   barX: number;
   barY: number;
@@ -37,6 +39,8 @@ export interface OverviewSlideModel {
 export interface SubtaskRowModel {
   text: string;
   color: string;
+  statusText: string;
+  statusColor: string;
   y: number;
 }
 
@@ -71,10 +75,14 @@ function buildOverviewSlide(parentItems: TimelineItem[]): OverviewSlideModel {
       const barX = CONTENT_X_IN + left * scale;
       const trackWidth = Math.max(width * scale, 0.15);
 
+      const status = getTaskStatus(item);
+
       bars.push({
         id: item.id,
         label: `${item.label}  ${progress}%`,
         color: statusColor(progress),
+        statusText: TASK_STATUS_LABELS[status],
+        statusColor: TASK_STATUS_COLORS[status],
         labelY: rowY,
         barX,
         barY: rowY + ROW_LABEL_HEIGHT_IN + ROW_GAP_IN,
@@ -102,9 +110,12 @@ function buildDetailSlide(
 
     children.forEach((child) => {
       const progress = clampProgress(child.progress);
+      const status = getTaskStatus(child);
       subtasks.push({
         text: `${child.label}  —  ${child.start} → ${child.end}  —  ${progress}%`,
         color: statusColor(progress),
+        statusText: TASK_STATUS_LABELS[status],
+        statusColor: TASK_STATUS_COLORS[status],
         y,
       });
       y += LIST_ROW_HEIGHT_IN;
