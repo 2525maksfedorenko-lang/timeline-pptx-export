@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useTimelineStore, type ExportOptions } from '../store/timelineStore';
-import { getTaskStatus, TASK_STATUS_LABELS, type SortMode, type TaskStatus, type TimelineItem } from '../types/timeline';
+import { getTaskStatus, TASK_STATUS_LABELS, type SortMode, type TaskStatus } from '../types/timeline';
 import { toHtml } from '../utils/renderMarkdown';
+import { buildTaskHierarchy } from '../utils/taskHierarchy';
 
 const COMMENT_BODY_CLASSES =
   '[&_p]:mb-2 [&_p:last-child]:mb-0 [&_strong]:font-semibold [&_em]:italic ' +
@@ -28,32 +29,6 @@ const SORT_MODE_OPTIONS: { value: SortMode; label: string }[] = [
   { value: 'progress', label: 'Progress' },
 ];
 
-interface ItemRow {
-  item: TimelineItem;
-  depth: number;
-}
-
-/** Orders items so each parent is followed by its children, indented by depth. */
-function buildOrderedRows(items: TimelineItem[]): ItemRow[] {
-  const childrenByParent = new Map<string | undefined, TimelineItem[]>();
-  items.forEach((item) => {
-    const siblings = childrenByParent.get(item.parentId) ?? [];
-    siblings.push(item);
-    childrenByParent.set(item.parentId, siblings);
-  });
-
-  const rows: ItemRow[] = [];
-  function visit(parentId: string | undefined, depth: number) {
-    for (const item of childrenByParent.get(parentId) ?? []) {
-      rows.push({ item, depth });
-      visit(item.id, depth + 1);
-    }
-  }
-  visit(undefined, 0);
-
-  return rows;
-}
-
 export function ExportSettingsPanel() {
   const [isOpen, setIsOpen] = useState(true);
   const items = useTimelineStore((state) => state.items);
@@ -63,7 +38,7 @@ export function ExportSettingsPanel() {
   const sortMode = useTimelineStore((state) => state.exportOptions.sortMode);
   const updateExportOptions = useTimelineStore((state) => state.updateExportOptions);
 
-  const rows = buildOrderedRows(items);
+  const rows = buildTaskHierarchy(items).flat;
   const allIncluded = items.every((item) => item.includeInExport !== false);
 
   const handleToggleAll = () => {

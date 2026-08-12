@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import { getTaskStatus, TASK_STATUS_COLORS, TASK_STATUS_LABELS, type TimelineItem } from '../types/timeline';
 import { useTimelineStore } from '../store/timelineStore';
 import { getItemBar, shiftIsoDate } from '../export/dateScale';
+import { clampProgress } from '../utils/clampProgress';
 
 interface GanttRowProps {
   item: TimelineItem;
@@ -38,7 +39,7 @@ export function GanttRow({ item, minDate, pxPerDay }: GanttRowProps) {
   const dragState = useRef<DragState | null>(null);
 
   const { left, width } = getItemBar(item, minDate, pxPerDay);
-  const progress = Math.min(100, Math.max(0, item.progress ?? 0));
+  const progress = clampProgress(item.progress ?? 0);
   const status = getTaskStatus(item);
   const included = item.includeInExport !== false;
 

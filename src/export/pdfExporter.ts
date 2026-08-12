@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf';
 import type { TextOptionsLight } from 'jspdf';
-import { useTimelineStore } from '../store/timelineStore';
+import type { ExportOptions } from '../store/timelineStore';
+import type { TaskComment, TimelineItem } from '../types/timeline';
 import { sortItems } from '../utils/sortItems';
 import {
   buildExportSlides,
@@ -187,8 +188,11 @@ function drawSummarySlide(doc: jsPDF, model: SummarySlideModel) {
   });
 }
 
-export function exportTimelineToPdf(): void {
-  const { items, exportOptions, comments } = useTimelineStore.getState();
+export function exportTimelineToPdf(
+  items: TimelineItem[],
+  exportOptions: ExportOptions,
+  comments: TaskComment[],
+): void {
   const sortedItems = sortItems(items, exportOptions.sortMode);
   const slides = buildExportSlides(sortedItems, comments, exportOptions.commentMode);
 

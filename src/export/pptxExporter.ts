@@ -1,5 +1,6 @@
 import pptxgen from 'pptxgenjs';
-import { useTimelineStore } from '../store/timelineStore';
+import type { ExportOptions } from '../store/timelineStore';
+import type { TaskComment, TimelineItem } from '../types/timeline';
 import { sortItems } from '../utils/sortItems';
 import {
   buildExportSlides,
@@ -260,8 +261,11 @@ function drawSummarySlide(slide: PptxSlide, model: SummarySlideModel) {
   });
 }
 
-export function exportTimelineToPptx(): void {
-  const { items, exportOptions, comments } = useTimelineStore.getState();
+export function exportTimelineToPptx(
+  items: TimelineItem[],
+  exportOptions: ExportOptions,
+  comments: TaskComment[],
+): void {
   const sortedItems = sortItems(items, exportOptions.sortMode);
   const slides = buildExportSlides(sortedItems, comments, exportOptions.commentMode);
 

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { SortMode, TaskComment, Timeline, TimelineItem } from '../types/timeline';
+import { DEV_SEED_COMMENTS, DEV_SEED_ITEMS, DEV_SEED_TITLE } from './devSeed';
 import {
   deletePlan as deletePlanFromDb,
   getAllPlans,
@@ -70,114 +71,40 @@ const DEFAULT_UI: UiState = {
   editingItemId: null,
 };
 
-const mockItems: TimelineItem[] = [
-  {
-    id: '1',
-    label: 'Research',
-    start: '2026-08-01',
-    end: '2026-08-05',
-    progress: 100,
-    status: 'done',
-    group: 'Phase 1',
-    color: '#3b82f6',
-  },
-  {
-    id: '2',
-    label: 'Design',
-    start: '2026-08-04',
-    end: '2026-08-10',
-    progress: 60,
-    status: 'in_progress',
-    group: 'Phase 1',
-    color: '#8b5cf6',
-    dependencies: ['1'],
-  },
-  {
-    id: '3',
-    label: 'Development',
-    start: '2026-08-08',
-    end: '2026-08-20',
-    progress: 30,
-    status: 'in_progress',
-    group: 'Phase 2',
-    color: '#f59e0b',
-    dependencies: ['2'],
-  },
-  {
-    id: '4',
-    label: 'Testing',
-    start: '2026-08-18',
-    end: '2026-08-25',
-    progress: 0,
-    status: 'todo',
-    group: 'Phase 2',
-    color: '#ef4444',
-    dependencies: ['3'],
-  },
-  {
-    id: '3a',
-    label: 'Backend API',
-    start: '2026-08-08',
-    end: '2026-08-14',
-    progress: 50,
-    status: 'blocked',
-    group: 'Phase 2',
-    color: '#f59e0b',
-    parentId: '3',
-  },
-  {
-    id: '3b',
-    label: 'Frontend UI',
-    start: '2026-08-12',
-    end: '2026-08-20',
-    progress: 20,
-    status: 'in_progress',
-    group: 'Phase 2',
-    color: '#f59e0b',
-    parentId: '3',
-  },
-  {
-    id: '5',
-    label: 'Internal Notes',
-    start: '2026-08-01',
-    end: '2026-08-02',
-    progress: 100,
-    status: 'done',
-    group: 'Internal',
-    color: '#94a3b8',
-    includeInExport: false,
-  },
-];
-
-const mockComments: TaskComment[] = [
-  {
-    id: 'c1',
-    taskId: '2',
-    body: 'Initial design review looks good, ready for sign-off.',
-    isPinned: true,
-    createdAt: '2026-08-05T10:00:00.000Z',
-  },
-  {
-    id: 'c2',
-    taskId: '2',
-    body: 'Updated color palette per client feedback.',
-    createdAt: '2026-08-07T09:30:00.000Z',
-  },
-  {
-    id: 'c3',
-    taskId: '3',
-    body: 'Backend API contracts finalized with the mobile team.',
-    createdAt: '2026-08-10T14:00:00.000Z',
-  },
-];
+/**
+ * First-run bootstrap: persists `seed` (whatever is currently in memory —
+ * the dev seed on a truly first visit, or in-memory state recovered from
+ * localStorage if IndexedDB's plan list is empty for some other reason) as
+ * the first saved plan. Kept as a standalone function, separate from the
+ * store's closure, so a product integration can call a different bootstrap
+ * (e.g. fetch the user's real plan from an API) instead of editing the
+ * store engine itself.
+ */
+export async function initializeStore(seed: {
+  title: string;
+  items: TimelineItem[];
+  exportOptions: ExportOptions;
+}): Promise<SavedPlan> {
+  const now = new Date().toISOString();
+  const plan: SavedPlan = {
+    id: crypto.randomUUID(),
+    name: seed.title || DEV_SEED_TITLE,
+    items: seed.items,
+    exportOptions: seed.exportOptions,
+    createdAt: now,
+    updatedAt: now,
+  };
+  await persistPlan(plan);
+  return plan;
+}
 
 export const useTimelineStore = create<TimelineStore>()(
   persist(
     (set, get) => ({
-      title: 'Демо-проект',
+      title: DEV_SEED_TITLE,
       setTitle: (title) => set({ title }),
 
-      items: mockItems,
+      items: DEV_SEED_ITEMS,
       addItem: (item) => set((state) => ({ items: [...state.items, item] })),
       updateItem: (id, patch) =>
         set((state) => ({
@@ -186,7 +113,7 @@ export const useTimelineStore = create<TimelineStore>()(
       removeItem: (id) =>
         set((state) => ({ items: state.items.filter((item) => item.id !== id) })),
 
-      comments: mockComments,
+      comments: DEV_SEED_COMMENTS,
       addComment: (comment) => set((state) => ({ comments: [...state.comments, comment] })),
       removeComment: (id) =>
         set((state) => ({ comments: state.comments.filter((comment) => comment.id !== id) })),
@@ -208,16 +135,11 @@ export const useTimelineStore = create<TimelineStore>()(
 
         if (plans.length === 0) {
           const state = get();
-          const now = new Date().toISOString();
-          const defaultPlan: SavedPlan = {
-            id: crypto.randomUUID(),
-            name: state.title || 'Демо-проект',
+          const defaultPlan = await initializeStore({
+            title: state.title,
             items: state.items,
             exportOptions: state.exportOptions,
-            createdAt: now,
-            updatedAt: now,
-          };
-          await persistPlan(defaultPlan);
+          });
           set({ savedPlans: [defaultPlan], activePlanId: defaultPlan.id });
           return;
         }
@@ -340,6 +262,18 @@ export const useTimelineStore = create<TimelineStore>()(
       },
     }),
     {
+      // Two persistence layers exist by design, not by accident:
+      // - localStorage (this `persist` middleware) mirrors only the
+      //   *currently active* plan's working state. It's synchronous, so it
+      //   restores instantly on reload — before IndexedDB has even opened —
+      //   avoiding a flash of empty/seed data while `loadPlans()` (async)
+      //   resolves.
+      // - IndexedDB (`planStorage.ts`) is the durable, authoritative store
+      //   for the *list* of named saved plans (the multi-plan library
+      //   feature) — something a single flat localStorage key can't model.
+      // `loadPlans()` reconciles the two on startup. If a product
+      // integration doesn't need multiple named plans, IndexedDB can be
+      // dropped and this `persist` config becomes the only storage layer.
       name: 'timeline-pptx-export-storage',
       partialize: (state) => ({
         title: state.title,

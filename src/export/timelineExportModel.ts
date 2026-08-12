@@ -8,6 +8,8 @@ import {
   type TimelineItem,
 } from '../types/timeline';
 import { markdownToPlainLines } from '../utils/renderMarkdown';
+import { clampProgress } from '../utils/clampProgress';
+import { buildTaskHierarchy } from '../utils/taskHierarchy';
 import { BASE_PX_PER_DAY, getDateRange, getItemBar, groupItemsForExport } from './dateScale';
 import { statusColor } from './theme';
 import {
@@ -20,10 +22,6 @@ import {
   ROW_LABEL_HEIGHT_IN,
   SECTION_GAP_IN,
 } from './slideLayout';
-
-function clampProgress(progress: number | undefined) {
-  return Math.min(100, Math.max(0, progress ?? 0));
-}
 
 export interface OverviewBarModel {
   id: string;
@@ -129,7 +127,7 @@ function buildOverviewSlide(parentItems: TimelineItem[], title: string): Overvie
 
     parentItems.forEach((item, index) => {
       const { left, width } = getItemBar(item, minDate, BASE_PX_PER_DAY);
-      const progress = clampProgress(item.progress);
+      const progress = clampProgress(item.progress ?? 0);
       const rowY = CONTENT_TOP_IN + index * ROW_HEIGHT_IN;
       const barX = CONTENT_X_IN + left * scale;
       const trackWidth = Math.max(width * scale, 0.15);
@@ -182,7 +180,7 @@ function buildDetailSlide(
     y += ROW_LABEL_HEIGHT_IN + ROW_GAP_IN;
 
     children.forEach((child) => {
-      const progress = clampProgress(child.progress);
+      const progress = clampProgress(child.progress ?? 0);
       const status = getTaskStatus(child);
       subtasks.push({
         text: `${child.label}  —  ${child.start} → ${child.end}  —  ${progress}%`,
@@ -252,12 +250,14 @@ export function buildExportSlides(
   commentMode: ExportOptions['commentMode'],
 ): ExportSlideModel[] {
   const exportableItems = items.filter((item) => item.includeInExport !== false);
-  const parentItems = exportableItems.filter((item) => item.parentId === undefined);
+  const { roots } = buildTaskHierarchy(exportableItems);
+  const parentItems = roots.map((node) => node.item);
 
   const slides: ExportSlideModel[] = [...buildOverviewSlides(parentItems)];
 
-  parentItems.forEach((parent) => {
-    const children = exportableItems.filter((item) => item.parentId === parent.id);
+  roots.forEach((parentNode) => {
+    const parent = parentNode.item;
+    const children = parentNode.children.map((node) => node.item);
     const parentComments = comments.filter((comment) => comment.taskId === parent.id);
 
     if (children.length === 0 && parentComments.length === 0) return;
