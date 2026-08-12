@@ -1,6 +1,14 @@
 import { useState } from 'react';
 import { useTimelineStore, type ExportOptions } from '../store/timelineStore';
 import { getTaskStatus, TASK_STATUS_LABELS, type TaskStatus, type TimelineItem } from '../types/timeline';
+import { toHtml } from '../utils/renderMarkdown';
+
+const COMMENT_BODY_CLASSES =
+  '[&_p]:mb-2 [&_p:last-child]:mb-0 [&_strong]:font-semibold [&_em]:italic ' +
+  '[&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:mb-0.5 ' +
+  '[&_h1]:text-base [&_h1]:font-semibold [&_h2]:text-sm [&_h2]:font-semibold [&_h3]:text-sm [&_h3]:font-semibold ' +
+  '[&_code]:rounded [&_code]:bg-slate-100 [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-xs ' +
+  '[&_a]:text-[#2A9D90] [&_a]:underline';
 
 const COMMENT_MODE_OPTIONS: { value: ExportOptions['commentMode']; label: string }[] = [
   { value: 'latest', label: 'Latest comment only' },
@@ -43,6 +51,7 @@ export function ExportSettingsPanel() {
   const [isOpen, setIsOpen] = useState(true);
   const items = useTimelineStore((state) => state.items);
   const updateItem = useTimelineStore((state) => state.updateItem);
+  const comments = useTimelineStore((state) => state.comments);
   const commentMode = useTimelineStore((state) => state.exportOptions.commentMode);
   const updateExportOptions = useTimelineStore((state) => state.updateExportOptions);
 
@@ -133,6 +142,36 @@ export function ExportSettingsPanel() {
               </option>
             ))}
           </select>
+
+          {comments.length > 0 && (
+            <div className="mt-4 border-t border-[#E5E5E1] pt-4">
+              <span className="mb-2 block text-xs font-medium uppercase tracking-wide text-slate-500">
+                Comments
+              </span>
+              <ul className="space-y-3">
+                {comments.map((comment) => {
+                  const task = items.find((item) => item.id === comment.taskId);
+                  return (
+                    <li key={comment.id} className="rounded-md border border-[#E5E5E1] p-3">
+                      <div className="mb-1 flex items-center justify-between text-xs text-slate-500">
+                        <span className="font-medium text-[#1E2B38]">
+                          {task?.label ?? 'Unknown task'}
+                        </span>
+                        <span>
+                          {comment.isPinned ? '📌 ' : ''}
+                          {new Date(comment.createdAt).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <div
+                        className={`text-sm text-[#1E2B38] ${COMMENT_BODY_CLASSES}`}
+                        dangerouslySetInnerHTML={{ __html: toHtml(comment.body) }}
+                      />
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
         </div>
       )}
     </div>

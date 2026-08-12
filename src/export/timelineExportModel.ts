@@ -1,5 +1,6 @@
 import type { ExportOptions } from '../store/timelineStore';
 import { getTaskStatus, TASK_STATUS_COLORS, TASK_STATUS_LABELS, type TaskComment, type TimelineItem } from '../types/timeline';
+import { markdownToPlainLines } from '../utils/renderMarkdown';
 import { BASE_PX_PER_DAY, getDateRange, getItemBar } from './dateScale';
 import { statusColor } from './theme';
 import {
@@ -134,8 +135,14 @@ function buildDetailSlide(
     relevantComments.forEach((comment) => {
       const date = new Date(comment.createdAt).toLocaleDateString();
       const prefix = comment.isPinned ? '\u{1F4CC} ' : '';
-      comments.push({ text: `${prefix}${comment.body} (${date})`, y });
-      y += LIST_ROW_HEIGHT_IN;
+      const bodyLines = markdownToPlainLines(comment.body);
+
+      bodyLines.forEach((line, index) => {
+        const isLast = index === bodyLines.length - 1;
+        const text = index === 0 ? `${prefix}${line}` : line;
+        comments.push({ text: isLast ? `${text} (${date})` : text, y });
+        y += LIST_ROW_HEIGHT_IN;
+      });
     });
   }
 

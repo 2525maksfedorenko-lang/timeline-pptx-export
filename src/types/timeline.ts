@@ -46,7 +46,7 @@ export interface Timeline {
 export interface TaskComment {
   id: string;
   taskId: string;
-  body: string;
+  body: string; // markdown; see src/utils/renderMarkdown.ts for rendering
   isPinned?: boolean;
   createdAt: string;
 }
