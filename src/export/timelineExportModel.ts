@@ -13,6 +13,7 @@ import { buildTaskHierarchy } from '../utils/taskHierarchy';
 import { BASE_PX_PER_DAY, MS_PER_DAY, formatShortDate, getDateRange, getItemBar } from './dateScale';
 import { statusColor } from './theme';
 import {
+  BAR_LABEL_ZONE_MIN_IN,
   CONTENT_HEIGHT_IN,
   CONTENT_TOP_IN,
   CONTENT_X_IN,
@@ -189,7 +190,11 @@ function buildOverviewSlide(
       const { left, width } = getItemBar(item, minDate, BASE_PX_PER_DAY);
       const progress = clampProgress(item.progress ?? 0);
       const barX = CONTENT_X_IN + left * scale;
-      const trackWidth = Math.max(width * scale, 0.15);
+      // Cap how far right the track can extend so its label + status always
+      // have BAR_LABEL_ZONE_MIN_IN of room after it, however late/long the
+      // task's real date span would otherwise make the bar.
+      const maxTrackWidth = Math.max(0.15, CONTENT_X_IN + CONTENT_WIDTH_IN - BAR_LABEL_ZONE_MIN_IN - barX);
+      const trackWidth = Math.min(Math.max(width * scale, 0.15), maxTrackWidth);
       const status = getTaskStatus(item);
 
       bars.push({

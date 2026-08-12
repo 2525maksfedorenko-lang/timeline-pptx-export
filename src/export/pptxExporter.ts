@@ -137,12 +137,12 @@ function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel) {
       });
     }
 
-    // Label is overlaid on the bar itself (one merged line per task),
-    // matching the on-screen Gantt row instead of a separate text row.
+    // Label sits outside the track, immediately to its right — never on top
+    // of it — so it never gets split across the filled/unfilled boundary.
     slide.addText(bar.label, {
-      x: bar.barX + BAR_LABEL_PADDING_IN,
+      x: bar.barX + bar.trackWidth + BAR_LABEL_PADDING_IN,
       y: bar.y,
-      w: CONTENT_WIDTH_IN - (bar.barX - CONTENT_X_IN) - BAR_LABEL_PADDING_IN,
+      w: CONTENT_WIDTH_IN - (bar.barX + bar.trackWidth - CONTENT_X_IN) - BAR_LABEL_PADDING_IN,
       h: BAR_HEIGHT_IN,
       fontSize: 11,
       bold: true,

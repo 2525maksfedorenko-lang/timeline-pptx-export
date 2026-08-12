@@ -97,14 +97,14 @@ function drawOverviewSlide(doc: jsPDF, model: OverviewSlideModel) {
       doc.roundedRect(bar.barX, bar.y, bar.fillWidth, BAR_HEIGHT_IN, BAR_RADIUS_IN, BAR_RADIUS_IN, 'F');
     }
 
-    // Label is overlaid on the bar itself (one merged line per task),
-    // matching the on-screen Gantt row instead of a separate text row.
+    // Label sits outside the track, immediately to its right — never on top
+    // of it — so it never gets split across the filled/unfilled boundary.
     const centerY = bar.y + BAR_HEIGHT_IN / 2;
 
     doc.setFont(PDF_FONT_FACE, 'bold');
     doc.setFontSize(11);
     doc.setTextColor(withHash(COLORS.navy));
-    drawText(doc, bar.label, bar.barX + BAR_LABEL_PADDING_IN, centerY, { baseline: 'middle' });
+    drawText(doc, bar.label, bar.barX + bar.trackWidth + BAR_LABEL_PADDING_IN, centerY, { baseline: 'middle' });
 
     doc.setFontSize(9);
     doc.setTextColor(withHash(bar.statusColor));
