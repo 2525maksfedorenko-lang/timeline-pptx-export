@@ -11,6 +11,7 @@ import {
 import { COLORS, FOOTER_TEXT, PPTX_FONT_FACE } from './theme';
 import {
   BAR_HEIGHT_IN,
+  BAR_LABEL_PADDING_IN,
   BAR_RADIUS_IN,
   CONTENT_BOTTOM_IN,
   CONTENT_TOP_IN,
@@ -77,7 +78,7 @@ function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel) {
   model.bars.forEach((bar) => {
     slide.addShape('roundRect', {
       x: bar.barX,
-      y: bar.barY,
+      y: bar.y,
       w: bar.trackWidth,
       h: BAR_HEIGHT_IN,
       rectRadius: BAR_RADIUS_IN,
@@ -88,7 +89,7 @@ function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel) {
     if (bar.fillWidth > 0) {
       slide.addShape('roundRect', {
         x: bar.barX,
-        y: bar.barY,
+        y: bar.y,
         w: bar.fillWidth,
         h: BAR_HEIGHT_IN,
         rectRadius: BAR_RADIUS_IN,
@@ -97,27 +98,31 @@ function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel) {
       });
     }
 
+    // Label is overlaid on the bar itself (one merged line per task),
+    // matching the on-screen Gantt row instead of a separate text row.
     slide.addText(bar.label, {
-      x: bar.barX,
-      y: bar.labelY,
-      w: CONTENT_WIDTH_IN - (bar.barX - CONTENT_X_IN),
-      h: ROW_LABEL_HEIGHT_IN,
+      x: bar.barX + BAR_LABEL_PADDING_IN,
+      y: bar.y,
+      w: CONTENT_WIDTH_IN - (bar.barX - CONTENT_X_IN) - BAR_LABEL_PADDING_IN,
+      h: BAR_HEIGHT_IN,
       fontSize: 11,
       bold: true,
       color: COLORS.navy,
       fontFace: PPTX_FONT_FACE,
+      valign: 'middle',
     });
 
     slide.addText(bar.statusText, {
       x: CONTENT_X_IN,
-      y: bar.labelY,
+      y: bar.y,
       w: CONTENT_WIDTH_IN,
-      h: ROW_LABEL_HEIGHT_IN,
+      h: BAR_HEIGHT_IN,
       fontSize: 9,
       bold: true,
       color: bar.statusColor,
       fontFace: PPTX_FONT_FACE,
       align: 'right',
+      valign: 'middle',
     });
   });
 }
@@ -125,65 +130,78 @@ function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel) {
 function drawDetailSlide(slide: PptxSlide, model: DetailSlideModel) {
   drawChrome(slide, model.title);
 
-  if (model.subtasksHeadingY !== undefined) {
-    slide.addText('Subtasks', {
+  model.sections.forEach((section) => {
+    slide.addText(section.parentTitle, {
       x: CONTENT_X_IN,
-      y: model.subtasksHeadingY,
+      y: section.parentTitleY,
       w: CONTENT_WIDTH_IN,
       h: ROW_LABEL_HEIGHT_IN,
-      fontSize: 14,
+      fontSize: 16,
       bold: true,
       color: COLORS.navy,
       fontFace: PPTX_FONT_FACE,
     });
-  }
 
-  model.subtasks.forEach((row) => {
-    slide.addText(row.text, {
-      x: CONTENT_X_IN + 0.2,
-      y: row.y,
-      w: CONTENT_WIDTH_IN - 0.2,
-      h: LIST_ROW_HEIGHT_IN,
-      fontSize: 12,
-      color: COLORS.navy,
-      fontFace: PPTX_FONT_FACE,
+    if (section.subtasksHeadingY !== undefined) {
+      slide.addText('Subtasks', {
+        x: CONTENT_X_IN,
+        y: section.subtasksHeadingY,
+        w: CONTENT_WIDTH_IN,
+        h: ROW_LABEL_HEIGHT_IN,
+        fontSize: 14,
+        bold: true,
+        color: COLORS.navy,
+        fontFace: PPTX_FONT_FACE,
+      });
+    }
+
+    section.subtasks.forEach((row) => {
+      slide.addText(row.text, {
+        x: CONTENT_X_IN + 0.2,
+        y: row.y,
+        w: CONTENT_WIDTH_IN - 0.2,
+        h: LIST_ROW_HEIGHT_IN,
+        fontSize: 12,
+        color: COLORS.navy,
+        fontFace: PPTX_FONT_FACE,
+      });
+
+      slide.addText(row.statusText, {
+        x: CONTENT_X_IN,
+        y: row.y,
+        w: CONTENT_WIDTH_IN,
+        h: LIST_ROW_HEIGHT_IN,
+        fontSize: 10,
+        bold: true,
+        color: row.statusColor,
+        fontFace: PPTX_FONT_FACE,
+        align: 'right',
+      });
     });
 
-    slide.addText(row.statusText, {
-      x: CONTENT_X_IN,
-      y: row.y,
-      w: CONTENT_WIDTH_IN,
-      h: LIST_ROW_HEIGHT_IN,
-      fontSize: 10,
-      bold: true,
-      color: row.statusColor,
-      fontFace: PPTX_FONT_FACE,
-      align: 'right',
-    });
-  });
+    if (section.commentsHeadingY !== undefined) {
+      slide.addText('Comments', {
+        x: CONTENT_X_IN,
+        y: section.commentsHeadingY,
+        w: CONTENT_WIDTH_IN,
+        h: ROW_LABEL_HEIGHT_IN,
+        fontSize: 14,
+        bold: true,
+        color: COLORS.navy,
+        fontFace: PPTX_FONT_FACE,
+      });
+    }
 
-  if (model.commentsHeadingY !== undefined) {
-    slide.addText('Comments', {
-      x: CONTENT_X_IN,
-      y: model.commentsHeadingY,
-      w: CONTENT_WIDTH_IN,
-      h: ROW_LABEL_HEIGHT_IN,
-      fontSize: 14,
-      bold: true,
-      color: COLORS.navy,
-      fontFace: PPTX_FONT_FACE,
-    });
-  }
-
-  model.comments.forEach((row) => {
-    slide.addText(row.text, {
-      x: CONTENT_X_IN + 0.2,
-      y: row.y,
-      w: CONTENT_WIDTH_IN - 0.2,
-      h: LIST_ROW_HEIGHT_IN,
-      fontSize: 11,
-      color: COLORS.navy,
-      fontFace: PPTX_FONT_FACE,
+    section.comments.forEach((row) => {
+      slide.addText(row.text, {
+        x: CONTENT_X_IN + 0.2,
+        y: row.y,
+        w: CONTENT_WIDTH_IN - 0.2,
+        h: LIST_ROW_HEIGHT_IN,
+        fontSize: 11,
+        color: COLORS.navy,
+        fontFace: PPTX_FONT_FACE,
+      });
     });
   });
 }

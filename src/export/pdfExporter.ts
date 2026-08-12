@@ -12,6 +12,7 @@ import {
 import { COLORS, FOOTER_TEXT, PDF_FONT_FACE, withHash } from './theme';
 import {
   BAR_HEIGHT_IN,
+  BAR_LABEL_PADDING_IN,
   BAR_RADIUS_IN,
   CONTENT_TOP_IN,
   CONTENT_WIDTH_IN,
@@ -66,22 +67,26 @@ function drawOverviewSlide(doc: jsPDF, model: OverviewSlideModel) {
 
   model.bars.forEach((bar) => {
     doc.setFillColor(withHash(COLORS.border));
-    doc.roundedRect(bar.barX, bar.barY, bar.trackWidth, BAR_HEIGHT_IN, BAR_RADIUS_IN, BAR_RADIUS_IN, 'F');
+    doc.roundedRect(bar.barX, bar.y, bar.trackWidth, BAR_HEIGHT_IN, BAR_RADIUS_IN, BAR_RADIUS_IN, 'F');
 
     if (bar.fillWidth > 0) {
       doc.setFillColor(withHash(bar.color));
-      doc.roundedRect(bar.barX, bar.barY, bar.fillWidth, BAR_HEIGHT_IN, BAR_RADIUS_IN, BAR_RADIUS_IN, 'F');
+      doc.roundedRect(bar.barX, bar.y, bar.fillWidth, BAR_HEIGHT_IN, BAR_RADIUS_IN, BAR_RADIUS_IN, 'F');
     }
+
+    // Label is overlaid on the bar itself (one merged line per task),
+    // matching the on-screen Gantt row instead of a separate text row.
+    const centerY = bar.y + BAR_HEIGHT_IN / 2;
 
     doc.setFont(PDF_FONT_FACE, 'bold');
     doc.setFontSize(11);
     doc.setTextColor(withHash(COLORS.navy));
-    drawText(doc, bar.label, bar.barX, bar.labelY, { baseline: 'top' });
+    drawText(doc, bar.label, bar.barX + BAR_LABEL_PADDING_IN, centerY, { baseline: 'middle' });
 
     doc.setFontSize(9);
     doc.setTextColor(withHash(bar.statusColor));
-    drawText(doc, bar.statusText, CONTENT_X_IN + CONTENT_WIDTH_IN, bar.labelY, {
-      baseline: 'top',
+    drawText(doc, bar.statusText, CONTENT_X_IN + CONTENT_WIDTH_IN, centerY, {
+      baseline: 'middle',
       align: 'right',
     });
   });
@@ -90,42 +95,49 @@ function drawOverviewSlide(doc: jsPDF, model: OverviewSlideModel) {
 function drawDetailSlide(doc: jsPDF, model: DetailSlideModel) {
   drawChrome(doc, model.title);
 
-  if (model.subtasksHeadingY !== undefined) {
+  model.sections.forEach((section) => {
     doc.setFont(PDF_FONT_FACE, 'bold');
-    doc.setFontSize(14);
+    doc.setFontSize(16);
     doc.setTextColor(withHash(COLORS.navy));
-    drawText(doc, 'Subtasks', CONTENT_X_IN, model.subtasksHeadingY, { baseline: 'top' });
-  }
+    drawText(doc, section.parentTitle, CONTENT_X_IN, section.parentTitleY, { baseline: 'top' });
 
-  model.subtasks.forEach((row) => {
-    doc.setFont(PDF_FONT_FACE, 'normal');
-    doc.setFontSize(12);
-    doc.setTextColor(withHash(COLORS.navy));
-    drawText(doc, row.text, CONTENT_X_IN + 0.2, row.y, { baseline: 'top' });
+    if (section.subtasksHeadingY !== undefined) {
+      doc.setFont(PDF_FONT_FACE, 'bold');
+      doc.setFontSize(14);
+      doc.setTextColor(withHash(COLORS.navy));
+      drawText(doc, 'Subtasks', CONTENT_X_IN, section.subtasksHeadingY, { baseline: 'top' });
+    }
 
-    doc.setFont(PDF_FONT_FACE, 'bold');
-    doc.setFontSize(10);
-    doc.setTextColor(withHash(row.statusColor));
-    drawText(doc, row.statusText, CONTENT_X_IN + CONTENT_WIDTH_IN, row.y, {
-      baseline: 'top',
-      align: 'right',
+    section.subtasks.forEach((row) => {
+      doc.setFont(PDF_FONT_FACE, 'normal');
+      doc.setFontSize(12);
+      doc.setTextColor(withHash(COLORS.navy));
+      drawText(doc, row.text, CONTENT_X_IN + 0.2, row.y, { baseline: 'top' });
+
+      doc.setFont(PDF_FONT_FACE, 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(withHash(row.statusColor));
+      drawText(doc, row.statusText, CONTENT_X_IN + CONTENT_WIDTH_IN, row.y, {
+        baseline: 'top',
+        align: 'right',
+      });
     });
-  });
 
-  if (model.commentsHeadingY !== undefined) {
-    doc.setFont(PDF_FONT_FACE, 'bold');
-    doc.setFontSize(14);
-    doc.setTextColor(withHash(COLORS.navy));
-    drawText(doc, 'Comments', CONTENT_X_IN, model.commentsHeadingY, { baseline: 'top' });
-  }
+    if (section.commentsHeadingY !== undefined) {
+      doc.setFont(PDF_FONT_FACE, 'bold');
+      doc.setFontSize(14);
+      doc.setTextColor(withHash(COLORS.navy));
+      drawText(doc, 'Comments', CONTENT_X_IN, section.commentsHeadingY, { baseline: 'top' });
+    }
 
-  model.comments.forEach((row) => {
-    doc.setFont(PDF_FONT_FACE, 'normal');
-    doc.setFontSize(11);
-    doc.setTextColor(withHash(COLORS.navy));
-    drawText(doc, row.text, CONTENT_X_IN + 0.2, row.y, {
-      baseline: 'top',
-      maxWidth: CONTENT_WIDTH_IN - 0.2,
+    section.comments.forEach((row) => {
+      doc.setFont(PDF_FONT_FACE, 'normal');
+      doc.setFontSize(11);
+      doc.setTextColor(withHash(COLORS.navy));
+      drawText(doc, row.text, CONTENT_X_IN + 0.2, row.y, {
+        baseline: 'top',
+        maxWidth: CONTENT_WIDTH_IN - 0.2,
+      });
     });
   });
 }

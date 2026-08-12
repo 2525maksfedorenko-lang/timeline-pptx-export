@@ -13,10 +13,12 @@ import { buildTaskHierarchy } from '../utils/taskHierarchy';
 import { BASE_PX_PER_DAY, getDateRange, getItemBar, groupItemsForExport } from './dateScale';
 import { statusColor } from './theme';
 import {
+  CONTENT_HEIGHT_IN,
   CONTENT_TOP_IN,
   CONTENT_X_IN,
   CONTENT_WIDTH_IN,
   LIST_ROW_HEIGHT_IN,
+  PARENT_SECTION_GAP_IN,
   ROW_GAP_IN,
   ROW_HEIGHT_IN,
   ROW_LABEL_HEIGHT_IN,
@@ -29,9 +31,8 @@ export interface OverviewBarModel {
   color: string;
   statusText: string;
   statusColor: string;
-  labelY: number;
+  y: number;
   barX: number;
-  barY: number;
   trackWidth: number;
   fillWidth: number;
 }
@@ -55,13 +56,19 @@ export interface CommentRowModel {
   y: number;
 }
 
-export interface DetailSlideModel {
-  kind: 'detail';
-  title: string;
+export interface DetailSectionModel {
+  parentTitle: string;
+  parentTitleY: number;
   subtasksHeadingY?: number;
   subtasks: SubtaskRowModel[];
   commentsHeadingY?: number;
   comments: CommentRowModel[];
+}
+
+export interface DetailSlideModel {
+  kind: 'detail';
+  title: string;
+  sections: DetailSectionModel[];
 }
 
 export interface SummarySegmentModel {
@@ -128,7 +135,7 @@ function buildOverviewSlide(parentItems: TimelineItem[], title: string): Overvie
     parentItems.forEach((item, index) => {
       const { left, width } = getItemBar(item, minDate, BASE_PX_PER_DAY);
       const progress = clampProgress(item.progress ?? 0);
-      const rowY = CONTENT_TOP_IN + index * ROW_HEIGHT_IN;
+      const y = CONTENT_TOP_IN + index * ROW_HEIGHT_IN;
       const barX = CONTENT_X_IN + left * scale;
       const trackWidth = Math.max(width * scale, 0.15);
 
@@ -140,9 +147,8 @@ function buildOverviewSlide(parentItems: TimelineItem[], title: string): Overvie
         color: statusColor(progress),
         statusText: TASK_STATUS_LABELS[status],
         statusColor: TASK_STATUS_COLORS[status],
-        labelY: rowY,
+        y,
         barX,
-        barY: rowY + ROW_LABEL_HEIGHT_IN + ROW_GAP_IN,
         trackWidth,
         fillWidth: progress > 0 ? Math.max((trackWidth * progress) / 100, 0.05) : 0,
       });
@@ -152,7 +158,15 @@ function buildOverviewSlide(parentItems: TimelineItem[], title: string): Overvie
   return { kind: 'overview', title, bars };
 }
 
-const MAX_OVERVIEW_BARS_PER_SLIDE = 20;
+// How many task rows actually fit on one overview slide, computed from real
+// geometry instead of a guessed count. Each row is now a single merged
+// label+bar line (ROW_HEIGHT_IN = BAR_HEIGHT_IN + ROW_GAP_IN, see
+// slideLayout.ts), so:
+//   CONTENT_HEIGHT_IN = CONTENT_BOTTOM_IN - CONTENT_TOP_IN = 5.25 - 1.14375 = 4.10625in
+//   ROW_HEIGHT_IN     = BAR_HEIGHT_IN + ROW_GAP_IN          = 0.28 + 0.04   = 0.32in
+//   4.10625 / 0.32 = 12.83 -> floor to 12 whole rows, leaving
+//   4.10625 - 12 * 0.32 = 0.26625in of margin (no row is cut off mid-bar).
+const MAX_OVERVIEW_BARS_PER_SLIDE = Math.floor(CONTENT_HEIGHT_IN / ROW_HEIGHT_IN);
 
 function buildOverviewSlides(parentItems: TimelineItem[]): OverviewSlideModel[] {
   const groups = groupItemsForExport(parentItems, MAX_OVERVIEW_BARS_PER_SLIDE);
@@ -166,12 +180,25 @@ function buildOverviewSlides(parentItems: TimelineItem[]): OverviewSlideModel[] 
   );
 }
 
-function buildDetailSlide(
-  parent: TimelineItem,
-  children: TimelineItem[],
-  relevantComments: TaskComment[],
-): DetailSlideModel {
-  let y = CONTENT_TOP_IN;
+interface DetailCandidate {
+  parent: TimelineItem;
+  children: TimelineItem[];
+  relevantComments: TaskComment[];
+}
+
+/** Lays out one parent's subtasks/comments block starting at `startY`,
+ * returning both the section model (with absolute Y coordinates) and the Y
+ * where it ends — so a caller can measure a section's height (by calling
+ * with startY = 0) before deciding whether it fits on the current slide, or
+ * stack several sections on one slide by chaining `endY` into the next
+ * section's `startY`. */
+function buildDetailSection(candidate: DetailCandidate, startY: number): { section: DetailSectionModel; endY: number } {
+  const { parent, children, relevantComments } = candidate;
+
+  let y = startY;
+  const parentTitleY = y;
+  y += ROW_LABEL_HEIGHT_IN + ROW_GAP_IN;
+
   const subtasks: SubtaskRowModel[] = [];
   let subtasksHeadingY: number | undefined;
 
@@ -214,9 +241,60 @@ function buildDetailSlide(
         y += LIST_ROW_HEIGHT_IN;
       });
     });
+
+    y += SECTION_GAP_IN;
   }
 
-  return { kind: 'detail', title: parent.label, subtasksHeadingY, subtasks, commentsHeadingY, comments };
+  return {
+    section: { parentTitle: parent.label, parentTitleY, subtasksHeadingY, subtasks, commentsHeadingY, comments },
+    endY: y,
+  };
+}
+
+/** Packs parent sections onto appendix slides by their actual measured
+ * height (not a fixed count per slide — sections vary a lot depending on
+ * how many subtasks/comments a parent has), so several parents share a
+ * slide whenever they fit within CONTENT_HEIGHT_IN. */
+function buildDetailSlides(candidates: DetailCandidate[]): DetailSlideModel[] {
+  if (candidates.length === 0) return [];
+
+  const withHeight = candidates.map((candidate) => ({
+    candidate,
+    // Height is independent of the starting Y (the layout math is purely
+    // additive), so probing at startY = 0 gives the section's own height.
+    heightIn: buildDetailSection(candidate, 0).endY,
+  }));
+
+  const groups: DetailCandidate[][] = [];
+  let currentGroup: DetailCandidate[] = [];
+  let usedHeight = 0;
+
+  withHeight.forEach(({ candidate, heightIn }) => {
+    const additionalHeight = currentGroup.length === 0 ? heightIn : PARENT_SECTION_GAP_IN + heightIn;
+
+    if (currentGroup.length > 0 && usedHeight + additionalHeight > CONTENT_HEIGHT_IN) {
+      groups.push(currentGroup);
+      currentGroup = [];
+      usedHeight = 0;
+    }
+
+    currentGroup.push(candidate);
+    usedHeight += currentGroup.length === 1 ? heightIn : PARENT_SECTION_GAP_IN + heightIn;
+  });
+
+  if (currentGroup.length > 0) groups.push(currentGroup);
+
+  return groups.map((group, index) => {
+    let y = CONTENT_TOP_IN;
+    const sections = group.map((candidate) => {
+      const { section, endY } = buildDetailSection(candidate, y);
+      y = endY + PARENT_SECTION_GAP_IN;
+      return section;
+    });
+
+    const title = groups.length > 1 ? `Subtasks & Comments (${index + 1}/${groups.length})` : 'Subtasks & Comments';
+    return { kind: 'detail', title, sections };
+  });
 }
 
 export function getCommentsForSlide(
@@ -253,8 +331,7 @@ export function buildExportSlides(
   const { roots } = buildTaskHierarchy(exportableItems);
   const parentItems = roots.map((node) => node.item);
 
-  const slides: ExportSlideModel[] = [...buildOverviewSlides(parentItems)];
-
+  const detailCandidates: DetailCandidate[] = [];
   roots.forEach((parentNode) => {
     const parent = parentNode.item;
     const children = parentNode.children.map((node) => node.item);
@@ -263,8 +340,13 @@ export function buildExportSlides(
     if (children.length === 0 && parentComments.length === 0) return;
 
     const relevantComments = getCommentsForSlide(comments, parent.id, commentMode);
-    slides.push(buildDetailSlide(parent, children, relevantComments));
+    detailCandidates.push({ parent, children, relevantComments });
   });
+
+  const slides: ExportSlideModel[] = [
+    ...buildOverviewSlides(parentItems),
+    ...buildDetailSlides(detailCandidates),
+  ];
 
   slides.push(buildSummarySlide(exportableItems));
 
