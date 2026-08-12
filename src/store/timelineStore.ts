@@ -54,7 +54,7 @@ interface TimelineStore {
   deletePlan: (id: string) => Promise<void>;
 }
 
-const DEFAULT_EXPORT_OPTIONS: ExportOptions = {
+export const DEFAULT_EXPORT_OPTIONS: ExportOptions = {
   theme: 'default',
   scale: 'days',
   showProgress: true,

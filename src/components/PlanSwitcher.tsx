@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTimelineStore } from '../store/timelineStore';
+import { savePlan as savePlanToDb } from '../store/planStorage';
+import { exportPlanToJsonFile, parsePlanJson } from '../import/planJson';
 
 export function PlanSwitcher() {
   const savedPlans = useTimelineStore((state) => state.savedPlans);
@@ -7,9 +9,13 @@ export function PlanSwitcher() {
   const switchToPlan = useTimelineStore((state) => state.switchToPlan);
   const saveCurrentAsPlan = useTimelineStore((state) => state.saveCurrentAsPlan);
   const deletePlan = useTimelineStore((state) => state.deletePlan);
+  const loadPlans = useTimelineStore((state) => state.loadPlans);
 
   const [isCreating, setIsCreating] = useState(false);
   const [newPlanName, setNewPlanName] = useState('');
+  const jsonFileInputRef = useRef<HTMLInputElement>(null);
+
+  const activePlan = savedPlans.find((plan) => plan.id === activePlanId);
 
   const handleCreate = async () => {
     const name = newPlanName.trim();
@@ -22,6 +28,37 @@ export function PlanSwitcher() {
   const handleDelete = async (id: string, name: string) => {
     if (!window.confirm(`Delete plan "${name}"? This cannot be undone.`)) return;
     await deletePlan(id);
+  };
+
+  const handleSaveJson = () => {
+    if (!activePlan) return;
+    exportPlanToJsonFile(activePlan);
+  };
+
+  const handleLoadJsonClick = () => {
+    jsonFileInputRef.current?.click();
+  };
+
+  const handleJsonFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const plan = parsePlanJson(reader.result as string);
+        await savePlanToDb(plan);
+        await loadPlans();
+        await switchToPlan(plan.id);
+      } catch (error) {
+        alert(error instanceof Error ? error.message : 'Failed to load plan.');
+      }
+    };
+    reader.onerror = () => {
+      alert('Failed to read the file.');
+    };
+    reader.readAsText(file);
   };
 
   return (
@@ -98,6 +135,51 @@ export function PlanSwitcher() {
           + New plan
         </button>
       )}
+
+      <div className="ml-auto flex items-center gap-1">
+        <input
+          ref={jsonFileInputRef}
+          type="file"
+          accept=".json"
+          onChange={handleJsonFileChange}
+          className="hidden"
+        />
+        <button
+          type="button"
+          onClick={handleSaveJson}
+          disabled={!activePlan}
+          title="Save current plan as JSON"
+          aria-label="Save current plan as JSON"
+          className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-[#2A9D90] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+        >
+          <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4" aria-hidden="true">
+            <path
+              d="M10 3v9m0 0-3-3m3 3 3-3M4 13v2a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-2"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
+        <button
+          type="button"
+          onClick={handleLoadJsonClick}
+          title="Load plan from JSON"
+          aria-label="Load plan from JSON"
+          className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-[#2A9D90]"
+        >
+          <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4" aria-hidden="true">
+            <path
+              d="M10 12V3m0 0-3 3m3-3 3 3M4 13v2a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-2"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
+      </div>
     </div>
   );
 }
