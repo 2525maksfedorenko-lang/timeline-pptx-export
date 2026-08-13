@@ -1,5 +1,6 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { GanttChart } from './components/GanttChart'
+import { Dashboard, type DashboardSection } from './components/Dashboard'
 import { ExportSettingsPanel } from './components/ExportSettingsPanel'
 import { PlanSwitcher } from './components/PlanSwitcher'
 import { exportTimelineToPptx } from './export/pptxExporter'
@@ -8,11 +9,26 @@ import { getExportParentItems, planOverview } from './export/timelineExportModel
 import { sortItems } from './utils/sortItems'
 import { useTimelineStore } from './store/timelineStore'
 
+type Tab = 'timeline' | 'dashboard'
+
+const DASHBOARD_VIEW_SECTIONS: DashboardSection[] = ['status', 'delayed', 'atrisk']
+
+/** Reads the initial tab + highlighted dashboard section from
+ * ?dashboardView=delayed|atrisk|status once at startup, so a shared link
+ * opens straight on the right view instead of the default Timeline tab. */
+function readDashboardViewParam(): DashboardSection | null {
+  const value = new URLSearchParams(window.location.search).get('dashboardView')
+  return (DASHBOARD_VIEW_SECTIONS as string[]).includes(value ?? '') ? (value as DashboardSection) : null
+}
+
 function App() {
   const loadPlans = useTimelineStore((state) => state.loadPlans)
   const items = useTimelineStore((state) => state.items)
   const exportOptions = useTimelineStore((state) => state.exportOptions)
   const comments = useTimelineStore((state) => state.comments)
+
+  const [highlightSection] = useState<DashboardSection | null>(readDashboardViewParam)
+  const [activeTab, setActiveTab] = useState<Tab>(highlightSection ? 'dashboard' : 'timeline')
 
   useEffect(() => {
     void loadPlans()
@@ -69,7 +85,24 @@ function App() {
         </div>
       </div>
       <PlanSwitcher />
-      <GanttChart />
+
+      <div className="mb-4 inline-flex rounded-md border border-[#E5E5E1] bg-white p-1">
+        {(['timeline', 'dashboard'] as const).map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            onClick={() => setActiveTab(tab)}
+            className={`rounded px-3 py-1.5 text-sm font-medium capitalize transition-colors ${
+              activeTab === tab ? 'bg-[#1E2B38] text-white' : 'text-slate-500 hover:text-[#1E2B38]'
+            }`}
+          >
+            {tab}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'timeline' ? <GanttChart /> : <Dashboard highlightSection={highlightSection} />}
+
       <div className="mt-6" style={{ maxWidth: '50%' }}>
         <ExportSettingsPanel />
       </div>

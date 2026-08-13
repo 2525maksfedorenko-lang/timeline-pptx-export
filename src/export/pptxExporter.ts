@@ -9,7 +9,13 @@ import {
   type OverviewSlideModel,
   type SummarySlideModel,
 } from './timelineExportModel';
-import { EXPORT_LINK_DISPLAY, getExportQrCodeDataUrl } from './qrCode';
+import {
+  buildDashboardSlides,
+  type DashboardStatusSlideModel,
+  type DashboardTable,
+  type DashboardTableSlideModel,
+} from './dashboardSlides';
+import { EXPORT_LINK_DISPLAY, getExportQrCodeDataUrl, getQrCodeDataUrl } from './qrCode';
 import { COLORS, FOOTER_TEXT, PPTX_FONT_FACE } from './theme';
 import {
   BAR_HEIGHT_IN,
@@ -232,6 +238,43 @@ function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel) {
   });
 }
 
+/** Draws a real pptxgenjs table (borders, columns, a bold header row) at an
+ * arbitrary position/width — shared by a comment's markdown table blocks and
+ * the dashboard's delayed/at-risk task tables, so there's exactly one table
+ * renderer instead of one per caller. */
+function drawTableBlock(
+  slide: PptxSlide,
+  table: DashboardTable,
+  x: number,
+  y: number,
+  width: number,
+  fontSize: number = COMMENT_TABLE_FONT_SIZE,
+) {
+  const colCount = Math.max(table.headers.length, 1);
+  const colW = width / colCount;
+
+  slide.addTable(
+    [
+      table.headers.map((header) => ({
+        text: header,
+        options: { bold: true, fill: { color: COLORS.border }, color: COLORS.navy },
+      })),
+      ...table.rows.map((row) => row.map((cell) => ({ text: cell }))),
+    ],
+    {
+      x,
+      y,
+      w: width,
+      colW: Array(colCount).fill(colW),
+      fontSize,
+      fontFace: PPTX_FONT_FACE,
+      color: COLORS.navy,
+      border: { type: 'solid', color: COLORS.border, pt: 0.5 },
+      autoPage: false,
+    },
+  );
+}
+
 /** Renders one parsed-markdown block of a comment's body as real PPTX
  * content — a heading gets bold/sized text, a paragraph plain text, a list
  * a real bulleted textbox, and a table pptxgenjs's native addTable (borders
@@ -278,29 +321,7 @@ function drawCommentBlock(slide: PptxSlide, block: CommentBlockRowModel) {
       },
     );
   } else {
-    const colCount = Math.max(block.headers.length, 1);
-    const colW = COMMENT_BODY_WIDTH_IN / colCount;
-
-    slide.addTable(
-      [
-        block.headers.map((header) => ({
-          text: header,
-          options: { bold: true, fill: { color: COLORS.border }, color: COLORS.navy },
-        })),
-        ...block.rows.map((row) => row.map((cell) => ({ text: cell }))),
-      ],
-      {
-        x: COMMENT_BODY_X_IN,
-        y: block.y,
-        w: COMMENT_BODY_WIDTH_IN,
-        colW: Array(colCount).fill(colW),
-        fontSize: COMMENT_TABLE_FONT_SIZE,
-        fontFace: PPTX_FONT_FACE,
-        color: COLORS.navy,
-        border: { type: 'solid', color: COLORS.border, pt: 0.5 },
-        autoPage: false,
-      },
-    );
+    drawTableBlock(slide, block, COMMENT_BODY_X_IN, block.y, COMMENT_BODY_WIDTH_IN);
   }
 }
 
@@ -402,6 +423,80 @@ function drawDetailSlide(slide: PptxSlide, model: DetailSlideModel) {
   });
 }
 
+/** Draws the status-breakdown doughnut chart (pptxgenjs's native chart
+ * engine — real slices, not a hand-drawn approximation) at an arbitrary
+ * position/size — shared by the summary slide and the dashboard's "Status
+ * breakdown" slide, which show the exact same segments data. */
+function drawStatusDonutChart(
+  slide: PptxSlide,
+  segments: SummarySlideModel['segments'],
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+) {
+  if (segments.length === 0) return;
+
+  slide.addChart(
+    'doughnut',
+    [
+      {
+        name: 'Status',
+        labels: segments.map((segment) => segment.label),
+        values: segments.map((segment) => segment.count),
+      },
+    ],
+    {
+      x,
+      y,
+      w,
+      h,
+      chartColors: segments.map((segment) => segment.color),
+      holeSize: 55,
+      showLegend: true,
+      legendPos: 'b',
+      legendColor: COLORS.navy,
+      legendFontFace: PPTX_FONT_FACE,
+      legendFontSize: 10,
+      showPercent: true,
+      showValue: false,
+      showLabel: false,
+      dataLabelColor: COLORS.lightText,
+      dataLabelFontFace: PPTX_FONT_FACE,
+      dataLabelFontSize: 9,
+      dataBorder: { color: COLORS.slideBg, pt: 1 },
+    },
+  );
+}
+
+/** Draws a QR code image with a link caption beneath — shared by the
+ * summary slide and the dashboard slides, each pointing at a different
+ * deep link (so each takes its own caption text and data URL). */
+function drawQrWithLink(
+  slide: PptxSlide,
+  qrCodeDataUrl: string,
+  linkDisplay: string,
+  x: number,
+  w: number,
+  y: number,
+  size: number,
+) {
+  const imageX = x + (w - size) / 2;
+
+  slide.addImage({ data: qrCodeDataUrl, x: imageX, y, w: size, h: size });
+
+  slide.addText(linkDisplay, {
+    x,
+    y: y + size + 0.1,
+    w,
+    h: 0.3,
+    fontSize: 8,
+    color: COLORS.footerText,
+    fontFace: PPTX_FONT_FACE,
+    align: 'center',
+  });
+}
+
 const SUMMARY_CHART_WIDTH_IN = 3.6;
 const SUMMARY_CHART_GAP_IN = 0.3;
 const SUMMARY_STAT_GAP_IN = 0.3;
@@ -413,39 +508,7 @@ function drawSummarySlide(slide: PptxSlide, model: SummarySlideModel, qrCodeData
   drawChrome(slide, model.title);
 
   const chartH = CONTENT_BOTTOM_IN - CONTENT_TOP_IN;
-
-  if (model.segments.length > 0) {
-    slide.addChart(
-      'doughnut',
-      [
-        {
-          name: 'Status',
-          labels: model.segments.map((segment) => segment.label),
-          values: model.segments.map((segment) => segment.count),
-        },
-      ],
-      {
-        x: CONTENT_X_IN,
-        y: CONTENT_TOP_IN,
-        w: SUMMARY_CHART_WIDTH_IN,
-        h: chartH,
-        chartColors: model.segments.map((segment) => segment.color),
-        holeSize: 55,
-        showLegend: true,
-        legendPos: 'b',
-        legendColor: COLORS.navy,
-        legendFontFace: PPTX_FONT_FACE,
-        legendFontSize: 10,
-        showPercent: true,
-        showValue: false,
-        showLabel: false,
-        dataLabelColor: COLORS.lightText,
-        dataLabelFontFace: PPTX_FONT_FACE,
-        dataLabelFontSize: 9,
-        dataBorder: { color: COLORS.slideBg, pt: 1 },
-      },
-    );
-  }
+  drawStatusDonutChart(slide, model.segments, CONTENT_X_IN, CONTENT_TOP_IN, SUMMARY_CHART_WIDTH_IN, chartH);
 
   const statsX = CONTENT_X_IN + SUMMARY_CHART_WIDTH_IN + SUMMARY_CHART_GAP_IN;
   const statsW = SUMMARY_STATS_WIDTH_IN;
@@ -479,26 +542,58 @@ function drawSummarySlide(slide: PptxSlide, model: SummarySlideModel, qrCodeData
 
   const qrX = statsX + statsW + SUMMARY_QR_GAP_IN;
   const qrColumnWidth = CONTENT_X_IN + CONTENT_WIDTH_IN - qrX;
-  const qrImageX = qrX + (qrColumnWidth - SUMMARY_QR_SIZE_IN) / 2;
+  drawQrWithLink(slide, qrCodeDataUrl, EXPORT_LINK_DISPLAY, qrX, qrColumnWidth, CONTENT_TOP_IN, SUMMARY_QR_SIZE_IN);
+}
 
-  slide.addImage({
-    data: qrCodeDataUrl,
-    x: qrImageX,
-    y: CONTENT_TOP_IN,
-    w: SUMMARY_QR_SIZE_IN,
-    h: SUMMARY_QR_SIZE_IN,
-  });
+const DASHBOARD_CHART_WIDTH_IN = 5.2;
+const DASHBOARD_CHART_GAP_IN = 0.4;
+const DASHBOARD_QR_SIZE_IN = 1.6;
 
-  slide.addText(EXPORT_LINK_DISPLAY, {
-    x: qrX,
-    y: CONTENT_TOP_IN + SUMMARY_QR_SIZE_IN + 0.1,
-    w: qrColumnWidth,
-    h: 0.3,
-    fontSize: 8,
-    color: COLORS.footerText,
-    fontFace: PPTX_FONT_FACE,
-    align: 'center',
-  });
+function drawDashboardStatusSlide(slide: PptxSlide, model: DashboardStatusSlideModel, qrCodeDataUrl: string) {
+  drawChrome(slide, model.title);
+
+  const chartH = CONTENT_BOTTOM_IN - CONTENT_TOP_IN;
+  drawStatusDonutChart(slide, model.segments, CONTENT_X_IN, CONTENT_TOP_IN, DASHBOARD_CHART_WIDTH_IN, chartH);
+
+  const qrX = CONTENT_X_IN + DASHBOARD_CHART_WIDTH_IN + DASHBOARD_CHART_GAP_IN;
+  const qrColumnWidth = CONTENT_X_IN + CONTENT_WIDTH_IN - qrX;
+  const qrY = CONTENT_TOP_IN + (chartH - DASHBOARD_QR_SIZE_IN) / 2;
+  drawQrWithLink(slide, qrCodeDataUrl, model.qrDisplay, qrX, qrColumnWidth, qrY, DASHBOARD_QR_SIZE_IN);
+}
+
+const DASHBOARD_TABLE_QR_COLUMN_WIDTH_IN = 2.0;
+const DASHBOARD_TABLE_GAP_IN = 0.4;
+const DASHBOARD_TABLE_QR_SIZE_IN = 1.5;
+
+function drawDashboardTableSlide(slide: PptxSlide, model: DashboardTableSlideModel, qrCodeDataUrl: string) {
+  drawChrome(slide, model.title);
+
+  const tableWidth = CONTENT_WIDTH_IN - DASHBOARD_TABLE_QR_COLUMN_WIDTH_IN - DASHBOARD_TABLE_GAP_IN;
+
+  if (model.table) {
+    drawTableBlock(slide, model.table, CONTENT_X_IN, CONTENT_TOP_IN, tableWidth);
+  } else {
+    slide.addText(model.emptyMessage, {
+      x: CONTENT_X_IN,
+      y: CONTENT_TOP_IN,
+      w: tableWidth,
+      h: 0.4,
+      fontSize: 13,
+      color: COLORS.footerText,
+      fontFace: PPTX_FONT_FACE,
+    });
+  }
+
+  const qrX = CONTENT_X_IN + tableWidth + DASHBOARD_TABLE_GAP_IN;
+  drawQrWithLink(
+    slide,
+    qrCodeDataUrl,
+    model.qrDisplay,
+    qrX,
+    DASHBOARD_TABLE_QR_COLUMN_WIDTH_IN,
+    CONTENT_TOP_IN,
+    DASHBOARD_TABLE_QR_SIZE_IN,
+  );
 }
 
 export async function exportTimelineToPptx(
@@ -508,7 +603,11 @@ export async function exportTimelineToPptx(
 ): Promise<void> {
   const sortedItems = sortItems(items, exportOptions.sortMode);
   const slides = buildExportSlides(sortedItems, comments, exportOptions.commentMode, exportOptions.exportTimeframe);
+  const dashboardSlides = buildDashboardSlides(sortedItems, new Date());
   const qrCodeDataUrl = await getExportQrCodeDataUrl();
+  const dashboardQrCodeDataUrls = await Promise.all(
+    dashboardSlides.map((slideModel) => getQrCodeDataUrl(slideModel.qrUrl)),
+  );
 
   const pptx = new pptxgen();
   pptx.layout = 'LAYOUT_16x9';
@@ -521,6 +620,16 @@ export async function exportTimelineToPptx(
       drawDetailSlide(slide, slideModel);
     } else {
       drawSummarySlide(slide, slideModel, qrCodeDataUrl);
+    }
+  });
+
+  dashboardSlides.forEach((slideModel, index) => {
+    const slide = pptx.addSlide();
+    const dashboardQrCodeDataUrl = dashboardQrCodeDataUrls[index];
+    if (slideModel.kind === 'dashboard-status') {
+      drawDashboardStatusSlide(slide, slideModel, dashboardQrCodeDataUrl);
+    } else {
+      drawDashboardTableSlide(slide, slideModel, dashboardQrCodeDataUrl);
     }
   });
 

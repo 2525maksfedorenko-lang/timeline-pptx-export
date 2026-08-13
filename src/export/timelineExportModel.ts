@@ -4,10 +4,10 @@ import {
   TASK_STATUS_COLORS,
   TASK_STATUS_LABELS,
   type TaskComment,
-  type TaskStatus,
   type TimelineItem,
 } from '../types/timeline';
 import { parseMarkdownBlocks, type MarkdownBlock } from '../utils/renderMarkdown';
+import { getStatusSegments, type StatusSegment } from '../utils/dashboardMetrics';
 import { clampProgress } from '../utils/clampProgress';
 import { buildTaskHierarchy } from '../utils/taskHierarchy';
 import { daysBetween, BASE_PX_PER_DAY, MS_PER_DAY, formatShortDate, getDateRange, getItemBar } from './dateScale';
@@ -116,13 +116,7 @@ export interface DetailSlideModel {
   sections: DetailSectionModel[];
 }
 
-export interface SummarySegmentModel {
-  status: TaskStatus;
-  label: string;
-  color: string;
-  count: number;
-  percent: number;
-}
+export type SummarySegmentModel = StatusSegment;
 
 export interface SummaryStatModel {
   label: string;
@@ -138,24 +132,11 @@ export interface SummarySlideModel {
 
 export type ExportSlideModel = OverviewSlideModel | DetailSlideModel | SummarySlideModel;
 
-const STATUS_ORDER: TaskStatus[] = ['todo', 'in_progress', 'done', 'blocked'];
-
 function buildSummarySlide(items: TimelineItem[]): SummarySlideModel {
-  const counts: Record<TaskStatus, number> = { todo: 0, in_progress: 0, done: 0, blocked: 0 };
-  items.forEach((item) => {
-    counts[getTaskStatus(item)] += 1;
-  });
-
+  const segments = getStatusSegments(items);
   const total = items.length;
-  const segments: SummarySegmentModel[] = STATUS_ORDER.filter((status) => counts[status] > 0).map((status) => ({
-    status,
-    label: TASK_STATUS_LABELS[status],
-    color: TASK_STATUS_COLORS[status],
-    count: counts[status],
-    percent: total > 0 ? Math.round((counts[status] / total) * 100) : 0,
-  }));
-
-  const completedPercent = total > 0 ? Math.round((counts.done / total) * 100) : 0;
+  const done = segments.find((segment) => segment.status === 'done');
+  const blocked = segments.find((segment) => segment.status === 'blocked');
 
   return {
     kind: 'summary',
@@ -163,8 +144,8 @@ function buildSummarySlide(items: TimelineItem[]): SummarySlideModel {
     segments,
     stats: [
       { label: 'Total tasks', value: `${total}` },
-      { label: 'Completed', value: `${counts.done} (${completedPercent}%)` },
-      { label: 'At risk (blocked)', value: `${counts.blocked}` },
+      { label: 'Completed', value: `${done?.count ?? 0} (${done?.percent ?? 0}%)` },
+      { label: 'At risk (blocked)', value: `${blocked?.count ?? 0}` },
     ],
   };
 }

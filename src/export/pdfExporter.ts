@@ -11,7 +11,13 @@ import {
   type OverviewSlideModel,
   type SummarySlideModel,
 } from './timelineExportModel';
-import { EXPORT_LINK_DISPLAY, getExportQrCodeDataUrl } from './qrCode';
+import {
+  buildDashboardSlides,
+  type DashboardStatusSlideModel,
+  type DashboardTable,
+  type DashboardTableSlideModel,
+} from './dashboardSlides';
+import { EXPORT_LINK_DISPLAY, getExportQrCodeDataUrl, getQrCodeDataUrl } from './qrCode';
 import { COLORS, FOOTER_TEXT, PDF_FONT_FACE, withHash } from './theme';
 import {
   BAR_HEIGHT_IN,
@@ -169,6 +175,42 @@ function drawOverviewSlide(doc: jsPDF, model: OverviewSlideModel) {
   });
 }
 
+/** Draws a real jspdf-autotable table (borders, columns, a bold header row)
+ * at an arbitrary position/width — shared by a comment's markdown table
+ * blocks and the dashboard's delayed/at-risk task tables, so there's exactly
+ * one table renderer instead of one per caller. `pageBreak: 'avoid'` still
+ * means autoTable *can* insert its own page if the table doesn't fit in the
+ * remaining space — callers whose surrounding layout doesn't already
+ * guarantee a fit (see drawCommentBlock's caller, which does) should guard
+ * against that corrupting this file's own page bookkeeping (see
+ * drawDashboardTableSlide). */
+function drawTableBlock(
+  doc: jsPDF,
+  table: DashboardTable,
+  x: number,
+  y: number,
+  width: number,
+  fontSize: number = COMMENT_TABLE_FONT_SIZE,
+) {
+  autoTable(doc, {
+    startY: y,
+    margin: { left: x, right: PAGE_WIDTH_IN - x - width },
+    tableWidth: width,
+    head: [table.headers.map(toPdfSafeText)],
+    body: table.rows.map((row) => row.map(toPdfSafeText)),
+    theme: 'grid',
+    styles: {
+      font: PDF_FONT_FACE,
+      fontSize,
+      textColor: withHash(COLORS.navy),
+      lineColor: withHash(COLORS.border),
+      lineWidth: 0.01,
+    },
+    headStyles: { fillColor: withHash(COLORS.border), textColor: withHash(COLORS.navy), fontStyle: 'bold' },
+    pageBreak: 'avoid',
+  });
+}
+
 /** Renders one parsed-markdown block of a comment's body as real PDF content
  * — a heading gets bold/sized text, a paragraph wraps within the content
  * width, a list gets bullet-prefixed wrapped lines, and a table uses
@@ -209,27 +251,11 @@ function drawCommentBlock(doc: jsPDF, block: CommentBlockRowModel) {
     return;
   }
 
-  autoTable(doc, {
-    startY: block.y,
-    margin: { left: COMMENT_BODY_X_IN, right: PAGE_WIDTH_IN - COMMENT_BODY_X_IN - COMMENT_BODY_WIDTH_IN },
-    tableWidth: COMMENT_BODY_WIDTH_IN,
-    head: [block.headers.map(toPdfSafeText)],
-    body: block.rows.map((row) => row.map(toPdfSafeText)),
-    theme: 'grid',
-    styles: {
-      font: PDF_FONT_FACE,
-      fontSize: COMMENT_TABLE_FONT_SIZE,
-      textColor: withHash(COLORS.navy),
-      lineColor: withHash(COLORS.border),
-      lineWidth: 0.01,
-    },
-    headStyles: { fillColor: withHash(COLORS.border), textColor: withHash(COLORS.navy), fontStyle: 'bold' },
-    // The shared slide model already decided what fits where (see
-    // expandCandidateToChunks in timelineExportModel.ts) — autoTable must
-    // never add its own page mid-table, which would desync every block
-    // drawn after it from the model's precomputed Y positions.
-    pageBreak: 'avoid',
-  });
+  // The shared slide model already decided what fits where (see
+  // expandCandidateToChunks in timelineExportModel.ts), guaranteeing this
+  // table always fits in the remaining space — so drawTableBlock's own
+  // pageBreak:'avoid' never actually triggers a page insert here.
+  drawTableBlock(doc, block, COMMENT_BODY_X_IN, block.y, COMMENT_BODY_WIDTH_IN);
 }
 
 function drawDetailSlide(doc: jsPDF, model: DetailSlideModel) {
@@ -299,32 +325,35 @@ const SUMMARY_STATS_GAP_IN = 0.55;
 const SUMMARY_QR_GAP_ABOVE_IN = 0.9;
 const SUMMARY_QR_SIZE_IN = 1.3;
 
-function drawSummarySlide(doc: jsPDF, model: SummarySlideModel, qrCodeDataUrl: string) {
-  drawChrome(doc, model.title);
-
-  const barY = CONTENT_TOP_IN;
-  const total = model.segments.reduce((sum, segment) => sum + segment.count, 0);
+/** Draws the status-breakdown stacked bar + legend at an arbitrary
+ * position/width, returning the Y just below the legend — jsPDF has no
+ * built-in donut/pie primitive (unlike pptxgenjs's native chart engine used
+ * for the same data in pptxExporter.ts), so a segmented bar is this
+ * exporter's equivalent, reused by both the summary slide and the
+ * dashboard's "Status breakdown" slide. */
+function drawStatusBreakdown(doc: jsPDF, segments: SummarySlideModel['segments'], x: number, y: number, width: number): number {
+  const total = segments.reduce((sum, segment) => sum + segment.count, 0);
 
   if (total > 0) {
-    let cursorX = CONTENT_X_IN;
-    model.segments.forEach((segment) => {
-      const segmentWidth = (segment.count / total) * CONTENT_WIDTH_IN;
+    let cursorX = x;
+    segments.forEach((segment) => {
+      const segmentWidth = (segment.count / total) * width;
       doc.setFillColor(withHash(segment.color));
-      doc.rect(cursorX, barY, segmentWidth, SUMMARY_BAR_HEIGHT_IN, 'F');
+      doc.rect(cursorX, y, segmentWidth, SUMMARY_BAR_HEIGHT_IN, 'F');
       cursorX += segmentWidth;
     });
   } else {
     doc.setFillColor(withHash(COLORS.border));
-    doc.rect(CONTENT_X_IN, barY, CONTENT_WIDTH_IN, SUMMARY_BAR_HEIGHT_IN, 'F');
+    doc.rect(x, y, width, SUMMARY_BAR_HEIGHT_IN, 'F');
   }
 
-  const legendY = barY + SUMMARY_BAR_HEIGHT_IN + SUMMARY_LEGEND_GAP_IN;
-  const legendColWidth = CONTENT_WIDTH_IN / Math.max(model.segments.length, 1);
+  const legendY = y + SUMMARY_BAR_HEIGHT_IN + SUMMARY_LEGEND_GAP_IN;
+  const legendColWidth = width / Math.max(segments.length, 1);
 
   doc.setFont(PDF_FONT_FACE, 'normal');
   doc.setFontSize(10);
-  model.segments.forEach((segment, index) => {
-    const itemX = CONTENT_X_IN + index * legendColWidth;
+  segments.forEach((segment, index) => {
+    const itemX = x + index * legendColWidth;
     doc.setFillColor(withHash(segment.color));
     doc.rect(itemX, legendY, SUMMARY_CHIP_SIZE_IN, SUMMARY_CHIP_SIZE_IN, 'F');
 
@@ -334,6 +363,26 @@ function drawSummarySlide(doc: jsPDF, model: SummarySlideModel, qrCodeDataUrl: s
     });
   });
 
+  return legendY;
+}
+
+/** Draws a QR code image with a link caption beneath, centered within a
+ * column — shared by the summary slide and the dashboard slides, each
+ * pointing at a different deep link. */
+function drawQrWithLink(doc: jsPDF, qrCodeDataUrl: string, linkDisplay: string, x: number, width: number, y: number, size: number) {
+  const imageX = x + (width - size) / 2;
+  doc.addImage(qrCodeDataUrl, 'PNG', imageX, y, size, size);
+
+  doc.setFont(PDF_FONT_FACE, 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(withHash(COLORS.footerText));
+  drawText(doc, linkDisplay, x + width / 2, y + size + 0.15, { align: 'center', baseline: 'top', maxWidth: width });
+}
+
+function drawSummarySlide(doc: jsPDF, model: SummarySlideModel, qrCodeDataUrl: string) {
+  drawChrome(doc, model.title);
+
+  const legendY = drawStatusBreakdown(doc, model.segments, CONTENT_X_IN, CONTENT_TOP_IN, CONTENT_WIDTH_IN);
   const statsY = legendY + SUMMARY_STATS_GAP_IN;
   const statColWidth = CONTENT_WIDTH_IN / model.stats.length;
 
@@ -352,16 +401,64 @@ function drawSummarySlide(doc: jsPDF, model: SummarySlideModel, qrCodeDataUrl: s
   });
 
   const qrY = statsY + SUMMARY_QR_GAP_ABOVE_IN;
-  const qrX = CONTENT_X_IN + (CONTENT_WIDTH_IN - SUMMARY_QR_SIZE_IN) / 2;
-  doc.addImage(qrCodeDataUrl, 'PNG', qrX, qrY, SUMMARY_QR_SIZE_IN, SUMMARY_QR_SIZE_IN);
+  drawQrWithLink(doc, qrCodeDataUrl, EXPORT_LINK_DISPLAY, CONTENT_X_IN, CONTENT_WIDTH_IN, qrY, SUMMARY_QR_SIZE_IN);
+}
 
-  doc.setFont(PDF_FONT_FACE, 'normal');
-  doc.setFontSize(9);
-  doc.setTextColor(withHash(COLORS.footerText));
-  drawText(doc, EXPORT_LINK_DISPLAY, CONTENT_X_IN + CONTENT_WIDTH_IN / 2, qrY + SUMMARY_QR_SIZE_IN + 0.15, {
-    align: 'center',
-    baseline: 'top',
-  });
+const DASHBOARD_STATUS_QR_GAP_ABOVE_IN = 0.6;
+const DASHBOARD_STATUS_QR_SIZE_IN = 1.5;
+
+function drawDashboardStatusSlide(doc: jsPDF, model: DashboardStatusSlideModel, qrCodeDataUrl: string) {
+  drawChrome(doc, model.title);
+
+  const legendY = drawStatusBreakdown(doc, model.segments, CONTENT_X_IN, CONTENT_TOP_IN, CONTENT_WIDTH_IN);
+  const qrY = legendY + DASHBOARD_STATUS_QR_GAP_ABOVE_IN;
+  drawQrWithLink(doc, qrCodeDataUrl, model.qrDisplay, CONTENT_X_IN, CONTENT_WIDTH_IN, qrY, DASHBOARD_STATUS_QR_SIZE_IN);
+}
+
+const DASHBOARD_TABLE_QR_COLUMN_WIDTH_IN = 2.0;
+const DASHBOARD_TABLE_GAP_IN = 0.4;
+const DASHBOARD_TABLE_QR_SIZE_IN = 1.5;
+
+function drawDashboardTableSlide(doc: jsPDF, model: DashboardTableSlideModel, qrCodeDataUrl: string) {
+  drawChrome(doc, model.title);
+
+  const tableWidth = CONTENT_WIDTH_IN - DASHBOARD_TABLE_QR_COLUMN_WIDTH_IN - DASHBOARD_TABLE_GAP_IN;
+
+  if (model.table) {
+    // Defense in depth: the realistic data volumes this dashboard targets
+    // (a handful of delayed/at-risk tasks, see dashboardSlides.ts) always
+    // fit in one page's content height, so drawTableBlock's own
+    // pageBreak:'avoid' should never actually need to insert a page here —
+    // but unlike the comment-table case, nothing upstream *guarantees* that
+    // for an arbitrarily large task list. Neutralizing addPage for the
+    // duration of the call means that even if it tried, this file's own
+    // page count (and every subsequent slide's chrome) stays correct; the
+    // worst case is visual overflow within this one page, never a stray
+    // blank page.
+    const originalAddPage = doc.addPage.bind(doc);
+    doc.addPage = (() => doc) as typeof doc.addPage;
+    try {
+      drawTableBlock(doc, model.table, CONTENT_X_IN, CONTENT_TOP_IN, tableWidth);
+    } finally {
+      doc.addPage = originalAddPage;
+    }
+  } else {
+    doc.setFont(PDF_FONT_FACE, 'normal');
+    doc.setFontSize(13);
+    doc.setTextColor(withHash(COLORS.footerText));
+    drawText(doc, model.emptyMessage, CONTENT_X_IN, CONTENT_TOP_IN, { baseline: 'top' });
+  }
+
+  const qrX = CONTENT_X_IN + tableWidth + DASHBOARD_TABLE_GAP_IN;
+  drawQrWithLink(
+    doc,
+    qrCodeDataUrl,
+    model.qrDisplay,
+    qrX,
+    DASHBOARD_TABLE_QR_COLUMN_WIDTH_IN,
+    CONTENT_TOP_IN,
+    DASHBOARD_TABLE_QR_SIZE_IN,
+  );
 }
 
 export async function exportTimelineToPdf(
@@ -371,7 +468,11 @@ export async function exportTimelineToPdf(
 ): Promise<void> {
   const sortedItems = sortItems(items, exportOptions.sortMode);
   const slides = buildExportSlides(sortedItems, comments, exportOptions.commentMode, exportOptions.exportTimeframe);
+  const dashboardSlides = buildDashboardSlides(sortedItems, new Date());
   const qrCodeDataUrl = await getExportQrCodeDataUrl();
+  const dashboardQrCodeDataUrls = await Promise.all(
+    dashboardSlides.map((slideModel) => getQrCodeDataUrl(slideModel.qrUrl)),
+  );
 
   const doc = new jsPDF({
     orientation: 'landscape',
@@ -379,15 +480,21 @@ export async function exportTimelineToPdf(
     format: [PAGE_WIDTH_IN, PAGE_HEIGHT_IN],
   });
 
-  slides.forEach((slideModel, index) => {
+  const allSlides = [...slides, ...dashboardSlides];
+
+  allSlides.forEach((slideModel, index) => {
     if (index > 0) doc.addPage([PAGE_WIDTH_IN, PAGE_HEIGHT_IN], 'landscape');
 
     if (slideModel.kind === 'overview') {
       drawOverviewSlide(doc, slideModel);
     } else if (slideModel.kind === 'detail') {
       drawDetailSlide(doc, slideModel);
-    } else {
+    } else if (slideModel.kind === 'summary') {
       drawSummarySlide(doc, slideModel, qrCodeDataUrl);
+    } else if (slideModel.kind === 'dashboard-status') {
+      drawDashboardStatusSlide(doc, slideModel, dashboardQrCodeDataUrls[index - slides.length]);
+    } else {
+      drawDashboardTableSlide(doc, slideModel, dashboardQrCodeDataUrls[index - slides.length]);
     }
   });
 
