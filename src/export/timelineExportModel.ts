@@ -7,13 +7,20 @@ import {
   type TaskStatus,
   type TimelineItem,
 } from '../types/timeline';
-import { markdownToPlainLines } from '../utils/renderMarkdown';
+import { parseMarkdownBlocks, type MarkdownBlock } from '../utils/renderMarkdown';
 import { clampProgress } from '../utils/clampProgress';
 import { buildTaskHierarchy } from '../utils/taskHierarchy';
 import { daysBetween, BASE_PX_PER_DAY, MS_PER_DAY, formatShortDate, getDateRange, getItemBar } from './dateScale';
 import { statusColor } from './theme';
 import {
   BAR_LABEL_ZONE_MIN_IN,
+  COMMENT_BLOCK_GAP_IN,
+  COMMENT_GAP_IN,
+  COMMENT_HEADING_ROW_HEIGHT_IN,
+  COMMENT_LINE_HEIGHT_IN,
+  COMMENT_META_ROW_HEIGHT_IN,
+  COMMENT_TABLE_HEADER_ROW_HEIGHT_IN,
+  COMMENT_TABLE_ROW_HEIGHT_IN,
   CONTENT_HEIGHT_IN,
   CONTENT_TOP_IN,
   CONTENT_X_IN,
@@ -74,9 +81,21 @@ export interface SubtaskRowModel {
   y: number;
 }
 
-export interface CommentRowModel {
+export interface CommentMetaModel {
   text: string;
   y: number;
+}
+
+// One parsed markdown block (heading/paragraph/list/table — see
+// src/utils/renderMarkdown.ts) positioned within a comment's body.
+export type CommentBlockRowModel = MarkdownBlock & { y: number; height: number };
+
+export interface CommentModel {
+  // Omitted when a comment's blocks were split across a "(continued)"
+  // overflow slide (see expandCandidateToChunks) — the meta line (date/pin)
+  // only appears once, alongside the first fragment.
+  meta?: CommentMetaModel;
+  blocks: CommentBlockRowModel[];
 }
 
 export interface DetailSectionModel {
@@ -87,7 +106,8 @@ export interface DetailSectionModel {
   assigneeText?: string;
   assigneeY?: number;
   commentsHeadingY?: number;
-  comments: CommentRowModel[];
+  commentsHeadingText?: string;
+  comments: CommentModel[];
 }
 
 export interface DetailSlideModel {
@@ -293,15 +313,99 @@ interface DetailCandidate {
   relevantComments: TaskComment[];
 }
 
+/** One comment's meta line (shown only alongside its first fragment — see
+ * expandCandidateToChunks) plus a slice of its parsed markdown blocks. A
+ * comment normally has exactly one fragment; it's split into more only when
+ * its blocks don't all fit in one chunk. */
+interface CommentFragment {
+  comment: TaskComment;
+  blocks: MarkdownBlock[];
+  showMeta: boolean;
+}
+
+/** One self-contained chunk of a parent's detail content: subtasks +
+ * assignee + a slice of its comments' fragments. Almost always one chunk per
+ * parent — split into further "(continued)" chunks only when a parent's
+ * comments are too long to fit on a single slide even alone (see
+ * expandCandidateToChunks), splitting at block boundaries within a comment
+ * if needed, so a block is never silently cut off instead of continuing on
+ * a new slide. */
+interface DetailChunk {
+  parentTitle: string;
+  children: TimelineItem[];
+  assignee?: TimelineItem['assignee'];
+  commentFragments: CommentFragment[];
+  commentsHeadingText: string;
+}
+
+// Rough text-wrapping estimate used only to size layout boxes ahead of
+// render: neither pptxgenjs nor jsPDF expose real text measurement before
+// drawing. Assumes an average glyph is ~0.55em wide — a bit wider than a
+// typical sans-serif average, so this skews toward *more* estimated lines
+// rather than fewer, which is the safer direction to be wrong in (extra
+// whitespace instead of overlapping the next block).
+const AVG_CHAR_WIDTH_EM = 0.55;
+
+function estimateWrappedLines(text: string, fontSizePt: number, widthIn: number): number {
+  if (!text) return 1;
+  const charWidthIn = (fontSizePt * AVG_CHAR_WIDTH_EM) / 72;
+  const charsPerLine = Math.max(1, Math.floor(widthIn / charWidthIn));
+  return Math.max(1, Math.ceil(text.length / charsPerLine));
+}
+
+const COMMENT_BODY_X_INDENT_IN = 0.2;
+const COMMENT_BODY_WIDTH_IN = CONTENT_WIDTH_IN - COMMENT_BODY_X_INDENT_IN;
+const COMMENT_LIST_BULLET_INDENT_IN = 0.2;
+const COMMENT_BODY_FONT_SIZE = 11;
+
+/** Estimates one markdown block's rendered height. Used both to lay out a
+ * comment's blocks (layoutMarkdownBlocks) and, at the same per-block
+ * granularity, to decide where a comment needs to be split across slides
+ * (expandCandidateToChunks) — the two always agree on what fits. */
+function estimateBlockHeight(block: MarkdownBlock): number {
+  if (block.type === 'heading') return COMMENT_HEADING_ROW_HEIGHT_IN;
+
+  if (block.type === 'paragraph') {
+    return estimateWrappedLines(block.text, COMMENT_BODY_FONT_SIZE, COMMENT_BODY_WIDTH_IN) * COMMENT_LINE_HEIGHT_IN;
+  }
+
+  if (block.type === 'list') {
+    const totalLines = block.items.reduce(
+      (sum, item) =>
+        sum + estimateWrappedLines(item, COMMENT_BODY_FONT_SIZE, COMMENT_BODY_WIDTH_IN - COMMENT_LIST_BULLET_INDENT_IN),
+      0,
+    );
+    return Math.max(totalLines, 1) * COMMENT_LINE_HEIGHT_IN;
+  }
+
+  return COMMENT_TABLE_HEADER_ROW_HEIGHT_IN + block.rows.length * COMMENT_TABLE_ROW_HEIGHT_IN;
+}
+
+/** Lays out one comment fragment's blocks starting at `startY`, using the
+ * same additive-height approach as the rest of a detail section: each
+ * block's height is estimated from its content and type, then blocks stack
+ * with a small gap between them. */
+function layoutMarkdownBlocks(blocks: MarkdownBlock[], startY: number): { rows: CommentBlockRowModel[]; endY: number } {
+  let y = startY;
+  const rows: CommentBlockRowModel[] = [];
+
+  blocks.forEach((block, index) => {
+    if (index > 0) y += COMMENT_BLOCK_GAP_IN;
+    const height = estimateBlockHeight(block);
+    rows.push({ ...block, y, height });
+    y += height;
+  });
+
+  return { rows, endY: y };
+}
+
 /** Lays out one parent's subtasks/comments block starting at `startY`,
  * returning both the section model (with absolute Y coordinates) and the Y
  * where it ends — so a caller can measure a section's height (by calling
  * with startY = 0) before deciding whether it fits on the current slide, or
  * stack several sections on one slide by chaining `endY` into the next
  * section's `startY`. */
-function buildDetailSection(candidate: DetailCandidate, startY: number): { section: DetailSectionModel; endY: number } {
-  const { parent, children, relevantComments } = candidate;
-
+function buildDetailSection(chunk: DetailChunk, startY: number): { section: DetailSectionModel; endY: number } {
   let y = startY;
   const parentTitleY = y;
   y += ROW_LABEL_HEIGHT_IN + ROW_GAP_IN;
@@ -309,11 +413,11 @@ function buildDetailSection(candidate: DetailCandidate, startY: number): { secti
   const subtasks: SubtaskRowModel[] = [];
   let subtasksHeadingY: number | undefined;
 
-  if (children.length > 0) {
+  if (chunk.children.length > 0) {
     subtasksHeadingY = y;
     y += ROW_LABEL_HEIGHT_IN + ROW_GAP_IN;
 
-    children.forEach((child) => {
+    chunk.children.forEach((child) => {
       const progress = clampProgress(child.progress ?? 0);
       const status = getTaskStatus(child);
       subtasks.push({
@@ -332,30 +436,35 @@ function buildDetailSection(candidate: DetailCandidate, startY: number): { secti
   let assigneeText: string | undefined;
   let assigneeY: number | undefined;
 
-  if (parent.assignee) {
-    assigneeText = `Assigned to: ${parent.assignee.name}`;
+  if (chunk.assignee) {
+    assigneeText = `Assigned to: ${chunk.assignee.name}`;
     assigneeY = y;
     y += LIST_ROW_HEIGHT_IN + SECTION_GAP_IN;
   }
 
-  const comments: CommentRowModel[] = [];
+  const comments: CommentModel[] = [];
   let commentsHeadingY: number | undefined;
 
-  if (relevantComments.length > 0) {
+  if (chunk.commentFragments.length > 0) {
     commentsHeadingY = y;
     y += ROW_LABEL_HEIGHT_IN + ROW_GAP_IN;
 
-    relevantComments.forEach((comment) => {
-      const date = new Date(comment.createdAt).toLocaleDateString();
-      const prefix = comment.isPinned ? '\u{1F4CC} ' : '';
-      const bodyLines = markdownToPlainLines(comment.body);
+    chunk.commentFragments.forEach((fragment, index) => {
+      let meta: CommentMetaModel | undefined;
 
-      bodyLines.forEach((line, index) => {
-        const isLast = index === bodyLines.length - 1;
-        const text = index === 0 ? `${prefix}${line}` : line;
-        comments.push({ text: isLast ? `${text} (${date})` : text, y });
-        y += LIST_ROW_HEIGHT_IN;
-      });
+      if (fragment.showMeta) {
+        const date = new Date(fragment.comment.createdAt).toLocaleDateString();
+        const metaText = fragment.comment.isPinned ? `\u{1F4CC} ${date}` : date;
+        meta = { text: metaText, y };
+        y += COMMENT_META_ROW_HEIGHT_IN;
+      }
+
+      const { rows, endY } = layoutMarkdownBlocks(fragment.blocks, y);
+      y = endY;
+
+      comments.push({ meta, blocks: rows });
+
+      if (index < chunk.commentFragments.length - 1) y += COMMENT_GAP_IN;
     });
 
     y += SECTION_GAP_IN;
@@ -363,38 +472,132 @@ function buildDetailSection(candidate: DetailCandidate, startY: number): { secti
 
   return {
     section: {
-      parentTitle: parent.label,
+      parentTitle: chunk.parentTitle,
       parentTitleY,
       subtasksHeadingY,
       subtasks,
       assigneeText,
       assigneeY,
       commentsHeadingY,
+      commentsHeadingText: chunk.commentFragments.length > 0 ? chunk.commentsHeadingText : undefined,
       comments,
     },
     endY: y,
   };
 }
 
-/** Packs parent sections onto appendix slides by their actual measured
- * height (not a fixed count per slide — sections vary a lot depending on
- * how many subtasks/comments a parent has), so several parents share a
- * slide whenever they fit within CONTENT_HEIGHT_IN. */
-function buildDetailSlides(candidates: DetailCandidate[]): DetailSlideModel[] {
-  if (candidates.length === 0) return [];
+/** Splits one parent's detail content into one or more chunks so nothing is
+ * silently cut off: if the parent's subtasks/assignee/comments all fit
+ * within one slide's content height, there's a single chunk as before;
+ * otherwise comments spill into "(continued)" chunks that repeat the
+ * parent's title. When even one comment's blocks don't fit in a fresh
+ * chunk, it's split at block boundaries (e.g. a heading+paragraph+list on
+ * one slide, a trailing table continuing on the next) rather than accepted
+ * as a single oversized chunk — letting a block-level element like a table
+ * overflow a slide's bounds is what previously made jsPDF's table plugin
+ * silently insert its own extra page when asked to draw past the bottom of
+ * the content area. Chunks (possibly from different parents) are then
+ * packed onto slides by buildDetailSlides exactly like whole sections used
+ * to be. */
+function expandCandidateToChunks(candidate: DetailCandidate): DetailChunk[] {
+  const { parent, children, relevantComments } = candidate;
 
-  const withHeight = candidates.map((candidate) => ({
-    candidate,
+  const makeChunk = (isFirst: boolean): DetailChunk => ({
+    parentTitle: isFirst ? parent.label : `${parent.label} (continued)`,
+    children: isFirst ? children : [],
+    assignee: isFirst ? parent.assignee : undefined,
+    commentFragments: [],
+    commentsHeadingText: isFirst ? 'Comments' : 'Comments (continued)',
+  });
+
+  if (relevantComments.length === 0) return [makeChunk(true)];
+
+  const chunks: DetailChunk[] = [];
+  let current = makeChunk(true);
+
+  const fits = (chunk: DetailChunk) => buildDetailSection(chunk, 0).endY <= CONTENT_HEIGHT_IN;
+  const isEmpty = (chunk: DetailChunk) => chunk.commentFragments.length === 0;
+  const withFragment = (chunk: DetailChunk, fragment: CommentFragment): DetailChunk => ({
+    ...chunk,
+    commentFragments: [...chunk.commentFragments, fragment],
+  });
+  const startNewChunk = () => {
+    chunks.push(current);
+    current = makeChunk(false);
+  };
+
+  relevantComments.forEach((comment) => {
+    const blocks = parseMarkdownBlocks(comment.body);
+
+    if (blocks.length === 0) {
+      // No parsed content (e.g. an empty/whitespace-only body) — still show
+      // the meta line, on a fresh chunk if the current one has no room left.
+      if (!isEmpty(current) && !fits(withFragment(current, { comment, blocks: [], showMeta: true }))) {
+        startNewChunk();
+      }
+      current = withFragment(current, { comment, blocks: [], showMeta: true });
+      return;
+    }
+
+    let remaining = blocks;
+    let showMeta = true;
+
+    while (remaining.length > 0) {
+      // Grow this comment's fragment in the current chunk one block at a
+      // time, taking as many as still fit.
+      let taken = 0;
+      for (let count = 1; count <= remaining.length; count++) {
+        const attempt = withFragment(current, { comment, blocks: remaining.slice(0, count), showMeta });
+        // The lone-block fallback only applies at count === 1: a single
+        // block that's unavoidably too tall for an empty chunk is let
+        // through as best effort rather than looping forever trying to
+        // split it further.
+        if (fits(attempt) || (isEmpty(current) && count === 1)) {
+          taken = count;
+        } else {
+          break;
+        }
+      }
+
+      if (taken === 0) {
+        // Nothing from this comment fits alongside the current chunk's
+        // existing content — start a fresh chunk and retry there.
+        startNewChunk();
+        continue;
+      }
+
+      current = withFragment(current, { comment, blocks: remaining.slice(0, taken), showMeta });
+      remaining = remaining.slice(taken);
+      showMeta = false;
+
+      if (remaining.length > 0) startNewChunk();
+    }
+  });
+
+  chunks.push(current);
+  return chunks;
+}
+
+/** Packs parent chunks onto appendix slides by their actual measured height
+ * (not a fixed count per slide — sections vary a lot depending on how many
+ * subtasks/comments a parent has), so several chunks share a slide whenever
+ * they fit within CONTENT_HEIGHT_IN. */
+function buildDetailSlides(candidates: DetailCandidate[]): DetailSlideModel[] {
+  const chunks = candidates.flatMap(expandCandidateToChunks);
+  if (chunks.length === 0) return [];
+
+  const withHeight = chunks.map((chunk) => ({
+    chunk,
     // Height is independent of the starting Y (the layout math is purely
-    // additive), so probing at startY = 0 gives the section's own height.
-    heightIn: buildDetailSection(candidate, 0).endY,
+    // additive), so probing at startY = 0 gives the chunk's own height.
+    heightIn: buildDetailSection(chunk, 0).endY,
   }));
 
-  const groups: DetailCandidate[][] = [];
-  let currentGroup: DetailCandidate[] = [];
+  const groups: DetailChunk[][] = [];
+  let currentGroup: DetailChunk[] = [];
   let usedHeight = 0;
 
-  withHeight.forEach(({ candidate, heightIn }) => {
+  withHeight.forEach(({ chunk, heightIn }) => {
     const additionalHeight = currentGroup.length === 0 ? heightIn : PARENT_SECTION_GAP_IN + heightIn;
 
     if (currentGroup.length > 0 && usedHeight + additionalHeight > CONTENT_HEIGHT_IN) {
@@ -403,7 +606,7 @@ function buildDetailSlides(candidates: DetailCandidate[]): DetailSlideModel[] {
       usedHeight = 0;
     }
 
-    currentGroup.push(candidate);
+    currentGroup.push(chunk);
     usedHeight += currentGroup.length === 1 ? heightIn : PARENT_SECTION_GAP_IN + heightIn;
   });
 
@@ -411,8 +614,8 @@ function buildDetailSlides(candidates: DetailCandidate[]): DetailSlideModel[] {
 
   return groups.map((group, index) => {
     let y = CONTENT_TOP_IN;
-    const sections = group.map((candidate) => {
-      const { section, endY } = buildDetailSection(candidate, y);
+    const sections = group.map((chunk) => {
+      const { section, endY } = buildDetailSection(chunk, y);
       y = endY + PARENT_SECTION_GAP_IN;
       return section;
     });

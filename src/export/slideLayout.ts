@@ -67,3 +67,18 @@ export const SECTION_GAP_IN = 0.2;
 // Gap between one parent's whole subtasks/comments block and the next
 // parent's block when several are packed onto the same appendix slide.
 export const PARENT_SECTION_GAP_IN = 0.3;
+
+// Comment bodies are parsed markdown (see src/utils/renderMarkdown.ts) and
+// rendered as real headings/paragraphs/lists/tables. Heights below reuse the
+// same row-pitch scale as the rest of a detail section (ROW_LABEL_HEIGHT_IN
+// for heading-weight rows, LIST_ROW_HEIGHT_IN for body-weight rows) so a
+// comment's blocks sit at the same visual rhythm as subtask rows.
+export const COMMENT_META_ROW_HEIGHT_IN = 0.18;
+export const COMMENT_HEADING_ROW_HEIGHT_IN = ROW_LABEL_HEIGHT_IN;
+export const COMMENT_LINE_HEIGHT_IN = LIST_ROW_HEIGHT_IN;
+export const COMMENT_TABLE_HEADER_ROW_HEIGHT_IN = 0.26;
+export const COMMENT_TABLE_ROW_HEIGHT_IN = 0.24;
+// Small vertical breathing room between adjacent blocks within one comment,
+// and between one comment's blocks and the next comment's meta line.
+export const COMMENT_BLOCK_GAP_IN = 0.06;
+export const COMMENT_GAP_IN = 0.14;

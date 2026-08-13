@@ -1,10 +1,12 @@
 import { jsPDF } from 'jspdf';
 import type { TextOptionsLight } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import type { ExportOptions } from '../store/timelineStore';
 import type { TaskComment, TimelineItem } from '../types/timeline';
 import { sortItems } from '../utils/sortItems';
 import {
   buildExportSlides,
+  type CommentBlockRowModel,
   type DetailSlideModel,
   type OverviewSlideModel,
   type SummarySlideModel,
@@ -15,6 +17,7 @@ import {
   BAR_HEIGHT_IN,
   BAR_LABEL_PADDING_IN,
   BAR_RADIUS_IN,
+  COMMENT_LINE_HEIGHT_IN,
   CONTENT_TOP_IN,
   CONTENT_WIDTH_IN,
   CONTENT_X_IN,
@@ -29,6 +32,15 @@ import {
 
 const PT_TO_IN = 1 / 72;
 const CHEVRON_WIDTH_IN = 0.14;
+
+// Comment blocks are indented slightly from the section's left edge, same as
+// the subtask rows above them.
+const COMMENT_BODY_X_IN = CONTENT_X_IN + 0.2;
+const COMMENT_BODY_WIDTH_IN = CONTENT_WIDTH_IN - 0.2;
+const COMMENT_HEADING_FONT_SIZE: Record<1 | 2 | 3, number> = { 1: 16, 2: 14, 3: 12 };
+const COMMENT_BODY_FONT_SIZE = 11;
+const COMMENT_TABLE_FONT_SIZE = 9;
+const COMMENT_LIST_BULLET_INDENT_IN = 0.2;
 
 // jsPDF's built-in standard fonts (helvetica/times/courier) only support the
 // WinAnsi character set, so any richer Unicode punctuation must be swapped
@@ -157,6 +169,69 @@ function drawOverviewSlide(doc: jsPDF, model: OverviewSlideModel) {
   });
 }
 
+/** Renders one parsed-markdown block of a comment's body as real PDF content
+ * — a heading gets bold/sized text, a paragraph wraps within the content
+ * width, a list gets bullet-prefixed wrapped lines, and a table uses
+ * jspdf-autotable for real borders/columns instead of a wall of "|"
+ * characters. */
+function drawCommentBlock(doc: jsPDF, block: CommentBlockRowModel) {
+  if (block.type === 'heading') {
+    doc.setFont(PDF_FONT_FACE, 'bold');
+    doc.setFontSize(COMMENT_HEADING_FONT_SIZE[block.level]);
+    doc.setTextColor(withHash(COLORS.navy));
+    drawText(doc, block.text, COMMENT_BODY_X_IN, block.y, { baseline: 'top', maxWidth: COMMENT_BODY_WIDTH_IN });
+    return;
+  }
+
+  if (block.type === 'paragraph') {
+    doc.setFont(PDF_FONT_FACE, 'normal');
+    doc.setFontSize(COMMENT_BODY_FONT_SIZE);
+    doc.setTextColor(withHash(COLORS.navy));
+    drawText(doc, block.text, COMMENT_BODY_X_IN, block.y, { baseline: 'top', maxWidth: COMMENT_BODY_WIDTH_IN });
+    return;
+  }
+
+  if (block.type === 'list') {
+    doc.setFont(PDF_FONT_FACE, 'normal');
+    doc.setFontSize(COMMENT_BODY_FONT_SIZE);
+    doc.setTextColor(withHash(COLORS.navy));
+
+    let itemY = block.y;
+    block.items.forEach((item) => {
+      drawText(doc, '•', COMMENT_BODY_X_IN, itemY, { baseline: 'top' });
+      const lines: string[] = doc.splitTextToSize(
+        toPdfSafeText(item),
+        COMMENT_BODY_WIDTH_IN - COMMENT_LIST_BULLET_INDENT_IN,
+      );
+      doc.text(lines, COMMENT_BODY_X_IN + COMMENT_LIST_BULLET_INDENT_IN, itemY, { baseline: 'top' });
+      itemY += lines.length * COMMENT_LINE_HEIGHT_IN;
+    });
+    return;
+  }
+
+  autoTable(doc, {
+    startY: block.y,
+    margin: { left: COMMENT_BODY_X_IN, right: PAGE_WIDTH_IN - COMMENT_BODY_X_IN - COMMENT_BODY_WIDTH_IN },
+    tableWidth: COMMENT_BODY_WIDTH_IN,
+    head: [block.headers.map(toPdfSafeText)],
+    body: block.rows.map((row) => row.map(toPdfSafeText)),
+    theme: 'grid',
+    styles: {
+      font: PDF_FONT_FACE,
+      fontSize: COMMENT_TABLE_FONT_SIZE,
+      textColor: withHash(COLORS.navy),
+      lineColor: withHash(COLORS.border),
+      lineWidth: 0.01,
+    },
+    headStyles: { fillColor: withHash(COLORS.border), textColor: withHash(COLORS.navy), fontStyle: 'bold' },
+    // The shared slide model already decided what fits where (see
+    // expandCandidateToChunks in timelineExportModel.ts) — autoTable must
+    // never add its own page mid-table, which would desync every block
+    // drawn after it from the model's precomputed Y positions.
+    pageBreak: 'avoid',
+  });
+}
+
 function drawDetailSlide(doc: jsPDF, model: DetailSlideModel) {
   drawChrome(doc, model.title);
 
@@ -199,17 +274,20 @@ function drawDetailSlide(doc: jsPDF, model: DetailSlideModel) {
       doc.setFont(PDF_FONT_FACE, 'bold');
       doc.setFontSize(14);
       doc.setTextColor(withHash(COLORS.navy));
-      drawText(doc, 'Comments', CONTENT_X_IN, section.commentsHeadingY, { baseline: 'top' });
+      drawText(doc, section.commentsHeadingText ?? 'Comments', CONTENT_X_IN, section.commentsHeadingY, {
+        baseline: 'top',
+      });
     }
 
-    section.comments.forEach((row) => {
-      doc.setFont(PDF_FONT_FACE, 'normal');
-      doc.setFontSize(11);
-      doc.setTextColor(withHash(COLORS.navy));
-      drawText(doc, row.text, CONTENT_X_IN + 0.2, row.y, {
-        baseline: 'top',
-        maxWidth: CONTENT_WIDTH_IN - 0.2,
-      });
+    section.comments.forEach((comment) => {
+      if (comment.meta) {
+        doc.setFont(PDF_FONT_FACE, 'italic');
+        doc.setFontSize(9);
+        doc.setTextColor(withHash(COLORS.footerText));
+        drawText(doc, comment.meta.text, COMMENT_BODY_X_IN, comment.meta.y, { baseline: 'top' });
+      }
+
+      comment.blocks.forEach((block) => drawCommentBlock(doc, block));
     });
   });
 }

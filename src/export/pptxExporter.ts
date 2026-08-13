@@ -4,6 +4,7 @@ import type { TaskComment, TimelineItem } from '../types/timeline';
 import { sortItems } from '../utils/sortItems';
 import {
   buildExportSlides,
+  type CommentBlockRowModel,
   type DetailSlideModel,
   type OverviewSlideModel,
   type SummarySlideModel,
@@ -14,6 +15,7 @@ import {
   BAR_HEIGHT_IN,
   BAR_LABEL_PADDING_IN,
   BAR_RADIUS_IN,
+  COMMENT_META_ROW_HEIGHT_IN,
   CONTENT_BOTTOM_IN,
   CONTENT_TOP_IN,
   CONTENT_WIDTH_IN,
@@ -29,6 +31,14 @@ import {
   PAGE_WIDTH_IN,
   ROW_LABEL_HEIGHT_IN,
 } from './slideLayout';
+
+// Comment blocks are indented slightly from the section's left edge, same as
+// the subtask rows above them.
+const COMMENT_BODY_X_IN = CONTENT_X_IN + 0.2;
+const COMMENT_BODY_WIDTH_IN = CONTENT_WIDTH_IN - 0.2;
+const COMMENT_HEADING_FONT_SIZE: Record<1 | 2 | 3, number> = { 1: 16, 2: 14, 3: 12 };
+const COMMENT_BODY_FONT_SIZE = 11;
+const COMMENT_TABLE_FONT_SIZE = 10;
 
 const CHEVRON_WIDTH_IN = 0.14;
 
@@ -222,6 +232,78 @@ function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel) {
   });
 }
 
+/** Renders one parsed-markdown block of a comment's body as real PPTX
+ * content — a heading gets bold/sized text, a paragraph plain text, a list
+ * a real bulleted textbox, and a table pptxgenjs's native addTable (borders
+ * and columns, not a wall of "|" characters). */
+function drawCommentBlock(slide: PptxSlide, block: CommentBlockRowModel) {
+  if (block.type === 'heading') {
+    slide.addText(block.text, {
+      x: COMMENT_BODY_X_IN,
+      y: block.y,
+      w: COMMENT_BODY_WIDTH_IN,
+      h: block.height,
+      fontSize: COMMENT_HEADING_FONT_SIZE[block.level],
+      bold: true,
+      color: COLORS.navy,
+      fontFace: PPTX_FONT_FACE,
+      valign: 'top',
+    });
+  } else if (block.type === 'paragraph') {
+    slide.addText(block.text, {
+      x: COMMENT_BODY_X_IN,
+      y: block.y,
+      w: COMMENT_BODY_WIDTH_IN,
+      h: block.height,
+      fontSize: COMMENT_BODY_FONT_SIZE,
+      color: COLORS.navy,
+      fontFace: PPTX_FONT_FACE,
+      valign: 'top',
+    });
+  } else if (block.type === 'list') {
+    slide.addText(
+      block.items.map((item, index) => ({
+        text: item,
+        options: { bullet: true, breakLine: index < block.items.length - 1 },
+      })),
+      {
+        x: COMMENT_BODY_X_IN,
+        y: block.y,
+        w: COMMENT_BODY_WIDTH_IN,
+        h: block.height,
+        fontSize: COMMENT_BODY_FONT_SIZE,
+        color: COLORS.navy,
+        fontFace: PPTX_FONT_FACE,
+        valign: 'top',
+      },
+    );
+  } else {
+    const colCount = Math.max(block.headers.length, 1);
+    const colW = COMMENT_BODY_WIDTH_IN / colCount;
+
+    slide.addTable(
+      [
+        block.headers.map((header) => ({
+          text: header,
+          options: { bold: true, fill: { color: COLORS.border }, color: COLORS.navy },
+        })),
+        ...block.rows.map((row) => row.map((cell) => ({ text: cell }))),
+      ],
+      {
+        x: COMMENT_BODY_X_IN,
+        y: block.y,
+        w: COMMENT_BODY_WIDTH_IN,
+        colW: Array(colCount).fill(colW),
+        fontSize: COMMENT_TABLE_FONT_SIZE,
+        fontFace: PPTX_FONT_FACE,
+        color: COLORS.navy,
+        border: { type: 'solid', color: COLORS.border, pt: 0.5 },
+        autoPage: false,
+      },
+    );
+  }
+}
+
 function drawDetailSlide(slide: PptxSlide, model: DetailSlideModel) {
   drawChrome(slide, model.title);
 
@@ -288,7 +370,7 @@ function drawDetailSlide(slide: PptxSlide, model: DetailSlideModel) {
     }
 
     if (section.commentsHeadingY !== undefined) {
-      slide.addText('Comments', {
+      slide.addText(section.commentsHeadingText ?? 'Comments', {
         x: CONTENT_X_IN,
         y: section.commentsHeadingY,
         w: CONTENT_WIDTH_IN,
@@ -300,16 +382,22 @@ function drawDetailSlide(slide: PptxSlide, model: DetailSlideModel) {
       });
     }
 
-    section.comments.forEach((row) => {
-      slide.addText(row.text, {
-        x: CONTENT_X_IN + 0.2,
-        y: row.y,
-        w: CONTENT_WIDTH_IN - 0.2,
-        h: LIST_ROW_HEIGHT_IN,
-        fontSize: 11,
-        color: COLORS.navy,
-        fontFace: PPTX_FONT_FACE,
-      });
+    section.comments.forEach((comment) => {
+      if (comment.meta) {
+        slide.addText(comment.meta.text, {
+          x: COMMENT_BODY_X_IN,
+          y: comment.meta.y,
+          w: COMMENT_BODY_WIDTH_IN,
+          h: COMMENT_META_ROW_HEIGHT_IN,
+          fontSize: 9,
+          italic: true,
+          color: COLORS.footerText,
+          fontFace: PPTX_FONT_FACE,
+          valign: 'top',
+        });
+      }
+
+      comment.blocks.forEach((block) => drawCommentBlock(slide, block));
     });
   });
 }
