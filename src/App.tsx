@@ -6,6 +6,7 @@ import { PlanSwitcher } from './components/PlanSwitcher'
 import { exportTimelineToPptx } from './export/pptxExporter'
 import { exportTimelineToPdf } from './export/pdfExporter'
 import { getExportParentItems, planOverview } from './export/timelineExportModel'
+import { buildExportFilename } from './export/dateScale'
 import { sortItems } from './utils/sortItems'
 import { useTimelineStore } from './store/timelineStore'
 import { usePeopleStore } from './store/peopleStore'
@@ -59,12 +60,12 @@ function App() {
 
   const handleExportPptx = () => {
     if (!confirmOverviewCapacity()) return
-    void exportTimelineToPptx(items, exportOptions, comments)
+    void exportTimelineToPptx(items, exportOptions, comments, buildExportFilename(exportOptions.exportTimeframe, 'pptx'))
   }
 
   const handleExportPdf = () => {
     if (!confirmOverviewCapacity()) return
-    void exportTimelineToPdf(items, exportOptions, comments)
+    void exportTimelineToPdf(items, exportOptions, comments, buildExportFilename(exportOptions.exportTimeframe, 'pdf'))
   }
 
   return (

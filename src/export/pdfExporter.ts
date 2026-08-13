@@ -465,6 +465,7 @@ export async function exportTimelineToPdf(
   items: TimelineItem[],
   exportOptions: ExportOptions,
   comments: TaskComment[],
+  fileName: string = 'timeline-export.pdf',
 ): Promise<void> {
   const sortedItems = sortItems(items, exportOptions.sortMode);
   const slides = buildExportSlides(sortedItems, comments, exportOptions.commentMode, exportOptions.exportTimeframe);
@@ -498,5 +499,5 @@ export async function exportTimelineToPdf(
     }
   });
 
-  doc.save('timeline-export.pdf');
+  doc.save(fileName);
 }

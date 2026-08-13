@@ -600,6 +600,7 @@ export async function exportTimelineToPptx(
   items: TimelineItem[],
   exportOptions: ExportOptions,
   comments: TaskComment[],
+  fileName: string = 'timeline-export.pptx',
 ): Promise<void> {
   const sortedItems = sortItems(items, exportOptions.sortMode);
   const slides = buildExportSlides(sortedItems, comments, exportOptions.commentMode, exportOptions.exportTimeframe);
@@ -633,7 +634,7 @@ export async function exportTimelineToPptx(
     }
   });
 
-  await pptx.writeFile({ fileName: 'timeline-export.pptx' }).catch((error) => {
+  await pptx.writeFile({ fileName }).catch((error) => {
     console.error('Failed to export timeline to PowerPoint', error);
   });
 }

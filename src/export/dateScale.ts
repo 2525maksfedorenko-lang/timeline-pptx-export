@@ -13,6 +13,60 @@ export function shiftIsoDate(iso: string, days: number) {
   return date.toISOString().slice(0, 10);
 }
 
+/** ISO date (YYYY-MM-DD) for the 1st of the given UTC month — `month` is
+ * 0-indexed (0 = January), matching Date's own convention. */
+export function firstDayOfMonthIso(year: number, month: number): string {
+  return new Date(Date.UTC(year, month, 1)).toISOString().slice(0, 10);
+}
+
+/** ISO date (YYYY-MM-DD) for the last day of the given UTC month — day 0 of
+ * the following month is a standard JS trick for "last day of this one". */
+export function lastDayOfMonthIso(year: number, month: number): string {
+  return new Date(Date.UTC(year, month + 1, 0)).toISOString().slice(0, 10);
+}
+
+const FULL_MONTH_NAMES = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
+
+/** Export filename derived from the export timeframe: 'timeline-export.ext'
+ * when there's no timeframe (the full date range), otherwise a human name
+ * like 'June-September_2026_aicoo.pdf' (same year) or
+ * 'November_2026-February_2027_aicoo.pdf' (spanning a year boundary). Dates
+ * are read as UTC (matching how the rest of this file treats ISO date-only
+ * strings) so the displayed month never shifts with the local timezone. */
+export function buildExportFilename(
+  timeframe: { start: string; end: string } | null,
+  extension: 'pptx' | 'pdf',
+): string {
+  if (!timeframe) return `timeline-export.${extension}`;
+
+  const start = new Date(timeframe.start);
+  const end = new Date(timeframe.end);
+  const startMonth = FULL_MONTH_NAMES[start.getUTCMonth()];
+  const startYear = start.getUTCFullYear();
+  const endMonth = FULL_MONTH_NAMES[end.getUTCMonth()];
+  const endYear = end.getUTCFullYear();
+
+  const range =
+    startYear === endYear
+      ? `${startMonth}-${endMonth}_${startYear}`
+      : `${startMonth}_${startYear}-${endMonth}_${endYear}`;
+
+  return `${range}_aicoo.${extension}`;
+}
+
 /** "Sep 01" — shared by the on-screen day header and the export overview's
  * date-scale axis, so both formats always agree. */
 export function formatShortDate(date: Date): string {

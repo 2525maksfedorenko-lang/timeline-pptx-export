@@ -3,6 +3,7 @@ import { useTimelineStore, type ExportOptions } from '../store/timelineStore';
 import { getTaskStatus, TASK_STATUS_LABELS, type SortMode, type TaskStatus } from '../types/timeline';
 import { toHtml } from '../utils/renderMarkdown';
 import { buildTaskHierarchy } from '../utils/taskHierarchy';
+import { firstDayOfMonthIso, getDateRange, lastDayOfMonthIso } from '../export/dateScale';
 
 const COMMENT_BODY_CLASSES =
   '[&_p]:mb-2 [&_p:last-child]:mb-0 [&_strong]:font-semibold [&_em]:italic ' +
@@ -29,6 +30,10 @@ const SORT_MODE_OPTIONS: { value: SortMode; label: string }[] = [
   { value: 'progress', label: 'Progress' },
 ];
 
+const MONTH_OPTIONS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map(
+  (label, value) => ({ value, label }),
+);
+
 export function ExportSettingsPanel() {
   const [isOpen, setIsOpen] = useState(true);
   const items = useTimelineStore((state) => state.items);
@@ -45,6 +50,41 @@ export function ExportSettingsPanel() {
   const handleToggleAll = () => {
     const nextValue = !allIncluded;
     items.forEach((item) => updateItem(item.id, { includeInExport: nextValue }));
+  };
+
+  // Month/year pickers default to the plan's own date range when no
+  // timeframe is set yet, so touching just one dropdown produces a sensible
+  // full timeframe immediately instead of an awkward half-set one.
+  const itemsRange = getDateRange(items);
+  const fromDefault = exportTimeframe ? new Date(exportTimeframe.start) : itemsRange.minDate;
+  const toDefault = exportTimeframe ? new Date(exportTimeframe.end) : itemsRange.maxDate;
+  const fromMonth = fromDefault.getUTCMonth();
+  const fromYear = fromDefault.getUTCFullYear();
+  const toMonth = toDefault.getUTCMonth();
+  const toYear = toDefault.getUTCFullYear();
+
+  // Year options always cover the plan's actual date range and today, plus
+  // a 1-year buffer on each side — expanded further if a previously-set
+  // timeframe already reaches outside that (so its year is never missing
+  // from the list).
+  const candidateYears = [
+    itemsRange.minDate.getUTCFullYear(),
+    itemsRange.maxDate.getUTCFullYear(),
+    new Date().getUTCFullYear(),
+    fromYear,
+    toYear,
+  ];
+  const minYear = Math.min(...candidateYears) - 1;
+  const maxYear = Math.max(...candidateYears) + 1;
+  const yearOptions = Array.from({ length: maxYear - minYear + 1 }, (_, index) => minYear + index);
+
+  const setTimeframe = (nextFromMonth: number, nextFromYear: number, nextToMonth: number, nextToYear: number) => {
+    updateExportOptions({
+      exportTimeframe: {
+        start: firstDayOfMonthIso(nextFromYear, nextFromMonth),
+        end: lastDayOfMonthIso(nextToYear, nextToMonth),
+      },
+    });
   };
 
   return (
@@ -163,29 +203,59 @@ export function ExportSettingsPanel() {
               )}
             </div>
             <div className="flex items-center gap-2">
-              <input
-                type="date"
-                aria-label="Export timeframe start"
-                value={exportTimeframe?.start ?? ''}
-                onChange={(event) =>
-                  updateExportOptions({
-                    exportTimeframe: { start: event.target.value, end: exportTimeframe?.end ?? event.target.value },
-                  })
-                }
-                className="flex-1 rounded-md border border-[#E5E5E1] px-2 py-1.5 text-sm text-[#1E2B38] focus:border-[#2A9D90] focus:outline-none"
-              />
+              <div className="flex flex-1 gap-1">
+                <select
+                  aria-label="From month"
+                  value={fromMonth}
+                  onChange={(event) => setTimeframe(Number(event.target.value), fromYear, toMonth, toYear)}
+                  className="min-w-0 flex-1 rounded-md border border-[#E5E5E1] px-2 py-1.5 text-sm text-[#1E2B38] focus:border-[#2A9D90] focus:outline-none"
+                >
+                  {MONTH_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  aria-label="From year"
+                  value={fromYear}
+                  onChange={(event) => setTimeframe(fromMonth, Number(event.target.value), toMonth, toYear)}
+                  className="w-20 flex-shrink-0 rounded-md border border-[#E5E5E1] px-2 py-1.5 text-sm text-[#1E2B38] focus:border-[#2A9D90] focus:outline-none"
+                >
+                  {yearOptions.map((year) => (
+                    <option key={year} value={year}>
+                      {year}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <span className="text-xs text-slate-400">to</span>
-              <input
-                type="date"
-                aria-label="Export timeframe end"
-                value={exportTimeframe?.end ?? ''}
-                onChange={(event) =>
-                  updateExportOptions({
-                    exportTimeframe: { start: exportTimeframe?.start ?? event.target.value, end: event.target.value },
-                  })
-                }
-                className="flex-1 rounded-md border border-[#E5E5E1] px-2 py-1.5 text-sm text-[#1E2B38] focus:border-[#2A9D90] focus:outline-none"
-              />
+              <div className="flex flex-1 gap-1">
+                <select
+                  aria-label="To month"
+                  value={toMonth}
+                  onChange={(event) => setTimeframe(fromMonth, fromYear, Number(event.target.value), toYear)}
+                  className="min-w-0 flex-1 rounded-md border border-[#E5E5E1] px-2 py-1.5 text-sm text-[#1E2B38] focus:border-[#2A9D90] focus:outline-none"
+                >
+                  {MONTH_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  aria-label="To year"
+                  value={toYear}
+                  onChange={(event) => setTimeframe(fromMonth, fromYear, toMonth, Number(event.target.value))}
+                  className="w-20 flex-shrink-0 rounded-md border border-[#E5E5E1] px-2 py-1.5 text-sm text-[#1E2B38] focus:border-[#2A9D90] focus:outline-none"
+                >
+                  {yearOptions.map((year) => (
+                    <option key={year} value={year}>
+                      {year}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
 
