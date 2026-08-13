@@ -24,12 +24,12 @@ import {
   BAR_LABEL_PADDING_IN,
   BAR_RADIUS_IN,
   COMMENT_LINE_HEIGHT_IN,
+  CONTENT_BOTTOM_IN,
   CONTENT_TOP_IN,
   CONTENT_WIDTH_IN,
   CONTENT_X_IN,
-  DIMENSION_LINE_WIDTH_PT,
-  DIMENSION_TICK_MARK_HEIGHT_IN,
   FOOTER_HEIGHT_IN,
+  GRID_LINE_WIDTH_PT,
   GROUP_HEADER_HEIGHT_IN,
   HEADER_HEIGHT_IN,
   PAGE_HEIGHT_IN,
@@ -116,36 +116,21 @@ function drawOverviewSlide(doc: jsPDF, model: OverviewSlideModel) {
   });
 
   if (model.dateTicks.length > 0) {
+    const axisLineY = model.dateAxisY + GROUP_HEADER_HEIGHT_IN;
     doc.setDrawColor(withHash(COLORS.border));
     doc.setLineWidth(0.01);
-    const axisLineY = model.dateAxisY + GROUP_HEADER_HEIGHT_IN;
     doc.line(CONTENT_X_IN, axisLineY, CONTENT_X_IN + CONTENT_WIDTH_IN, axisLineY);
+
+    // Grid lines dropped from each date-axis tick down through the bar
+    // area — drawn before the bars so they sit behind them in z-order.
+    doc.setDrawColor(withHash(COLORS.gridLine));
+    doc.setLineWidth(GRID_LINE_WIDTH_PT * PT_TO_IN);
+    model.dateTicks.forEach((tick) => {
+      doc.line(tick.x, axisLineY, tick.x, CONTENT_BOTTOM_IN);
+    });
   }
 
   model.bars.forEach((bar) => {
-    // Dimension line above the bar, technical-drawing style: a small date
-    // label, a thin extent line spanning the bar's drawn width, and short
-    // tick marks at both ends.
-    doc.setFont(PDF_FONT_FACE, 'normal');
-    doc.setFontSize(7);
-    doc.setTextColor(withHash(COLORS.footerText));
-    drawText(doc, bar.dimensionLabel, bar.barX + bar.trackWidth / 2, bar.dimensionLabelY, {
-      baseline: 'top',
-      align: 'center',
-    });
-
-    doc.setDrawColor(withHash(COLORS.footerText));
-    doc.setLineWidth(DIMENSION_LINE_WIDTH_PT * PT_TO_IN);
-    doc.line(bar.barX, bar.dimensionLineY, bar.barX + bar.trackWidth, bar.dimensionLineY);
-    [bar.barX, bar.barX + bar.trackWidth].forEach((tickX) => {
-      doc.line(
-        tickX,
-        bar.dimensionLineY - DIMENSION_TICK_MARK_HEIGHT_IN / 2,
-        tickX,
-        bar.dimensionLineY + DIMENSION_TICK_MARK_HEIGHT_IN / 2,
-      );
-    });
-
     doc.setFillColor(withHash(COLORS.border));
     doc.roundedRect(bar.barX, bar.y, bar.trackWidth, BAR_HEIGHT_IN, BAR_RADIUS_IN, BAR_RADIUS_IN, 'F');
 

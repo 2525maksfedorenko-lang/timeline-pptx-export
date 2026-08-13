@@ -25,8 +25,6 @@ import {
   CONTENT_TOP_IN,
   CONTENT_X_IN,
   CONTENT_WIDTH_IN,
-  DIMENSION_LINE_GAP_IN,
-  DIMENSION_TICK_HEIGHT_IN,
   GROUP_HEADER_HEIGHT_IN,
   LIST_ROW_HEIGHT_IN,
   MAX_OVERVIEW_BARS_PER_SLIDE,
@@ -48,12 +46,6 @@ export interface OverviewBarModel {
   barX: number;
   trackWidth: number;
   fillWidth: number;
-  // Technical-drawing-style dimension line above the bar: the task's real
-  // (unclipped) start/end dates, always shown even if the bar itself is
-  // visually cut off by an export timeframe window.
-  dimensionLabel: string;
-  dimensionLabelY: number;
-  dimensionLineY: number;
   // True when the task's real start/end falls outside the export timeframe
   // window, so the bar is drawn clipped at that edge with a chevron marker.
   chevronLeft: boolean;
@@ -215,11 +207,9 @@ export function planOverview(parentItems: TimelineItem[], timeframe: ExportTimef
 }
 
 /** Lays out the (single) overview slide: a date-scale axis at the top, then
- * one bar per item, each with its own dimension-line annotation showing its
- * real start/end dates. If an export timeframe window is set and a task's
- * real dates fall outside it, the bar is clipped to the content edge and
- * flagged with a chevron — but its dimension label always shows the task's
- * real, unclipped dates, and its progress is unaffected by the clip. */
+ * one bar per item. If an export timeframe window is set and a task's real
+ * dates fall outside it, the bar is clipped to the content edge and flagged
+ * with a chevron — but its progress is unaffected by the clip. */
 function buildOverviewSlide(
   items: TimelineItem[],
   timeframe: ExportTimeframe | null,
@@ -272,21 +262,16 @@ function buildOverviewSlide(
       const windowClippedWidth = Math.max(clippedRightIn - (barX - CONTENT_X_IN), 0);
       const trackWidth = Math.min(Math.max(windowClippedWidth, MIN_TRACK_WIDTH_IN), maxTrackWidth);
 
-      const barY = y + DIMENSION_TICK_HEIGHT_IN;
-
       bars.push({
         id: item.id,
         label: `${item.label}  ${progress}%`,
         color: statusColor(progress),
         statusText: TASK_STATUS_LABELS[status],
         statusColor: TASK_STATUS_COLORS[status],
-        y: barY,
+        y,
         barX,
         trackWidth,
         fillWidth: progress > 0 ? Math.max((trackWidth * progress) / 100, 0.05) : 0,
-        dimensionLabel: `${formatShortDate(new Date(item.start))} – ${formatShortDate(new Date(item.end))}`,
-        dimensionLabelY: y,
-        dimensionLineY: barY - DIMENSION_LINE_GAP_IN,
         chevronLeft,
         chevronRight,
       });

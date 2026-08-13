@@ -12,6 +12,8 @@ export const COLORS = {
   // Not part of the brand palette itself, but needed for legible gray
   // caption text on the light footer strip.
   footerText: '6B7280',
+  // Faint vertical date-axis grid lines on the overview slide.
+  gridLine: 'D8D6CC',
 } as const;
 
 export function withHash(hex: string) {

@@ -26,10 +26,8 @@ import {
   CONTENT_TOP_IN,
   CONTENT_WIDTH_IN,
   CONTENT_X_IN,
-  DIMENSION_LABEL_HEIGHT_IN,
-  DIMENSION_LINE_WIDTH_PT,
-  DIMENSION_TICK_MARK_HEIGHT_IN,
   FOOTER_HEIGHT_IN,
+  GRID_LINE_WIDTH_PT,
   GROUP_HEADER_HEIGHT_IN,
   HEADER_HEIGHT_IN,
   LIST_ROW_HEIGHT_IN,
@@ -133,49 +131,29 @@ function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel) {
   });
 
   if (model.dateTicks.length > 0) {
+    const axisLineY = model.dateAxisY + GROUP_HEADER_HEIGHT_IN;
     slide.addShape('line', {
       x: CONTENT_X_IN,
-      y: model.dateAxisY + GROUP_HEADER_HEIGHT_IN,
+      y: axisLineY,
       w: CONTENT_WIDTH_IN,
       h: 0,
       line: { color: COLORS.border, width: 0.75 },
     });
+
+    // Grid lines dropped from each date-axis tick down through the bar
+    // area — drawn before the bars so they sit behind them in z-order.
+    model.dateTicks.forEach((tick) => {
+      slide.addShape('line', {
+        x: tick.x,
+        y: axisLineY,
+        w: 0,
+        h: CONTENT_BOTTOM_IN - axisLineY,
+        line: { color: COLORS.gridLine, width: GRID_LINE_WIDTH_PT },
+      });
+    });
   }
 
   model.bars.forEach((bar) => {
-    // Dimension line above the bar, technical-drawing style: a small date
-    // label, a thin extent line spanning the bar's drawn width, and short
-    // tick marks at both ends.
-    slide.addText(bar.dimensionLabel, {
-      x: bar.barX,
-      y: bar.dimensionLabelY,
-      w: bar.trackWidth,
-      h: DIMENSION_LABEL_HEIGHT_IN,
-      fontSize: 7,
-      color: COLORS.footerText,
-      fontFace: PPTX_FONT_FACE,
-      align: 'center',
-      valign: 'middle',
-    });
-
-    slide.addShape('line', {
-      x: bar.barX,
-      y: bar.dimensionLineY,
-      w: bar.trackWidth,
-      h: 0,
-      line: { color: COLORS.footerText, width: DIMENSION_LINE_WIDTH_PT },
-    });
-
-    [bar.barX, bar.barX + bar.trackWidth].forEach((tickX) => {
-      slide.addShape('line', {
-        x: tickX,
-        y: bar.dimensionLineY - DIMENSION_TICK_MARK_HEIGHT_IN / 2,
-        w: 0,
-        h: DIMENSION_TICK_MARK_HEIGHT_IN,
-        line: { color: COLORS.footerText, width: DIMENSION_LINE_WIDTH_PT },
-      });
-    });
-
     slide.addShape('roundRect', {
       x: bar.barX,
       y: bar.y,

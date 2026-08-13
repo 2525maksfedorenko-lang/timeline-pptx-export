@@ -36,19 +36,13 @@ export const BAR_LABEL_ZONE_MIN_IN = 2.6;
 // almost entirely out of an export timeframe window.
 export const MIN_TRACK_WIDTH_IN = 0.15;
 
-// Technical-drawing-style dimension line stacked above each bar: a small
-// date-range label, then a thin extent line (with tick marks at both ends)
-// sitting right above the bar's top edge.
-const PT_PER_IN = 72;
-export const DIMENSION_LABEL_HEIGHT_IN = 0.08;
-export const DIMENSION_LINE_GAP_IN = 0.04;
-export const DIMENSION_TICK_HEIGHT_IN = DIMENSION_LABEL_HEIGHT_IN + DIMENSION_LINE_GAP_IN;
-export const DIMENSION_LINE_WIDTH_PT = 0.5;
-export const DIMENSION_TICK_MARK_HEIGHT_IN = 3 / PT_PER_IN;
+// Per-row vertical pitch on the overview slide = bar height + gap to the
+// next bar. = 0.28 + 0.04 = 0.32in
+export const ROW_HEIGHT_IN = BAR_HEIGHT_IN + ROW_GAP_IN;
 
-// Per-row vertical pitch on the overview slide = dimension-tick zone + bar
-// height + gap to the next bar. = 0.12 + 0.28 + 0.04 = 0.44in
-export const ROW_HEIGHT_IN = DIMENSION_TICK_HEIGHT_IN + BAR_HEIGHT_IN + ROW_GAP_IN;
+// Thin vertical grid line dropped from each date-axis tick, running down
+// through the bar area to the bottom of the content area, behind the bars.
+export const GRID_LINE_WIDTH_PT = 0.5;
 
 // Small heading-weight row, reused for the overview slide's date-scale axis
 // row. = 0.22 + 0.04 = 0.26in
