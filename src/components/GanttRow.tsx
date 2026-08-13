@@ -1,10 +1,17 @@
 import { useMemo, useRef, useState } from 'react';
 import { getTaskStatus, TASK_STATUS_COLORS, TASK_STATUS_LABELS, type TimelineItem } from '../types/timeline';
 import { useTimelineStore } from '../store/timelineStore';
+import { usePeopleStore } from '../store/peopleStore';
 import { getItemBar, shiftIsoDate } from '../export/dateScale';
 import { clampProgress } from '../utils/clampProgress';
 import { getInitials } from '../utils/initials';
 import { getDescendantIds } from '../utils/taskHierarchy';
+
+// Sentinel select value for "+ Add new person", distinct from any real
+// person id (a crypto.randomUUID()) and from '' (the default "no change"
+// placeholder — leaving this on save keeps the item's current assignee,
+// same as leaving the old free-text field blank used to).
+const NEW_PERSON_OPTION = '__new__';
 
 interface GanttRowProps {
   item: TimelineItem;
@@ -72,12 +79,17 @@ export function GanttRow({ item, minDate, pxPerDay }: GanttRowProps) {
   const addComment = useTimelineStore((state) => state.addComment);
   const toggleIncludeInExportCascade = useTimelineStore((state) => state.toggleIncludeInExportCascade);
   const deleteTaskCascade = useTimelineStore((state) => state.deleteTaskCascade);
+  const people = usePeopleStore((state) => state.people);
+  const addPerson = usePeopleStore((state) => state.addPerson);
   const barRef = useRef<HTMLDivElement>(null);
   const dragState = useRef<DragState | null>(null);
 
   const [isNotePopupOpen, setIsNotePopupOpen] = useState(false);
   const [commentText, setCommentText] = useState('');
-  const [assigneeName, setAssigneeName] = useState('');
+  // '' = no change (keep the item's current assignee, if any); a person's
+  // id = switch to them; NEW_PERSON_OPTION = show the "add new person" field.
+  const [selectedAssigneeId, setSelectedAssigneeId] = useState('');
+  const [newPersonName, setNewPersonName] = useState('');
 
   const { left, width } = getItemBar(item, minDate, pxPerDay);
   const progress = clampProgress(item.progress ?? 0);
@@ -115,23 +127,41 @@ export function GanttRow({ item, minDate, pxPerDay }: GanttRowProps) {
 
   const handleOpenNotePopup = (event: React.MouseEvent) => {
     event.stopPropagation();
+    // Preselect the item's current assignee if they're a known person, so
+    // reopening the popup doesn't look like the assignment was lost — but
+    // if there's no match (e.g. a name set before this picker existed),
+    // default to "no change" rather than guessing.
+    const currentAssigneeId = item.assignee
+      ? people.find((person) => person.name === item.assignee?.name)?.id
+      : undefined;
+    setSelectedAssigneeId(currentAssigneeId ?? '');
+    setNewPersonName('');
     setIsNotePopupOpen(true);
   };
 
   const closeNotePopup = () => {
     setIsNotePopupOpen(false);
     setCommentText('');
-    setAssigneeName('');
+    setSelectedAssigneeId('');
+    setNewPersonName('');
   };
 
   const canSaveNote = commentText.trim() !== '';
 
-  const handleSaveNote = () => {
+  const handleSaveNote = async () => {
     if (!canSaveNote) return;
 
-    const trimmedAssignee = assigneeName.trim();
-    if (trimmedAssignee !== '') {
-      updateItem(item.id, { assignee: { name: trimmedAssignee } });
+    if (selectedAssigneeId === NEW_PERSON_OPTION) {
+      const trimmedName = newPersonName.trim();
+      if (trimmedName !== '') {
+        const person = await addPerson(trimmedName);
+        updateItem(item.id, { assignee: { name: person.name } });
+      }
+    } else if (selectedAssigneeId !== '') {
+      const person = people.find((candidate) => candidate.id === selectedAssigneeId);
+      if (person) {
+        updateItem(item.id, { assignee: { name: person.name } });
+      }
     }
 
     addComment({
@@ -303,22 +333,38 @@ export function GanttRow({ item, minDate, pxPerDay }: GanttRowProps) {
 
           <div className="mt-2 flex flex-col gap-1">
             <label htmlFor={`assignee-${item.id}`} className="text-xs font-medium text-slate-500">
-              Assignee name
+              Assignee
             </label>
-            <input
+            <select
               id={`assignee-${item.id}`}
-              type="text"
-              value={assigneeName}
-              onChange={(event) => setAssigneeName(event.target.value)}
-              placeholder="e.g. Max Fedorenko"
-              className="rounded-md border border-[#E5E5E1] px-2 py-1 text-sm text-[#1E2B38] focus:border-[#2A9D90] focus:outline-none"
-            />
+              value={selectedAssigneeId}
+              onChange={(event) => setSelectedAssigneeId(event.target.value)}
+              className="rounded-md border border-[#E5E5E1] bg-white px-2 py-1 text-sm text-[#1E2B38] focus:border-[#2A9D90] focus:outline-none"
+            >
+              <option value="">{item.assignee ? `Keep: ${item.assignee.name}` : 'Select assignee…'}</option>
+              {people.map((person) => (
+                <option key={person.id} value={person.id}>
+                  {person.name}
+                </option>
+              ))}
+              <option value={NEW_PERSON_OPTION}>+ Add new person</option>
+            </select>
+            {selectedAssigneeId === NEW_PERSON_OPTION && (
+              <input
+                type="text"
+                autoFocus
+                value={newPersonName}
+                onChange={(event) => setNewPersonName(event.target.value)}
+                placeholder="e.g. Max Fedorenko"
+                className="mt-1 rounded-md border border-[#E5E5E1] px-2 py-1 text-sm text-[#1E2B38] focus:border-[#2A9D90] focus:outline-none"
+              />
+            )}
           </div>
 
           <div className="mt-3 flex gap-1.5">
             <button
               type="button"
-              onClick={handleSaveNote}
+              onClick={() => void handleSaveNote()}
               disabled={!canSaveNote}
               className="rounded-md bg-[#2A9D90] px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[#238277] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-[#2A9D90]"
             >

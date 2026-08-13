@@ -8,6 +8,7 @@ import { exportTimelineToPdf } from './export/pdfExporter'
 import { getExportParentItems, planOverview } from './export/timelineExportModel'
 import { sortItems } from './utils/sortItems'
 import { useTimelineStore } from './store/timelineStore'
+import { usePeopleStore } from './store/peopleStore'
 
 type Tab = 'timeline' | 'dashboard'
 
@@ -26,6 +27,7 @@ function App() {
   const items = useTimelineStore((state) => state.items)
   const exportOptions = useTimelineStore((state) => state.exportOptions)
   const comments = useTimelineStore((state) => state.comments)
+  const loadPeople = usePeopleStore((state) => state.loadPeople)
 
   const [highlightSection] = useState<DashboardSection | null>(readDashboardViewParam)
   const [activeTab, setActiveTab] = useState<Tab>(highlightSection ? 'dashboard' : 'timeline')
@@ -33,6 +35,10 @@ function App() {
   useEffect(() => {
     void loadPlans()
   }, [loadPlans])
+
+  useEffect(() => {
+    void loadPeople()
+  }, [loadPeople])
 
   // Overview is always a single slide: if more top-level tasks fall in the
   // effective date range than fit on it, confirm with the user before
