@@ -84,6 +84,8 @@ export interface DetailSectionModel {
   parentTitleY: number;
   subtasksHeadingY?: number;
   subtasks: SubtaskRowModel[];
+  assigneeText?: string;
+  assigneeY?: number;
   commentsHeadingY?: number;
   comments: CommentRowModel[];
 }
@@ -327,6 +329,15 @@ function buildDetailSection(candidate: DetailCandidate, startY: number): { secti
     y += SECTION_GAP_IN;
   }
 
+  let assigneeText: string | undefined;
+  let assigneeY: number | undefined;
+
+  if (parent.assignee) {
+    assigneeText = `Assigned to: ${parent.assignee.name}`;
+    assigneeY = y;
+    y += LIST_ROW_HEIGHT_IN + SECTION_GAP_IN;
+  }
+
   const comments: CommentRowModel[] = [];
   let commentsHeadingY: number | undefined;
 
@@ -351,7 +362,16 @@ function buildDetailSection(candidate: DetailCandidate, startY: number): { secti
   }
 
   return {
-    section: { parentTitle: parent.label, parentTitleY, subtasksHeadingY, subtasks, commentsHeadingY, comments },
+    section: {
+      parentTitle: parent.label,
+      parentTitleY,
+      subtasksHeadingY,
+      subtasks,
+      assigneeText,
+      assigneeY,
+      commentsHeadingY,
+      comments,
+    },
     endY: y,
   };
 }

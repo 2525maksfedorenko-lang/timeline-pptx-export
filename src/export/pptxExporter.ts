@@ -274,6 +274,19 @@ function drawDetailSlide(slide: PptxSlide, model: DetailSlideModel) {
       });
     });
 
+    if (section.assigneeText !== undefined && section.assigneeY !== undefined) {
+      slide.addText(section.assigneeText, {
+        x: CONTENT_X_IN,
+        y: section.assigneeY,
+        w: CONTENT_WIDTH_IN,
+        h: LIST_ROW_HEIGHT_IN,
+        fontSize: 12,
+        bold: true,
+        color: COLORS.navy,
+        fontFace: PPTX_FONT_FACE,
+      });
+    }
+
     if (section.commentsHeadingY !== undefined) {
       slide.addText('Comments', {
         x: CONTENT_X_IN,

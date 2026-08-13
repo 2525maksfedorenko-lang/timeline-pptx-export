@@ -1,8 +1,9 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { getTaskStatus, TASK_STATUS_COLORS, TASK_STATUS_LABELS, type TimelineItem } from '../types/timeline';
 import { useTimelineStore } from '../store/timelineStore';
 import { getItemBar, shiftIsoDate } from '../export/dateScale';
 import { clampProgress } from '../utils/clampProgress';
+import { getInitials } from '../utils/initials';
 
 interface GanttRowProps {
   item: TimelineItem;
@@ -33,10 +34,23 @@ function EyeOffIcon() {
   );
 }
 
+function CommentIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+    </svg>
+  );
+}
+
 export function GanttRow({ item, minDate, pxPerDay }: GanttRowProps) {
   const updateItem = useTimelineStore((state) => state.updateItem);
+  const addComment = useTimelineStore((state) => state.addComment);
   const barRef = useRef<HTMLDivElement>(null);
   const dragState = useRef<DragState | null>(null);
+
+  const [isNotePopupOpen, setIsNotePopupOpen] = useState(false);
+  const [commentText, setCommentText] = useState('');
+  const [assigneeName, setAssigneeName] = useState('');
 
   const { left, width } = getItemBar(item, minDate, pxPerDay);
   const progress = clampProgress(item.progress ?? 0);
@@ -46,6 +60,37 @@ export function GanttRow({ item, minDate, pxPerDay }: GanttRowProps) {
   const handleToggleVisibility = (event: React.MouseEvent) => {
     event.stopPropagation();
     updateItem(item.id, { includeInExport: !included });
+  };
+
+  const handleOpenNotePopup = (event: React.MouseEvent) => {
+    event.stopPropagation();
+    setIsNotePopupOpen(true);
+  };
+
+  const closeNotePopup = () => {
+    setIsNotePopupOpen(false);
+    setCommentText('');
+    setAssigneeName('');
+  };
+
+  const canSaveNote = commentText.trim() !== '';
+
+  const handleSaveNote = () => {
+    if (!canSaveNote) return;
+
+    const trimmedAssignee = assigneeName.trim();
+    if (trimmedAssignee !== '') {
+      updateItem(item.id, { assignee: { name: trimmedAssignee } });
+    }
+
+    addComment({
+      id: crypto.randomUUID(),
+      taskId: item.id,
+      body: commentText.trim(),
+      createdAt: new Date().toISOString(),
+    });
+
+    closeNotePopup();
   };
 
   const handleMouseDown = (event: React.MouseEvent) => {
@@ -96,7 +141,7 @@ export function GanttRow({ item, minDate, pxPerDay }: GanttRowProps) {
           className="h-full"
           style={{ width: `${progress}%`, backgroundColor: item.color ?? '#3b82f6' }}
         />
-        <span className="absolute inset-0 flex items-center gap-1 truncate pl-2 pr-6 text-xs font-medium text-slate-900">
+        <span className="absolute inset-0 flex items-center gap-1 truncate pl-2 pr-12 text-xs font-medium text-slate-900">
           <span
             className="h-2 w-2 flex-shrink-0 rounded-full"
             style={{ backgroundColor: `#${TASK_STATUS_COLORS[status]}` }}
@@ -104,7 +149,25 @@ export function GanttRow({ item, minDate, pxPerDay }: GanttRowProps) {
           />
           {item.label}
           {item.progress != null && <span className="text-slate-600">({item.progress}%)</span>}
+          {item.assignee && (
+            <span
+              className="ml-1 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full bg-[#2A9D90] text-[9px] font-semibold text-white"
+              title={item.assignee.name}
+            >
+              {getInitials(item.assignee.name)}
+            </span>
+          )}
         </span>
+        <button
+          type="button"
+          onMouseDown={(event) => event.stopPropagation()}
+          onClick={handleOpenNotePopup}
+          className="absolute right-6 top-1/2 z-10 flex h-4 w-4 -translate-y-1/2 items-center justify-center text-slate-700/70 hover:text-slate-900"
+          title="Add comment / assignee"
+          aria-label="Add comment / assignee"
+        >
+          <CommentIcon />
+        </button>
         <button
           type="button"
           onMouseDown={(event) => event.stopPropagation()}
@@ -116,6 +179,61 @@ export function GanttRow({ item, minDate, pxPerDay }: GanttRowProps) {
           {included ? <EyeIcon /> : <EyeOffIcon />}
         </button>
       </div>
+
+      {isNotePopupOpen && (
+        <div
+          className="absolute top-full z-20 mt-1 w-64 rounded-md border border-[#E5E5E1] bg-white p-3 shadow-lg"
+          style={{ left }}
+          onMouseDown={(event) => event.stopPropagation()}
+        >
+          <div className="flex flex-col gap-1">
+            <label htmlFor={`comment-${item.id}`} className="text-xs font-medium text-slate-500">
+              Comment *
+            </label>
+            <textarea
+              id={`comment-${item.id}`}
+              autoFocus
+              rows={3}
+              value={commentText}
+              onChange={(event) => setCommentText(event.target.value)}
+              placeholder="Add a note about this task…"
+              className="resize-none rounded-md border border-[#E5E5E1] px-2 py-1 text-sm text-[#1E2B38] focus:border-[#2A9D90] focus:outline-none"
+            />
+          </div>
+
+          <div className="mt-2 flex flex-col gap-1">
+            <label htmlFor={`assignee-${item.id}`} className="text-xs font-medium text-slate-500">
+              Assignee name
+            </label>
+            <input
+              id={`assignee-${item.id}`}
+              type="text"
+              value={assigneeName}
+              onChange={(event) => setAssigneeName(event.target.value)}
+              placeholder="e.g. Max Fedorenko"
+              className="rounded-md border border-[#E5E5E1] px-2 py-1 text-sm text-[#1E2B38] focus:border-[#2A9D90] focus:outline-none"
+            />
+          </div>
+
+          <div className="mt-3 flex gap-1.5">
+            <button
+              type="button"
+              onClick={handleSaveNote}
+              disabled={!canSaveNote}
+              className="rounded-md bg-[#2A9D90] px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[#238277] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-[#2A9D90]"
+            >
+              Save
+            </button>
+            <button
+              type="button"
+              onClick={closeNotePopup}
+              className="rounded-md px-3 py-1.5 text-sm font-medium text-slate-500 hover:bg-slate-100"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

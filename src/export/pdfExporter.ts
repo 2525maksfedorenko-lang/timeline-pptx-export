@@ -188,6 +188,13 @@ function drawDetailSlide(doc: jsPDF, model: DetailSlideModel) {
       });
     });
 
+    if (section.assigneeText !== undefined && section.assigneeY !== undefined) {
+      doc.setFont(PDF_FONT_FACE, 'bold');
+      doc.setFontSize(12);
+      doc.setTextColor(withHash(COLORS.navy));
+      drawText(doc, section.assigneeText, CONTENT_X_IN, section.assigneeY, { baseline: 'top' });
+    }
+
     if (section.commentsHeadingY !== undefined) {
       doc.setFont(PDF_FONT_FACE, 'bold');
       doc.setFontSize(14);

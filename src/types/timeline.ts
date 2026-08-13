@@ -37,6 +37,7 @@ export interface TimelineItem {
   milestone?: boolean;
   parentId?: string;
   includeInExport?: boolean;
+  assignee?: { name: string; email?: string };
 }
 
 export interface Timeline {
