@@ -6,3 +6,10 @@
 // exactly as visible whether the task spans 1 day or 3 months.
 export const ZONE1_WIDTH_PX = 160;
 export const ZONE3_WIDTH_PX = 140;
+
+// A row's total height and its bar's vertical center, in px — must match
+// GanttRow's own classes (`h-10` row, `top-1 h-8` bar) exactly, since the
+// dependency-connector overlay positions itself against these without
+// touching the DOM.
+export const ROW_HEIGHT_PX = 40;
+export const BAR_CENTER_Y_PX = 20;

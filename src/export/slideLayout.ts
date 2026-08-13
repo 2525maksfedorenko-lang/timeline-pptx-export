@@ -44,6 +44,13 @@ export const ROW_HEIGHT_IN = BAR_HEIGHT_IN + ROW_GAP_IN;
 // through the bar area to the bottom of the content area, behind the bars.
 export const GRID_LINE_WIDTH_PT = 0.5;
 
+// Dependency connector: an elbow line from a predecessor bar's right edge to
+// a successor bar's left edge (right a bit, down/up, right again). Width is
+// slightly heavier than the grid line so the arrow reads clearly on top of
+// the bars.
+export const DEPENDENCY_LINE_WIDTH_PT = 1;
+export const DEPENDENCY_JOG_IN = 0.15;
+
 // Small heading-weight row, reused for the overview slide's date-scale axis
 // row. = 0.22 + 0.04 = 0.26in
 export const GROUP_HEADER_HEIGHT_IN = ROW_LABEL_HEIGHT_IN + ROW_GAP_IN;

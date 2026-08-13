@@ -13,6 +13,7 @@ import { buildTaskHierarchy } from '../utils/taskHierarchy';
 import { daysBetween, BASE_PX_PER_DAY, MS_PER_DAY, formatShortDate, getDateRange, getItemBar } from './dateScale';
 import { statusColor } from './theme';
 import {
+  BAR_HEIGHT_IN,
   BAR_LABEL_ZONE_MIN_IN,
   COMMENT_BLOCK_GAP_IN,
   COMMENT_GAP_IN,
@@ -25,6 +26,7 @@ import {
   CONTENT_TOP_IN,
   CONTENT_X_IN,
   CONTENT_WIDTH_IN,
+  DEPENDENCY_JOG_IN,
   GROUP_HEADER_HEIGHT_IN,
   LIST_ROW_HEIGHT_IN,
   MAX_OVERVIEW_BARS_PER_SLIDE,
@@ -57,12 +59,34 @@ export interface OverviewDateTickModel {
   x: number;
 }
 
+// One straight (horizontal or vertical) leg of a dependency connector's
+// elbow path — drawn as its own line by both exporters, since neither
+// pptxgenjs nor jsPDF can draw an arbitrary multi-segment path directly.
+export interface DependencyConnectorSegment {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+}
+
+export interface OverviewConnectorModel {
+  id: string;
+  // 1 segment for a same-row (straight) connector, 3 for the right/down-or-up/right
+  // elbow — always in draw order, so the arrowhead belongs on the last one.
+  segments: DependencyConnectorSegment[];
+}
+
 export interface OverviewSlideModel {
   kind: 'overview';
   title: string;
   dateAxisY: number;
   dateTicks: OverviewDateTickModel[];
   bars: OverviewBarModel[];
+  // Empty when exportOptions.showDependencies is off, or for any dependency
+  // whose predecessor/successor didn't make it onto this slide (excluded
+  // from export, outside the timeframe window, or truncated by overflow) —
+  // silently omitted rather than drawn as a half-arrow to nowhere.
+  dependencyConnectors: OverviewConnectorModel[];
   // How many in-range parent tasks didn't fit on this slide and were left
   // off entirely — surfaced in the footer so the omission is visible in the
   // exported file itself, not just in the confirm() dialog shown before
@@ -215,6 +239,7 @@ function buildOverviewSlide(
   timeframe: ExportTimeframe | null,
   title: string,
   omittedCount: number,
+  showDependencies: boolean,
 ): OverviewSlideModel {
   const bars: OverviewBarModel[] = [];
   const dateAxisY = CONTENT_TOP_IN;
@@ -280,7 +305,44 @@ function buildOverviewSlide(
     });
   }
 
-  return { kind: 'overview', title, dateAxisY, dateTicks, bars, omittedCount };
+  const dependencyConnectors = showDependencies ? buildDependencyConnectors(items, bars) : [];
+
+  return { kind: 'overview', title, dateAxisY, dateTicks, bars, dependencyConnectors, omittedCount };
+}
+
+/** One connector per (successor, predecessor-id) pair, reusing each bar's
+ * already-computed position — never recomputed from item dates. A
+ * predecessor/successor missing from `barById` means it isn't on this slide
+ * (excluded from export, outside the timeframe window, or cut by overflow
+ * truncation), so that connector is dropped rather than drawn to nowhere. */
+function buildDependencyConnectors(items: TimelineItem[], bars: OverviewBarModel[]): OverviewConnectorModel[] {
+  const barById = new Map(bars.map((bar) => [bar.id, bar]));
+
+  return items.flatMap((item) => {
+    const successorBar = barById.get(item.id);
+    if (!successorBar) return [];
+
+    return (item.dependencies ?? []).flatMap((depId) => {
+      const predecessorBar = barById.get(depId);
+      if (!predecessorBar) return [];
+
+      const x1 = predecessorBar.barX + predecessorBar.trackWidth;
+      const y1 = predecessorBar.y + BAR_HEIGHT_IN / 2;
+      const x2 = successorBar.barX;
+      const y2 = successorBar.y + BAR_HEIGHT_IN / 2;
+
+      const segments: DependencyConnectorSegment[] =
+        y1 === y2
+          ? [{ x1, y1, x2, y2 }]
+          : [
+              { x1, y1, x2: x1 + DEPENDENCY_JOG_IN, y2: y1 },
+              { x1: x1 + DEPENDENCY_JOG_IN, y1, x2: x1 + DEPENDENCY_JOG_IN, y2 },
+              { x1: x1 + DEPENDENCY_JOG_IN, y1: y2, x2, y2 },
+            ];
+
+      return [{ id: `${depId}->${item.id}`, segments }];
+    });
+  });
 }
 
 interface DetailCandidate {
@@ -642,6 +704,7 @@ export function buildExportSlides(
   comments: TaskComment[],
   commentMode: ExportOptions['commentMode'],
   exportTimeframe: ExportTimeframe | null,
+  showDependencies: boolean,
 ): ExportSlideModel[] {
   const exportableItems = items.filter((item) => item.includeInExport !== false);
   const { roots } = buildTaskHierarchy(exportableItems);
@@ -662,7 +725,7 @@ export function buildExportSlides(
 
   const omittedCount = overviewPlan.inRange.length - overviewPlan.included.length;
   const slides: ExportSlideModel[] = [
-    buildOverviewSlide(overviewPlan.included, exportTimeframe, 'Timeline Overview', omittedCount),
+    buildOverviewSlide(overviewPlan.included, exportTimeframe, 'Timeline Overview', omittedCount, showDependencies),
     ...buildDetailSlides(detailCandidates),
   ];
 

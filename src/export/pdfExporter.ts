@@ -28,6 +28,7 @@ import {
   CONTENT_TOP_IN,
   CONTENT_WIDTH_IN,
   CONTENT_X_IN,
+  DEPENDENCY_LINE_WIDTH_PT,
   FOOTER_HEIGHT_IN,
   GRID_LINE_WIDTH_PT,
   GROUP_HEADER_HEIGHT_IN,
@@ -38,6 +39,8 @@ import {
 
 const PT_TO_IN = 1 / 72;
 const CHEVRON_WIDTH_IN = 0.14;
+const DEPENDENCY_ARROW_LENGTH_IN = 0.07;
+const DEPENDENCY_ARROW_HALF_WIDTH_IN = 0.035;
 
 // Comment blocks are indented slightly from the section's left edge, same as
 // the subtask rows above them.
@@ -62,6 +65,18 @@ function toPdfSafeText(text: string): string {
 
 function drawText(doc: jsPDF, text: string, x: number, y: number, options?: TextOptionsLight) {
   doc.text(toPdfSafeText(text), x, y, options);
+}
+
+/** jsPDF's `line()` has no arrowhead option (unlike pptxgenjs's `endArrowType`),
+ * so a dependency connector's arrow is a small filled triangle drawn by hand
+ * at the segment's end point, pointed along its direction of travel. */
+function drawArrowhead(doc: jsPDF, tipX: number, tipY: number, directionRad: number) {
+  const backX = tipX - DEPENDENCY_ARROW_LENGTH_IN * Math.cos(directionRad);
+  const backY = tipY - DEPENDENCY_ARROW_LENGTH_IN * Math.sin(directionRad);
+  const perpX = -Math.sin(directionRad) * DEPENDENCY_ARROW_HALF_WIDTH_IN;
+  const perpY = Math.cos(directionRad) * DEPENDENCY_ARROW_HALF_WIDTH_IN;
+
+  doc.triangle(tipX, tipY, backX + perpX, backY + perpY, backX - perpX, backY - perpY, 'F');
 }
 
 function drawChrome(doc: jsPDF, title: string) {
@@ -174,6 +189,25 @@ function drawOverviewSlide(doc: jsPDF, model: OverviewSlideModel) {
       });
     }
   });
+
+  // Drawn last (on top of the bars) so an arrowhead landing right on a bar's
+  // edge is never undercut by the bar shape painted after it.
+  if (model.dependencyConnectors.length > 0) {
+    doc.setDrawColor(withHash(COLORS.dependencyLine));
+    doc.setFillColor(withHash(COLORS.dependencyLine));
+    doc.setLineWidth(DEPENDENCY_LINE_WIDTH_PT * PT_TO_IN);
+
+    model.dependencyConnectors.forEach((connector) => {
+      connector.segments.forEach((segment, index) => {
+        doc.line(segment.x1, segment.y1, segment.x2, segment.y2);
+
+        if (index === connector.segments.length - 1) {
+          const direction = Math.atan2(segment.y2 - segment.y1, segment.x2 - segment.x1);
+          drawArrowhead(doc, segment.x2, segment.y2, direction);
+        }
+      });
+    });
+  }
 }
 
 /** Draws a real jspdf-autotable table (borders, columns, a bold header row)
@@ -469,7 +503,13 @@ export async function exportTimelineToPdf(
   fileName: string = 'timeline-export.pdf',
 ): Promise<void> {
   const sortedItems = sortItems(items, exportOptions.sortMode);
-  const slides = buildExportSlides(sortedItems, comments, exportOptions.commentMode, exportOptions.exportTimeframe);
+  const slides = buildExportSlides(
+    sortedItems,
+    comments,
+    exportOptions.commentMode,
+    exportOptions.exportTimeframe,
+    exportOptions.showDependencies,
+  );
   const dashboardSlides = buildDashboardSlides(sortedItems, new Date());
   const qrCodeDataUrl = await getExportQrCodeDataUrl();
   const dashboardQrCodeDataUrls = await Promise.all(

@@ -26,6 +26,7 @@ import {
   CONTENT_TOP_IN,
   CONTENT_WIDTH_IN,
   CONTENT_X_IN,
+  DEPENDENCY_LINE_WIDTH_PT,
   FOOTER_HEIGHT_IN,
   GRID_LINE_WIDTH_PT,
   GROUP_HEADER_HEIGHT_IN,
@@ -234,6 +235,26 @@ function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel) {
         valign: 'middle',
       });
     }
+  });
+
+  // Drawn last (on top of the bars) so an arrowhead landing right on a bar's
+  // edge is never undercut by the bar shape painted after it.
+  model.dependencyConnectors.forEach((connector) => {
+    connector.segments.forEach((segment, index) => {
+      slide.addShape('line', {
+        x: Math.min(segment.x1, segment.x2),
+        y: Math.min(segment.y1, segment.y2),
+        w: Math.abs(segment.x2 - segment.x1),
+        h: Math.abs(segment.y2 - segment.y1),
+        flipH: segment.x2 < segment.x1,
+        flipV: segment.y2 < segment.y1,
+        line: {
+          color: COLORS.dependencyLine,
+          width: DEPENDENCY_LINE_WIDTH_PT,
+          endArrowType: index === connector.segments.length - 1 ? 'triangle' : 'none',
+        },
+      });
+    });
   });
 }
 
@@ -602,7 +623,13 @@ export async function exportTimelineToPptx(
   fileName: string = 'timeline-export.pptx',
 ): Promise<void> {
   const sortedItems = sortItems(items, exportOptions.sortMode);
-  const slides = buildExportSlides(sortedItems, comments, exportOptions.commentMode, exportOptions.exportTimeframe);
+  const slides = buildExportSlides(
+    sortedItems,
+    comments,
+    exportOptions.commentMode,
+    exportOptions.exportTimeframe,
+    exportOptions.showDependencies,
+  );
   const dashboardSlides = buildDashboardSlides(sortedItems, new Date());
   const qrCodeDataUrl = await getExportQrCodeDataUrl();
   const dashboardQrCodeDataUrls = await Promise.all(

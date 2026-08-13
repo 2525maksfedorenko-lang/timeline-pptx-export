@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useTimelineStore } from '../store/timelineStore';
 import { GanttRow } from './GanttRow';
 import { AddTaskForm } from './AddTaskForm';
+import { DependencyConnectors } from './DependencyConnectors';
 import { ZONE1_WIDTH_PX, ZONE3_WIDTH_PX } from './ganttLayout';
 import { BASE_PX_PER_DAY, MS_PER_DAY, formatShortDate, getDateRange } from '../export/dateScale';
 import { sortItems } from '../utils/sortItems';
@@ -61,7 +62,8 @@ export function GanttChart() {
               style={{ width: ZONE3_WIDTH_PX }}
             />
           </div>
-          <div>
+          <div className="relative">
+            <DependencyConnectors items={sortedItems} minDate={minDate} pxPerDay={pxPerDay} />
             {sortedItems.map((item) => (
               <GanttRow key={item.id} item={item} minDate={minDate} pxPerDay={pxPerDay} timelineWidth={timelineWidth} />
             ))}
