@@ -1,5 +1,8 @@
 import { useState } from 'react';
 import { useTimelineStore } from '../store/timelineStore';
+import { usePeopleStore } from '../store/peopleStore';
+import { AssigneeSelect } from './AssigneeSelect';
+import { resolveAssignee } from './assigneeSelection';
 import { TASK_STATUS_LABELS, type TaskStatus } from '../types/timeline';
 
 const TASK_STATUS_OPTIONS: { value: TaskStatus; label: string }[] = (
@@ -10,17 +13,23 @@ const DEFAULT_STATUS: TaskStatus = 'todo';
 
 export function AddTaskForm() {
   const addItem = useTimelineStore((state) => state.addItem);
+  const people = usePeopleStore((state) => state.people);
+  const addPerson = usePeopleStore((state) => state.addPerson);
   const [isOpen, setIsOpen] = useState(false);
   const [label, setLabel] = useState('');
   const [start, setStart] = useState('');
   const [end, setEnd] = useState('');
   const [status, setStatus] = useState<TaskStatus>(DEFAULT_STATUS);
+  const [selectedAssigneeId, setSelectedAssigneeId] = useState('');
+  const [newPersonName, setNewPersonName] = useState('');
 
   const reset = () => {
     setLabel('');
     setStart('');
     setEnd('');
     setStatus(DEFAULT_STATUS);
+    setSelectedAssigneeId('');
+    setNewPersonName('');
   };
 
   const handleCancel = () => {
@@ -30,8 +39,10 @@ export function AddTaskForm() {
 
   const canAdd = label.trim() !== '' && start !== '' && end !== '';
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!canAdd) return;
+
+    const assignee = await resolveAssignee(selectedAssigneeId, newPersonName, people, addPerson);
 
     addItem({
       id: crypto.randomUUID(),
@@ -41,6 +52,7 @@ export function AddTaskForm() {
       status,
       progress: 0,
       includeInExport: true,
+      ...(assignee ? { assignee } : {}),
     });
 
     reset();
@@ -120,10 +132,24 @@ export function AddTaskForm() {
         </select>
       </div>
 
+      <div className="flex flex-col gap-1">
+        <label htmlFor="add-task-assignee" className="text-xs font-medium text-slate-500">
+          Assignee
+        </label>
+        <AssigneeSelect
+          idPrefix="add-task"
+          value={selectedAssigneeId}
+          onChange={setSelectedAssigneeId}
+          newPersonName={newPersonName}
+          onNewPersonNameChange={setNewPersonName}
+          placeholderLabel="No assignee"
+        />
+      </div>
+
       <div className="flex gap-1.5">
         <button
           type="button"
-          onClick={handleAdd}
+          onClick={() => void handleAdd()}
           disabled={!canAdd}
           className="rounded-md bg-[#2A9D90] px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[#238277] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-[#2A9D90]"
         >

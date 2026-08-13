@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useTimelineStore } from '../store/timelineStore';
 import { GanttRow } from './GanttRow';
 import { AddTaskForm } from './AddTaskForm';
+import { ZONE1_WIDTH_PX, ZONE3_WIDTH_PX } from './ganttLayout';
 import { BASE_PX_PER_DAY, MS_PER_DAY, formatShortDate, getDateRange } from '../export/dateScale';
 import { sortItems } from '../utils/sortItems';
 
@@ -23,7 +24,11 @@ export function GanttChart() {
     return { minDate: min, days: dayList };
   }, [items]);
 
-  const totalWidth = days.length * pxPerDay;
+  // Zone 2 (the date-scaled timeline) is whatever's left of each row after
+  // the two fixed zones — matches GanttRow's own zone math exactly so bars
+  // line up under the day headers below.
+  const timelineWidth = days.length * pxPerDay;
+  const rowWidth = ZONE1_WIDTH_PX + timelineWidth + ZONE3_WIDTH_PX;
 
   return (
     <div>
@@ -32,21 +37,33 @@ export function GanttChart() {
         <AddTaskForm />
       </div>
       <div className="w-full overflow-x-auto rounded-lg border border-slate-200 bg-white">
-        <div style={{ width: totalWidth }}>
+        <div style={{ width: rowWidth }}>
           <div className="flex border-b border-slate-200 bg-slate-50">
-            {days.map((day) => (
-              <div
-                key={day.toISOString()}
-                className="flex-shrink-0 border-r border-slate-100 py-2 text-center text-[11px] text-slate-500"
-                style={{ width: pxPerDay }}
-              >
-                {formatShortDate(day)}
-              </div>
-            ))}
+            <div
+              className="sticky left-0 z-20 flex-shrink-0 border-r border-slate-200 bg-slate-50 px-2 py-2 text-xs font-medium text-slate-500"
+              style={{ width: ZONE1_WIDTH_PX }}
+            >
+              Task
+            </div>
+            <div className="flex flex-shrink-0" style={{ width: timelineWidth }}>
+              {days.map((day) => (
+                <div
+                  key={day.toISOString()}
+                  className="flex-shrink-0 border-r border-slate-100 py-2 text-center text-[11px] text-slate-500"
+                  style={{ width: pxPerDay }}
+                >
+                  {formatShortDate(day)}
+                </div>
+              ))}
+            </div>
+            <div
+              className="sticky right-0 z-20 flex-shrink-0 border-l border-slate-200 bg-slate-50"
+              style={{ width: ZONE3_WIDTH_PX }}
+            />
           </div>
           <div>
             {sortedItems.map((item) => (
-              <GanttRow key={item.id} item={item} minDate={minDate} pxPerDay={pxPerDay} />
+              <GanttRow key={item.id} item={item} minDate={minDate} pxPerDay={pxPerDay} timelineWidth={timelineWidth} />
             ))}
           </div>
         </div>
