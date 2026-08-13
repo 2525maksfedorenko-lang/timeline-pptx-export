@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { SortMode, TaskComment, Timeline, TimelineItem } from '../types/timeline';
+import { getDescendantIds } from '../utils/taskHierarchy';
 import { DEV_SEED_COMMENTS, DEV_SEED_ITEMS, DEV_SEED_TITLE } from './devSeed';
 import {
   deletePlan as deletePlanFromDb,
@@ -41,6 +42,10 @@ interface TimelineStore {
   addItem: (item: TimelineItem) => void;
   updateItem: (id: string, patch: Partial<TimelineItem>) => void;
   removeItem: (id: string) => void;
+  // Parent-with-subtasks-aware variants of the two actions above: fall back
+  // to the plain single-item behavior when `id` has no subtasks.
+  toggleIncludeInExportCascade: (id: string) => void;
+  deleteTaskCascade: (id: string) => void;
 
   comments: TaskComment[];
   addComment: (comment: TaskComment) => void;
@@ -120,6 +125,43 @@ export const useTimelineStore = create<TimelineStore>()(
         })),
       removeItem: (id) =>
         set((state) => ({ items: state.items.filter((item) => item.id !== id) })),
+
+      toggleIncludeInExportCascade: (id) => {
+        const state = get();
+        const item = state.items.find((candidate) => candidate.id === id);
+        if (!item) return;
+
+        const descendantIds = getDescendantIds(state.items, id);
+        const nextValue = !(item.includeInExport !== false);
+
+        if (descendantIds.length === 0) {
+          state.updateItem(id, { includeInExport: nextValue });
+          return;
+        }
+
+        const idsToUpdate = new Set([id, ...descendantIds]);
+        set((current) => ({
+          items: current.items.map((candidate) =>
+            idsToUpdate.has(candidate.id) ? { ...candidate, includeInExport: nextValue } : candidate,
+          ),
+        }));
+      },
+
+      deleteTaskCascade: (id) => {
+        const state = get();
+        const idsToRemove = new Set([id, ...getDescendantIds(state.items, id)]);
+
+        set((current) => ({
+          items: current.items
+            .filter((item) => !idsToRemove.has(item.id))
+            .map((item) =>
+              item.dependencies?.some((depId) => idsToRemove.has(depId))
+                ? { ...item, dependencies: item.dependencies.filter((depId) => !idsToRemove.has(depId)) }
+                : item,
+            ),
+          comments: current.comments.filter((comment) => !idsToRemove.has(comment.taskId)),
+        }));
+      },
 
       comments: DEV_SEED_COMMENTS,
       addComment: (comment) => set((state) => ({ comments: [...state.comments, comment] })),

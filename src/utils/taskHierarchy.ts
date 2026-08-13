@@ -54,3 +54,24 @@ export function buildTaskHierarchy(items: TimelineItem[]): TaskHierarchy {
 
   return { roots, flat };
 }
+
+/** All descendant ids of `id` (children, grandchildren, ...), not including
+ * `id` itself. Empty if `id` isn't in `items` or has no subtasks — the same
+ * "has subtasks" check the cascade toggle/delete actions and the Gantt row's
+ * eye/trash icons rely on. */
+export function getDescendantIds(items: TimelineItem[], id: string): string[] {
+  const { flat } = buildTaskHierarchy(items);
+  const node = flat.find((candidate) => candidate.item.id === id);
+  if (!node) return [];
+
+  const ids: string[] = [];
+  function collect(nodes: TaskNode[]) {
+    nodes.forEach((child) => {
+      ids.push(child.item.id);
+      collect(child.children);
+    });
+  }
+  collect(node.children);
+
+  return ids;
+}

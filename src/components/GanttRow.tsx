@@ -1,9 +1,10 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { getTaskStatus, TASK_STATUS_COLORS, TASK_STATUS_LABELS, type TimelineItem } from '../types/timeline';
 import { useTimelineStore } from '../store/timelineStore';
 import { getItemBar, shiftIsoDate } from '../export/dateScale';
 import { clampProgress } from '../utils/clampProgress';
 import { getInitials } from '../utils/initials';
+import { getDescendantIds } from '../utils/taskHierarchy';
 
 interface GanttRowProps {
   item: TimelineItem;
@@ -42,9 +43,23 @@ function CommentIcon() {
   );
 }
 
+function TrashIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      <line x1="10" y1="11" x2="10" y2="17" />
+      <line x1="14" y1="11" x2="14" y2="17" />
+    </svg>
+  );
+}
+
 export function GanttRow({ item, minDate, pxPerDay }: GanttRowProps) {
+  const items = useTimelineStore((state) => state.items);
   const updateItem = useTimelineStore((state) => state.updateItem);
   const addComment = useTimelineStore((state) => state.addComment);
+  const toggleIncludeInExportCascade = useTimelineStore((state) => state.toggleIncludeInExportCascade);
+  const deleteTaskCascade = useTimelineStore((state) => state.deleteTaskCascade);
   const barRef = useRef<HTMLDivElement>(null);
   const dragState = useRef<DragState | null>(null);
 
@@ -57,9 +72,25 @@ export function GanttRow({ item, minDate, pxPerDay }: GanttRowProps) {
   const status = getTaskStatus(item);
   const included = item.includeInExport !== false;
 
+  const descendantIds = useMemo(() => getDescendantIds(items, item.id), [items, item.id]);
+  const hasSubtasks = descendantIds.length > 0;
+
   const handleToggleVisibility = (event: React.MouseEvent) => {
     event.stopPropagation();
-    updateItem(item.id, { includeInExport: !included });
+    if (hasSubtasks) {
+      toggleIncludeInExportCascade(item.id);
+    } else {
+      updateItem(item.id, { includeInExport: !included });
+    }
+  };
+
+  const handleDelete = (event: React.MouseEvent) => {
+    event.stopPropagation();
+    const confirmed = window.confirm(
+      `Delete '${item.label}' and its ${descendantIds.length} subtasks? This can't be undone.`,
+    );
+    if (!confirmed) return;
+    deleteTaskCascade(item.id);
   };
 
   const handleOpenNotePopup = (event: React.MouseEvent) => {
@@ -141,7 +172,9 @@ export function GanttRow({ item, minDate, pxPerDay }: GanttRowProps) {
           className="h-full"
           style={{ width: `${progress}%`, backgroundColor: item.color ?? '#3b82f6' }}
         />
-        <span className="absolute inset-0 flex items-center gap-1 truncate pl-2 pr-12 text-xs font-medium text-slate-900">
+        <span
+          className={`absolute inset-0 flex items-center gap-1 truncate pl-2 text-xs font-medium text-slate-900 ${hasSubtasks ? 'pr-16' : 'pr-12'}`}
+        >
           <span
             className="h-2 w-2 flex-shrink-0 rounded-full"
             style={{ backgroundColor: `#${TASK_STATUS_COLORS[status]}` }}
@@ -158,6 +191,18 @@ export function GanttRow({ item, minDate, pxPerDay }: GanttRowProps) {
             </span>
           )}
         </span>
+        {hasSubtasks && (
+          <button
+            type="button"
+            onMouseDown={(event) => event.stopPropagation()}
+            onClick={handleDelete}
+            className="absolute right-11 top-1/2 z-10 flex h-4 w-4 -translate-y-1/2 items-center justify-center text-slate-700/70 hover:text-red-600"
+            title="Delete task and subtasks"
+            aria-label="Delete task and subtasks"
+          >
+            <TrashIcon />
+          </button>
+        )}
         <button
           type="button"
           onMouseDown={(event) => event.stopPropagation()}
