@@ -51,10 +51,13 @@ function App() {
 
     if (plan.inRange.length <= plan.capacity) return true
 
+    const omittedCount = plan.inRange.length - plan.capacity
+
     return window.confirm(
-      `Your plan has ${plan.inRange.length} tasks in this range, only ${plan.capacity} fit on one slide. ` +
-        'Continue with first ' +
-        `${plan.capacity}, or cancel to narrow the timeframe or select fewer tasks?`,
+      `Your plan has ${plan.inRange.length} tasks, only ${plan.capacity} fit on one slide. ` +
+        'Click Cancel to select a narrower month/year range in Export settings before exporting, ' +
+        `or OK to export only the first ${plan.capacity} tasks ` +
+        `(the other ${omittedCount} will be noted as omitted at the bottom of the overview slide).`,
     )
   }
 

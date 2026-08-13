@@ -95,8 +95,29 @@ function drawChrome(slide: PptxSlide, title: string) {
   });
 }
 
+function drawOmittedTasksWarning(slide: PptxSlide, omittedCount: number) {
+  if (omittedCount <= 0) return;
+
+  const footerY = PAGE_HEIGHT_IN - FOOTER_HEIGHT_IN;
+  const taskWord = omittedCount === 1 ? 'task' : 'tasks';
+
+  slide.addText(`+${omittedCount} ${taskWord} not shown — narrow the export timeframe to see them`, {
+    x: CONTENT_X_IN,
+    y: footerY,
+    w: CONTENT_WIDTH_IN - 1.8,
+    h: FOOTER_HEIGHT_IN,
+    fontSize: 8,
+    bold: true,
+    color: COLORS.coral,
+    fontFace: PPTX_FONT_FACE,
+    valign: 'middle',
+    align: 'left',
+  });
+}
+
 function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel) {
   drawChrome(slide, model.title);
+  drawOmittedTasksWarning(slide, model.omittedCount);
 
   model.dateTicks.forEach((tick) => {
     slide.addText(tick.label, {

@@ -71,6 +71,11 @@ export interface OverviewSlideModel {
   dateAxisY: number;
   dateTicks: OverviewDateTickModel[];
   bars: OverviewBarModel[];
+  // How many in-range parent tasks didn't fit on this slide and were left
+  // off entirely — surfaced in the footer so the omission is visible in the
+  // exported file itself, not just in the confirm() dialog shown before
+  // export (see App.tsx's confirmOverviewCapacity).
+  omittedCount: number;
 }
 
 export interface SubtaskRowModel {
@@ -215,7 +220,12 @@ export function planOverview(parentItems: TimelineItem[], timeframe: ExportTimef
  * real dates fall outside it, the bar is clipped to the content edge and
  * flagged with a chevron — but its dimension label always shows the task's
  * real, unclipped dates, and its progress is unaffected by the clip. */
-function buildOverviewSlide(items: TimelineItem[], timeframe: ExportTimeframe | null, title: string): OverviewSlideModel {
+function buildOverviewSlide(
+  items: TimelineItem[],
+  timeframe: ExportTimeframe | null,
+  title: string,
+  omittedCount: number,
+): OverviewSlideModel {
   const bars: OverviewBarModel[] = [];
   const dateAxisY = CONTENT_TOP_IN;
   let dateTicks: OverviewDateTickModel[] = [];
@@ -285,7 +295,7 @@ function buildOverviewSlide(items: TimelineItem[], timeframe: ExportTimeframe | 
     });
   }
 
-  return { kind: 'overview', title, dateAxisY, dateTicks, bars };
+  return { kind: 'overview', title, dateAxisY, dateTicks, bars, omittedCount };
 }
 
 interface DetailCandidate {
@@ -665,8 +675,9 @@ export function buildExportSlides(
     detailCandidates.push({ parent, children, relevantComments });
   });
 
+  const omittedCount = overviewPlan.inRange.length - overviewPlan.included.length;
   const slides: ExportSlideModel[] = [
-    buildOverviewSlide(overviewPlan.included, exportTimeframe, 'Timeline Overview'),
+    buildOverviewSlide(overviewPlan.included, exportTimeframe, 'Timeline Overview', omittedCount),
     ...buildDetailSlides(detailCandidates),
   ];
 

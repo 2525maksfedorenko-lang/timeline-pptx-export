@@ -89,8 +89,24 @@ function drawChrome(doc: jsPDF, title: string) {
   });
 }
 
+function drawOmittedTasksWarning(doc: jsPDF, omittedCount: number) {
+  if (omittedCount <= 0) return;
+
+  const footerY = PAGE_HEIGHT_IN - FOOTER_HEIGHT_IN;
+  const taskWord = omittedCount === 1 ? 'task' : 'tasks';
+
+  doc.setFont(PDF_FONT_FACE, 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(withHash(COLORS.coral));
+  drawText(doc, `+${omittedCount} ${taskWord} not shown - narrow the export timeframe to see them`, CONTENT_X_IN, footerY + FOOTER_HEIGHT_IN / 2, {
+    baseline: 'middle',
+    align: 'left',
+  });
+}
+
 function drawOverviewSlide(doc: jsPDF, model: OverviewSlideModel) {
   drawChrome(doc, model.title);
+  drawOmittedTasksWarning(doc, model.omittedCount);
 
   doc.setFont(PDF_FONT_FACE, 'normal');
   doc.setFontSize(8);
