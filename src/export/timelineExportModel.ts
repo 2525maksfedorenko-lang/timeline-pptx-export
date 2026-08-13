@@ -1,4 +1,4 @@
-import type { ExportOptions } from '../store/timelineStore';
+import type { ExportOptions, ExportTimeframe } from '../store/timelineStore';
 import {
   getTaskStatus,
   TASK_STATUS_COLORS,
@@ -10,7 +10,7 @@ import {
 import { markdownToPlainLines } from '../utils/renderMarkdown';
 import { clampProgress } from '../utils/clampProgress';
 import { buildTaskHierarchy } from '../utils/taskHierarchy';
-import { BASE_PX_PER_DAY, MS_PER_DAY, formatShortDate, getDateRange, getItemBar } from './dateScale';
+import { daysBetween, BASE_PX_PER_DAY, MS_PER_DAY, formatShortDate, getDateRange, getItemBar } from './dateScale';
 import { statusColor } from './theme';
 import {
   BAR_LABEL_ZONE_MIN_IN,
@@ -18,8 +18,12 @@ import {
   CONTENT_TOP_IN,
   CONTENT_X_IN,
   CONTENT_WIDTH_IN,
+  DIMENSION_LINE_GAP_IN,
+  DIMENSION_TICK_HEIGHT_IN,
   GROUP_HEADER_HEIGHT_IN,
   LIST_ROW_HEIGHT_IN,
+  MAX_OVERVIEW_BARS_PER_SLIDE,
+  MIN_TRACK_WIDTH_IN,
   PARENT_SECTION_GAP_IN,
   ROW_GAP_IN,
   ROW_HEIGHT_IN,
@@ -37,12 +41,16 @@ export interface OverviewBarModel {
   barX: number;
   trackWidth: number;
   fillWidth: number;
-}
-
-export interface OverviewGroupHeaderModel {
-  label: string;
-  color: string;
-  y: number;
+  // Technical-drawing-style dimension line above the bar: the task's real
+  // (unclipped) start/end dates, always shown even if the bar itself is
+  // visually cut off by an export timeframe window.
+  dimensionLabel: string;
+  dimensionLabelY: number;
+  dimensionLineY: number;
+  // True when the task's real start/end falls outside the export timeframe
+  // window, so the bar is drawn clipped at that edge with a chevron marker.
+  chevronLeft: boolean;
+  chevronRight: boolean;
 }
 
 export interface OverviewDateTickModel {
@@ -55,7 +63,6 @@ export interface OverviewSlideModel {
   title: string;
   dateAxisY: number;
   dateTicks: OverviewDateTickModel[];
-  groupHeaders: OverviewGroupHeaderModel[];
   bars: OverviewBarModel[];
 }
 
@@ -158,44 +165,101 @@ function buildDateTicks(minDate: Date, totalDays: number, scale: number): Overvi
   });
 }
 
-/** Lays out one overview page: a repeating date-scale axis at the top,
- * then each bar, with a status-group heading inserted wherever `headerAt`
- * says one is needed (either a real status change, or a repeated heading
- * because the previous page ended mid-group). */
-function buildOverviewSlide(
-  pageItems: TimelineItem[],
-  headerAt: Map<number, TaskStatus>,
-  title: string,
-): OverviewSlideModel {
+/** Parent items that overlap the given export timeframe window (any part of
+ * the task's real date span inside the window counts). With no timeframe,
+ * every parent item is "in range" — the window is implicitly the full date
+ * span of the items themselves. */
+export function getItemsInTimeframe(
+  parentItems: TimelineItem[],
+  timeframe: ExportTimeframe | null,
+): TimelineItem[] {
+  if (!timeframe) return parentItems;
+
+  const windowStart = new Date(timeframe.start).getTime();
+  const windowEnd = new Date(timeframe.end).getTime();
+
+  return parentItems.filter((item) => {
+    const start = new Date(item.start).getTime();
+    const end = new Date(item.end).getTime();
+    return start <= windowEnd && end >= windowStart;
+  });
+}
+
+export interface OverviewPlan {
+  /** Parent items that overlap the effective date range, before truncation. */
+  inRange: TimelineItem[];
+  /** How many of those actually fit on the single overview slide. */
+  capacity: number;
+  /** The (possibly truncated) items that will actually be drawn. */
+  included: TimelineItem[];
+}
+
+/** Overview is always a single slide: this decides which of the in-range
+ * parent items fit (first `MAX_OVERVIEW_BARS_PER_SLIDE`, in their current
+ * sort order) so a caller can warn the user before truncating anything. */
+export function planOverview(parentItems: TimelineItem[], timeframe: ExportTimeframe | null): OverviewPlan {
+  const inRange = getItemsInTimeframe(parentItems, timeframe);
+  return {
+    inRange,
+    capacity: MAX_OVERVIEW_BARS_PER_SLIDE,
+    included: inRange.slice(0, MAX_OVERVIEW_BARS_PER_SLIDE),
+  };
+}
+
+/** Lays out the (single) overview slide: a date-scale axis at the top, then
+ * one bar per item, each with its own dimension-line annotation showing its
+ * real start/end dates. If an export timeframe window is set and a task's
+ * real dates fall outside it, the bar is clipped to the content edge and
+ * flagged with a chevron — but its dimension label always shows the task's
+ * real, unclipped dates, and its progress is unaffected by the clip. */
+function buildOverviewSlide(items: TimelineItem[], timeframe: ExportTimeframe | null, title: string): OverviewSlideModel {
   const bars: OverviewBarModel[] = [];
-  const groupHeaders: OverviewGroupHeaderModel[] = [];
   const dateAxisY = CONTENT_TOP_IN;
   let dateTicks: OverviewDateTickModel[] = [];
 
-  if (pageItems.length > 0) {
-    const { minDate, totalDays } = getDateRange(pageItems);
+  if (items.length > 0) {
+    const fullRange = getDateRange(items);
+    const minDate = timeframe ? new Date(timeframe.start) : fullRange.minDate;
+    const maxDate = timeframe ? new Date(timeframe.end) : fullRange.maxDate;
+    const totalDays = daysBetween(minDate, maxDate) + 1;
     const totalWidthPx = totalDays * BASE_PX_PER_DAY;
     const scale = CONTENT_WIDTH_IN / totalWidthPx;
     dateTicks = buildDateTicks(minDate, totalDays, scale);
 
     let y = CONTENT_TOP_IN + GROUP_HEADER_HEIGHT_IN;
 
-    pageItems.forEach((item, index) => {
-      const headerStatus = headerAt.get(index);
-      if (headerStatus !== undefined) {
-        groupHeaders.push({ label: TASK_STATUS_LABELS[headerStatus], color: TASK_STATUS_COLORS[headerStatus], y });
-        y += GROUP_HEADER_HEIGHT_IN;
-      }
-
+    items.forEach((item) => {
       const { left, width } = getItemBar(item, minDate, BASE_PX_PER_DAY);
       const progress = clampProgress(item.progress ?? 0);
-      const barX = CONTENT_X_IN + left * scale;
+      const status = getTaskStatus(item);
+
+      // Raw (unclamped) horizontal extent, in inches from CONTENT_X_IN — used
+      // only to detect whether the real task dates spill outside the window;
+      // never used directly to draw, since it can be negative or exceed
+      // CONTENT_WIDTH_IN.
+      const rawLeftIn = left * scale;
+      const rawRightIn = (left + width) * scale;
+      const chevronLeft = rawLeftIn < -0.001;
+      const chevronRight = rawRightIn > CONTENT_WIDTH_IN + 0.001;
+
+      const clippedLeftIn = Math.max(rawLeftIn, 0);
+      const clippedRightIn = Math.min(rawRightIn, CONTENT_WIDTH_IN);
+
+      // Cap how far right the bar can even *start*, so its label + status
+      // always have BAR_LABEL_ZONE_MIN_IN of room after it — otherwise a
+      // task clipped to a sliver right at the timeframe window's edge would
+      // leave its track's own left edge with no room for a label at all.
+      const maxLeftIn = Math.max(0, CONTENT_WIDTH_IN - BAR_LABEL_ZONE_MIN_IN - MIN_TRACK_WIDTH_IN);
+      const barX = CONTENT_X_IN + Math.min(clippedLeftIn, maxLeftIn);
+
       // Cap how far right the track can extend so its label + status always
       // have BAR_LABEL_ZONE_MIN_IN of room after it, however late/long the
       // task's real date span would otherwise make the bar.
-      const maxTrackWidth = Math.max(0.15, CONTENT_X_IN + CONTENT_WIDTH_IN - BAR_LABEL_ZONE_MIN_IN - barX);
-      const trackWidth = Math.min(Math.max(width * scale, 0.15), maxTrackWidth);
-      const status = getTaskStatus(item);
+      const maxTrackWidth = Math.max(MIN_TRACK_WIDTH_IN, CONTENT_X_IN + CONTENT_WIDTH_IN - BAR_LABEL_ZONE_MIN_IN - barX);
+      const windowClippedWidth = Math.max(clippedRightIn - (barX - CONTENT_X_IN), 0);
+      const trackWidth = Math.min(Math.max(windowClippedWidth, MIN_TRACK_WIDTH_IN), maxTrackWidth);
+
+      const barY = y + DIMENSION_TICK_HEIGHT_IN;
 
       bars.push({
         id: item.id,
@@ -203,88 +267,22 @@ function buildOverviewSlide(
         color: statusColor(progress),
         statusText: TASK_STATUS_LABELS[status],
         statusColor: TASK_STATUS_COLORS[status],
-        y,
+        y: barY,
         barX,
         trackWidth,
         fillWidth: progress > 0 ? Math.max((trackWidth * progress) / 100, 0.05) : 0,
+        dimensionLabel: `${formatShortDate(new Date(item.start))} – ${formatShortDate(new Date(item.end))}`,
+        dimensionLabelY: y,
+        dimensionLineY: barY - DIMENSION_LINE_GAP_IN,
+        chevronLeft,
+        chevronRight,
       });
 
       y += ROW_HEIGHT_IN;
     });
   }
 
-  return { kind: 'overview', title, dateAxisY, dateTicks, groupHeaders, bars };
-}
-
-interface OverviewPage {
-  items: TimelineItem[];
-  headerAt: Map<number, TaskStatus>;
-}
-
-// Real per-page height budget for the overview: every page reserves one
-// GROUP_HEADER_HEIGHT_IN row for the repeating date-scale axis, and each
-// status-group heading costs another GROUP_HEADER_HEIGHT_IN on top of its
-// bars' own ROW_HEIGHT_IN. Computed, not guessed:
-//   CONTENT_HEIGHT_IN       = 4.10625in
-//   date axis reservation   = GROUP_HEADER_HEIGHT_IN = 0.26in
-//   budget for headers+bars = 4.10625 - 0.26 = 3.84625in
-const OVERVIEW_ROWS_HEIGHT_BUDGET_IN = CONTENT_HEIGHT_IN - GROUP_HEADER_HEIGHT_IN;
-
-/** Paginates parent items onto overview pages by real measured height
- * (date axis + status headings + bars), inserting a status-group heading
- * above the first bar of each run of same-status bars — and repeating that
- * heading at the top of a new page if a group gets split across pages, so
- * no bar is ever shown without a visible status heading above it. */
-function paginateOverviewItems(parentItems: TimelineItem[]): OverviewPage[] {
-  if (parentItems.length === 0) return [];
-
-  const pages: OverviewPage[] = [];
-  let currentItems: TimelineItem[] = [];
-  let currentHeaderAt = new Map<number, TaskStatus>();
-  let usedHeight = 0;
-  let lastStatus: TaskStatus | undefined;
-
-  parentItems.forEach((item) => {
-    const status = getTaskStatus(item);
-    const isNewGroup = status !== lastStatus;
-    const rowHeight = ROW_HEIGHT_IN + (isNewGroup ? GROUP_HEADER_HEIGHT_IN : 0);
-
-    if (currentItems.length > 0 && usedHeight + rowHeight > OVERVIEW_ROWS_HEIGHT_BUDGET_IN) {
-      pages.push({ items: currentItems, headerAt: currentHeaderAt });
-      currentItems = [];
-      currentHeaderAt = new Map();
-      usedHeight = 0;
-
-      // Starting a fresh page mid-group: repeat the heading so this bar is
-      // never shown without one, even though its status didn't change.
-      currentHeaderAt.set(0, status);
-      usedHeight += GROUP_HEADER_HEIGHT_IN;
-    } else if (isNewGroup) {
-      currentHeaderAt.set(currentItems.length, status);
-      usedHeight += GROUP_HEADER_HEIGHT_IN;
-    }
-
-    currentItems.push(item);
-    usedHeight += ROW_HEIGHT_IN;
-    lastStatus = status;
-  });
-
-  if (currentItems.length > 0) pages.push({ items: currentItems, headerAt: currentHeaderAt });
-
-  return pages;
-}
-
-function buildOverviewSlides(parentItems: TimelineItem[]): OverviewSlideModel[] {
-  const pages = paginateOverviewItems(parentItems);
-
-  if (pages.length <= 1) {
-    const headerAt = pages[0]?.headerAt ?? new Map<number, TaskStatus>();
-    return [buildOverviewSlide(parentItems, headerAt, 'Timeline Overview')];
-  }
-
-  return pages.map((page, index) =>
-    buildOverviewSlide(page.items, page.headerAt, `Timeline Overview (${index + 1}/${pages.length})`),
-  );
+  return { kind: 'overview', title, dateAxisY, dateTicks, bars };
 }
 
 interface DetailCandidate {
@@ -427,16 +425,29 @@ export function getCommentsForSlide(
   return taskComments;
 }
 
+/** The top-level (parent) items that would appear on the overview slide for
+ * a given item set — same hierarchy rules used by the export settings list
+ * and the overview/detail slide builders, so all three always agree on
+ * "what counts as a top-level task". Exported so a caller (e.g. the export
+ * button) can run `planOverview` itself before generating the file. */
+export function getExportParentItems(items: TimelineItem[]): TimelineItem[] {
+  const exportableItems = items.filter((item) => item.includeInExport !== false);
+  const { roots } = buildTaskHierarchy(exportableItems);
+  return roots.map((node) => node.item);
+}
+
 /** Filters/groups items exactly like the on-screen Gantt chart and builds a
  * render-engine-agnostic slide model shared by the PPTX and PDF exporters. */
 export function buildExportSlides(
   items: TimelineItem[],
   comments: TaskComment[],
   commentMode: ExportOptions['commentMode'],
+  exportTimeframe: ExportTimeframe | null,
 ): ExportSlideModel[] {
   const exportableItems = items.filter((item) => item.includeInExport !== false);
   const { roots } = buildTaskHierarchy(exportableItems);
   const parentItems = roots.map((node) => node.item);
+  const overviewPlan = planOverview(parentItems, exportTimeframe);
 
   const detailCandidates: DetailCandidate[] = [];
   roots.forEach((parentNode) => {
@@ -451,7 +462,7 @@ export function buildExportSlides(
   });
 
   const slides: ExportSlideModel[] = [
-    ...buildOverviewSlides(parentItems),
+    buildOverviewSlide(overviewPlan.included, exportTimeframe, 'Timeline Overview'),
     ...buildDetailSlides(detailCandidates),
   ];
 

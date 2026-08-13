@@ -32,14 +32,35 @@ export const BAR_LABEL_PADDING_IN = 0.06;
 // bar positioned late in the date range (long duration or near the right
 // edge) never grows wide enough to push its label into the status column.
 export const BAR_LABEL_ZONE_MIN_IN = 2.6;
-// Per-row vertical pitch on the overview slide = bar height + gap to the
-// next bar. = 0.28 + 0.04 = 0.32in
-export const ROW_HEIGHT_IN = BAR_HEIGHT_IN + ROW_GAP_IN;
+// Smallest a track is ever drawn, even for a same-day task or one clipped
+// almost entirely out of an export timeframe window.
+export const MIN_TRACK_WIDTH_IN = 0.15;
 
-// Small heading-weight row, reused for: the status-group headers stacked
-// above each run of same-status bars on the overview slide, and that
-// slide's repeating date-scale axis row. = 0.22 + 0.04 = 0.26in
+// Technical-drawing-style dimension line stacked above each bar: a small
+// date-range label, then a thin extent line (with tick marks at both ends)
+// sitting right above the bar's top edge.
+const PT_PER_IN = 72;
+export const DIMENSION_LABEL_HEIGHT_IN = 0.08;
+export const DIMENSION_LINE_GAP_IN = 0.04;
+export const DIMENSION_TICK_HEIGHT_IN = DIMENSION_LABEL_HEIGHT_IN + DIMENSION_LINE_GAP_IN;
+export const DIMENSION_LINE_WIDTH_PT = 0.5;
+export const DIMENSION_TICK_MARK_HEIGHT_IN = 3 / PT_PER_IN;
+
+// Per-row vertical pitch on the overview slide = dimension-tick zone + bar
+// height + gap to the next bar. = 0.12 + 0.28 + 0.04 = 0.44in
+export const ROW_HEIGHT_IN = DIMENSION_TICK_HEIGHT_IN + BAR_HEIGHT_IN + ROW_GAP_IN;
+
+// Small heading-weight row, reused for the overview slide's date-scale axis
+// row. = 0.22 + 0.04 = 0.26in
 export const GROUP_HEADER_HEIGHT_IN = ROW_LABEL_HEIGHT_IN + ROW_GAP_IN;
+
+// Overview is always a single slide now (no more auto-pagination), so its
+// bar capacity is a derived ceiling instead of a hardcoded count: how many
+// row pitches fit under the content area once the date-axis row at the top
+// is reserved. Recomputes automatically if any of the geometry above changes.
+export const MAX_OVERVIEW_BARS_PER_SLIDE = Math.floor(
+  (CONTENT_HEIGHT_IN - GROUP_HEADER_HEIGHT_IN) / ROW_HEIGHT_IN,
+);
 
 export const LIST_ROW_HEIGHT_IN = 0.32;
 export const SECTION_GAP_IN = 0.2;

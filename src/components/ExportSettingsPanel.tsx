@@ -36,6 +36,7 @@ export function ExportSettingsPanel() {
   const comments = useTimelineStore((state) => state.comments);
   const commentMode = useTimelineStore((state) => state.exportOptions.commentMode);
   const sortMode = useTimelineStore((state) => state.exportOptions.sortMode);
+  const exportTimeframe = useTimelineStore((state) => state.exportOptions.exportTimeframe);
   const updateExportOptions = useTimelineStore((state) => state.updateExportOptions);
 
   const rows = buildTaskHierarchy(items).flat;
@@ -145,6 +146,48 @@ export function ExportSettingsPanel() {
               </option>
             ))}
           </select>
+
+          <div className="mt-4 border-t border-[#E5E5E1] pt-4">
+            <div className="mb-1 flex items-center justify-between">
+              <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                Export timeframe (optional)
+              </span>
+              {exportTimeframe && (
+                <button
+                  type="button"
+                  onClick={() => updateExportOptions({ exportTimeframe: null })}
+                  className="text-xs font-medium text-[#2A9D90] hover:underline"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                aria-label="Export timeframe start"
+                value={exportTimeframe?.start ?? ''}
+                onChange={(event) =>
+                  updateExportOptions({
+                    exportTimeframe: { start: event.target.value, end: exportTimeframe?.end ?? event.target.value },
+                  })
+                }
+                className="flex-1 rounded-md border border-[#E5E5E1] px-2 py-1.5 text-sm text-[#1E2B38] focus:border-[#2A9D90] focus:outline-none"
+              />
+              <span className="text-xs text-slate-400">to</span>
+              <input
+                type="date"
+                aria-label="Export timeframe end"
+                value={exportTimeframe?.end ?? ''}
+                onChange={(event) =>
+                  updateExportOptions({
+                    exportTimeframe: { start: exportTimeframe?.start ?? event.target.value, end: event.target.value },
+                  })
+                }
+                className="flex-1 rounded-md border border-[#E5E5E1] px-2 py-1.5 text-sm text-[#1E2B38] focus:border-[#2A9D90] focus:outline-none"
+              />
+            </div>
+          </div>
 
           {comments.length > 0 && (
             <div className="mt-4 border-t border-[#E5E5E1] pt-4">

@@ -11,6 +11,11 @@ import {
 
 export type { SavedPlan };
 
+export interface ExportTimeframe {
+  start: string; // ISO date
+  end: string; // ISO date
+}
+
 export interface ExportOptions {
   theme: string;
   scale: Timeline['scale'];
@@ -18,6 +23,8 @@ export interface ExportOptions {
   showDependencies: boolean;
   commentMode: 'latest' | 'pinned' | 'all' | 'none';
   sortMode: SortMode;
+  // null = use the full date range of the included tasks (no windowing).
+  exportTimeframe: ExportTimeframe | null;
 }
 
 export interface UiState {
@@ -63,6 +70,7 @@ export const DEFAULT_EXPORT_OPTIONS: ExportOptions = {
   showDependencies: true,
   commentMode: 'latest',
   sortMode: 'status',
+  exportTimeframe: null,
 };
 
 const DEFAULT_UI: UiState = {

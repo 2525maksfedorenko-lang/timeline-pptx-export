@@ -18,12 +18,17 @@ import {
   CONTENT_TOP_IN,
   CONTENT_WIDTH_IN,
   CONTENT_X_IN,
+  DIMENSION_LINE_WIDTH_PT,
+  DIMENSION_TICK_MARK_HEIGHT_IN,
   FOOTER_HEIGHT_IN,
   GROUP_HEADER_HEIGHT_IN,
   HEADER_HEIGHT_IN,
   PAGE_HEIGHT_IN,
   PAGE_WIDTH_IN,
 } from './slideLayout';
+
+const PT_TO_IN = 1 / 72;
+const CHEVRON_WIDTH_IN = 0.14;
 
 // jsPDF's built-in standard fonts (helvetica/times/courier) only support the
 // WinAnsi character set, so any richer Unicode punctuation must be swapped
@@ -32,7 +37,9 @@ function toPdfSafeText(text: string): string {
   return text
     .replace(/→/g, '->')
     .replace(/[–—]/g, '-')
-    .replace(/\u{1F4CC}/gu, '[pinned] ');
+    .replace(/\u{1F4CC}/gu, '[pinned] ')
+    .replace(/◀/g, '<')
+    .replace(/▶/g, '>');
 }
 
 function drawText(doc: jsPDF, text: string, x: number, y: number, options?: TextOptionsLight) {
@@ -81,14 +88,30 @@ function drawOverviewSlide(doc: jsPDF, model: OverviewSlideModel) {
     doc.line(CONTENT_X_IN, axisLineY, CONTENT_X_IN + CONTENT_WIDTH_IN, axisLineY);
   }
 
-  model.groupHeaders.forEach((header) => {
-    doc.setFont(PDF_FONT_FACE, 'bold');
-    doc.setFontSize(12);
-    doc.setTextColor(withHash(header.color));
-    drawText(doc, header.label, CONTENT_X_IN, header.y + GROUP_HEADER_HEIGHT_IN / 2, { baseline: 'middle' });
-  });
-
   model.bars.forEach((bar) => {
+    // Dimension line above the bar, technical-drawing style: a small date
+    // label, a thin extent line spanning the bar's drawn width, and short
+    // tick marks at both ends.
+    doc.setFont(PDF_FONT_FACE, 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(withHash(COLORS.footerText));
+    drawText(doc, bar.dimensionLabel, bar.barX + bar.trackWidth / 2, bar.dimensionLabelY, {
+      baseline: 'top',
+      align: 'center',
+    });
+
+    doc.setDrawColor(withHash(COLORS.footerText));
+    doc.setLineWidth(DIMENSION_LINE_WIDTH_PT * PT_TO_IN);
+    doc.line(bar.barX, bar.dimensionLineY, bar.barX + bar.trackWidth, bar.dimensionLineY);
+    [bar.barX, bar.barX + bar.trackWidth].forEach((tickX) => {
+      doc.line(
+        tickX,
+        bar.dimensionLineY - DIMENSION_TICK_MARK_HEIGHT_IN / 2,
+        tickX,
+        bar.dimensionLineY + DIMENSION_TICK_MARK_HEIGHT_IN / 2,
+      );
+    });
+
     doc.setFillColor(withHash(COLORS.border));
     doc.roundedRect(bar.barX, bar.y, bar.trackWidth, BAR_HEIGHT_IN, BAR_RADIUS_IN, BAR_RADIUS_IN, 'F');
 
@@ -104,7 +127,9 @@ function drawOverviewSlide(doc: jsPDF, model: OverviewSlideModel) {
     doc.setFont(PDF_FONT_FACE, 'bold');
     doc.setFontSize(11);
     doc.setTextColor(withHash(COLORS.navy));
-    drawText(doc, bar.label, bar.barX + bar.trackWidth + BAR_LABEL_PADDING_IN, centerY, { baseline: 'middle' });
+    const labelX = bar.barX + bar.trackWidth + BAR_LABEL_PADDING_IN;
+    const labelMaxWidth = CONTENT_X_IN + CONTENT_WIDTH_IN - labelX;
+    drawText(doc, bar.label, labelX, centerY, { baseline: 'middle', maxWidth: labelMaxWidth });
 
     doc.setFontSize(9);
     doc.setTextColor(withHash(bar.statusColor));
@@ -112,6 +137,23 @@ function drawOverviewSlide(doc: jsPDF, model: OverviewSlideModel) {
       baseline: 'middle',
       align: 'right',
     });
+
+    // Chevrons mark a bar clipped by the export timeframe window: "starts
+    // earlier" on the left, "continues further" on the right.
+    doc.setFont(PDF_FONT_FACE, 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(withHash(COLORS.navy));
+
+    if (bar.chevronLeft) {
+      drawText(doc, '◀', bar.barX, centerY, { baseline: 'middle', align: 'left' });
+    }
+
+    if (bar.chevronRight) {
+      drawText(doc, '▶', bar.barX + bar.trackWidth - CHEVRON_WIDTH_IN, centerY, {
+        baseline: 'middle',
+        align: 'left',
+      });
+    }
   });
 }
 
@@ -243,7 +285,7 @@ export async function exportTimelineToPdf(
   comments: TaskComment[],
 ): Promise<void> {
   const sortedItems = sortItems(items, exportOptions.sortMode);
-  const slides = buildExportSlides(sortedItems, comments, exportOptions.commentMode);
+  const slides = buildExportSlides(sortedItems, comments, exportOptions.commentMode, exportOptions.exportTimeframe);
   const qrCodeDataUrl = await getExportQrCodeDataUrl();
 
   const doc = new jsPDF({

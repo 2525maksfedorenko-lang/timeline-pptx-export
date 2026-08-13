@@ -18,6 +18,9 @@ import {
   CONTENT_TOP_IN,
   CONTENT_WIDTH_IN,
   CONTENT_X_IN,
+  DIMENSION_LABEL_HEIGHT_IN,
+  DIMENSION_LINE_WIDTH_PT,
+  DIMENSION_TICK_MARK_HEIGHT_IN,
   FOOTER_HEIGHT_IN,
   GROUP_HEADER_HEIGHT_IN,
   HEADER_HEIGHT_IN,
@@ -26,6 +29,8 @@ import {
   PAGE_WIDTH_IN,
   ROW_LABEL_HEIGHT_IN,
 } from './slideLayout';
+
+const CHEVRON_WIDTH_IN = 0.14;
 
 type PptxSlide = ReturnType<pptxgen['addSlide']>;
 
@@ -100,21 +105,40 @@ function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel) {
     });
   }
 
-  model.groupHeaders.forEach((header) => {
-    slide.addText(header.label, {
-      x: CONTENT_X_IN,
-      y: header.y,
-      w: CONTENT_WIDTH_IN,
-      h: GROUP_HEADER_HEIGHT_IN,
-      fontSize: 12,
-      bold: true,
-      color: header.color,
+  model.bars.forEach((bar) => {
+    // Dimension line above the bar, technical-drawing style: a small date
+    // label, a thin extent line spanning the bar's drawn width, and short
+    // tick marks at both ends.
+    slide.addText(bar.dimensionLabel, {
+      x: bar.barX,
+      y: bar.dimensionLabelY,
+      w: bar.trackWidth,
+      h: DIMENSION_LABEL_HEIGHT_IN,
+      fontSize: 7,
+      color: COLORS.footerText,
       fontFace: PPTX_FONT_FACE,
+      align: 'center',
       valign: 'middle',
     });
-  });
 
-  model.bars.forEach((bar) => {
+    slide.addShape('line', {
+      x: bar.barX,
+      y: bar.dimensionLineY,
+      w: bar.trackWidth,
+      h: 0,
+      line: { color: COLORS.footerText, width: DIMENSION_LINE_WIDTH_PT },
+    });
+
+    [bar.barX, bar.barX + bar.trackWidth].forEach((tickX) => {
+      slide.addShape('line', {
+        x: tickX,
+        y: bar.dimensionLineY - DIMENSION_TICK_MARK_HEIGHT_IN / 2,
+        w: 0,
+        h: DIMENSION_TICK_MARK_HEIGHT_IN,
+        line: { color: COLORS.footerText, width: DIMENSION_LINE_WIDTH_PT },
+      });
+    });
+
     slide.addShape('roundRect', {
       x: bar.barX,
       y: bar.y,
@@ -163,6 +187,38 @@ function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel) {
       align: 'right',
       valign: 'middle',
     });
+
+    // Chevrons mark a bar clipped by the export timeframe window: "starts
+    // earlier" on the left, "continues further" on the right.
+    if (bar.chevronLeft) {
+      slide.addText('◀', {
+        x: bar.barX,
+        y: bar.y,
+        w: CHEVRON_WIDTH_IN,
+        h: BAR_HEIGHT_IN,
+        fontSize: 9,
+        bold: true,
+        color: COLORS.navy,
+        fontFace: PPTX_FONT_FACE,
+        align: 'left',
+        valign: 'middle',
+      });
+    }
+
+    if (bar.chevronRight) {
+      slide.addText('▶', {
+        x: bar.barX + bar.trackWidth - CHEVRON_WIDTH_IN,
+        y: bar.y,
+        w: CHEVRON_WIDTH_IN,
+        h: BAR_HEIGHT_IN,
+        fontSize: 9,
+        bold: true,
+        color: COLORS.navy,
+        fontFace: PPTX_FONT_FACE,
+        align: 'right',
+        valign: 'middle',
+      });
+    }
   });
 }
 
@@ -350,7 +406,7 @@ export async function exportTimelineToPptx(
   comments: TaskComment[],
 ): Promise<void> {
   const sortedItems = sortItems(items, exportOptions.sortMode);
-  const slides = buildExportSlides(sortedItems, comments, exportOptions.commentMode);
+  const slides = buildExportSlides(sortedItems, comments, exportOptions.commentMode, exportOptions.exportTimeframe);
   const qrCodeDataUrl = await getExportQrCodeDataUrl();
 
   const pptx = new pptxgen();
