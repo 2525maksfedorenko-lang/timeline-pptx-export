@@ -17,6 +17,18 @@ interface DragState {
   startLeft: number;
 }
 
+// Real pixel dimensions of the icon-group controls (eye/comment/trash
+// buttons + assignee badge), matching their actual Tailwind sizes (h-4 w-4
+// = 16px, gap-1 = 4px) — used to decide whether they fit inside a bar's
+// real pixel width, never a "narrow bar" percentage guess (see
+// iconsOverflow below).
+const ICON_BUTTON_SIZE_PX = 16;
+const ICON_GROUP_GAP_PX = 4;
+const ICON_GROUP_EDGE_PADDING_PX = 4;
+// Gap between the bar's right edge and the icon group when it's moved
+// outside the bar.
+const OUTSIDE_ICON_GROUP_GAP_PX = 6;
+
 function EyeIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -74,6 +86,14 @@ export function GanttRow({ item, minDate, pxPerDay }: GanttRowProps) {
 
   const descendantIds = useMemo(() => getDescendantIds(items, item.id), [items, item.id]);
   const hasSubtasks = descendantIds.length > 0;
+
+  // eye + comment are always present; trash and the assignee badge only
+  // join the group when applicable — count them the same way whether they
+  // end up rendered inside the bar or moved outside it.
+  const iconCount = 2 + (hasSubtasks ? 1 : 0) + (item.assignee ? 1 : 0);
+  const iconGroupWidth =
+    iconCount * ICON_BUTTON_SIZE_PX + (iconCount - 1) * ICON_GROUP_GAP_PX + ICON_GROUP_EDGE_PADDING_PX;
+  const iconsOverflow = width < iconGroupWidth;
 
   const handleToggleVisibility = (event: React.MouseEvent) => {
     event.stopPropagation();
@@ -160,6 +180,65 @@ export function GanttRow({ item, minDate, pxPerDay }: GanttRowProps) {
     window.addEventListener('mouseup', handleMouseUp);
   };
 
+  // When the icon group doesn't fit inside the bar, it's rendered once as a
+  // sibling to the right of the bar instead of absolutely-positioned inside
+  // it — same buttons/handlers either way, only the wrapping position
+  // changes, so each control is built once here and placed in exactly one
+  // of the two spots below.
+  const assigneeBadge = item.assignee && (
+    <span
+      className={`flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full bg-[#2A9D90] text-[9px] font-semibold text-white ${iconsOverflow ? '' : 'ml-1'}`}
+      title={item.assignee.name}
+    >
+      {getInitials(item.assignee.name)}
+    </span>
+  );
+
+  const insideIconClass = (position: string) =>
+    `absolute ${position} top-1/2 z-10 flex h-4 w-4 -translate-y-1/2 items-center justify-center`;
+  const outsideIconClass = 'flex h-4 w-4 flex-shrink-0 items-center justify-center';
+
+  const trashButton = hasSubtasks && (
+    <button
+      type="button"
+      onMouseDown={(event) => event.stopPropagation()}
+      onClick={handleDelete}
+      className={`${iconsOverflow ? outsideIconClass : insideIconClass('right-11')} text-slate-700/70 hover:text-red-600`}
+      title="Delete task and subtasks"
+      aria-label="Delete task and subtasks"
+    >
+      <TrashIcon />
+    </button>
+  );
+
+  const commentButton = (
+    <button
+      type="button"
+      onMouseDown={(event) => event.stopPropagation()}
+      onClick={handleOpenNotePopup}
+      className={`${iconsOverflow ? outsideIconClass : insideIconClass('right-6')} text-slate-700/70 hover:text-slate-900`}
+      title="Add comment / assignee"
+      aria-label="Add comment / assignee"
+    >
+      <CommentIcon />
+    </button>
+  );
+
+  const eyeButton = (
+    <button
+      type="button"
+      onMouseDown={(event) => event.stopPropagation()}
+      onClick={handleToggleVisibility}
+      className={`${iconsOverflow ? outsideIconClass : insideIconClass('right-1')} text-slate-700/70 hover:text-slate-900`}
+      title={included ? 'Exclude from export' : 'Include in export'}
+      aria-label={included ? 'Exclude from export' : 'Include in export'}
+    >
+      {included ? <EyeIcon /> : <EyeOffIcon />}
+    </button>
+  );
+
+  const labelPaddingClass = iconsOverflow ? 'pr-2' : hasSubtasks ? 'pr-16' : 'pr-12';
+
   return (
     <div className="relative h-10 border-b border-slate-100">
       <div
@@ -173,7 +252,7 @@ export function GanttRow({ item, minDate, pxPerDay }: GanttRowProps) {
           style={{ width: `${progress}%`, backgroundColor: item.color ?? '#3b82f6' }}
         />
         <span
-          className={`absolute inset-0 flex items-center gap-1 truncate pl-2 text-xs font-medium text-slate-900 ${hasSubtasks ? 'pr-16' : 'pr-12'}`}
+          className={`absolute inset-0 flex items-center gap-1 truncate pl-2 text-xs font-medium text-slate-900 ${labelPaddingClass}`}
         >
           <span
             className="h-2 w-2 flex-shrink-0 rounded-full"
@@ -182,48 +261,24 @@ export function GanttRow({ item, minDate, pxPerDay }: GanttRowProps) {
           />
           {item.label}
           {item.progress != null && <span className="text-slate-600">({item.progress}%)</span>}
-          {item.assignee && (
-            <span
-              className="ml-1 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full bg-[#2A9D90] text-[9px] font-semibold text-white"
-              title={item.assignee.name}
-            >
-              {getInitials(item.assignee.name)}
-            </span>
-          )}
+          {!iconsOverflow && assigneeBadge}
         </span>
-        {hasSubtasks && (
-          <button
-            type="button"
-            onMouseDown={(event) => event.stopPropagation()}
-            onClick={handleDelete}
-            className="absolute right-11 top-1/2 z-10 flex h-4 w-4 -translate-y-1/2 items-center justify-center text-slate-700/70 hover:text-red-600"
-            title="Delete task and subtasks"
-            aria-label="Delete task and subtasks"
-          >
-            <TrashIcon />
-          </button>
-        )}
-        <button
-          type="button"
-          onMouseDown={(event) => event.stopPropagation()}
-          onClick={handleOpenNotePopup}
-          className="absolute right-6 top-1/2 z-10 flex h-4 w-4 -translate-y-1/2 items-center justify-center text-slate-700/70 hover:text-slate-900"
-          title="Add comment / assignee"
-          aria-label="Add comment / assignee"
-        >
-          <CommentIcon />
-        </button>
-        <button
-          type="button"
-          onMouseDown={(event) => event.stopPropagation()}
-          onClick={handleToggleVisibility}
-          className="absolute right-1 top-1/2 z-10 flex h-4 w-4 -translate-y-1/2 items-center justify-center text-slate-700/70 hover:text-slate-900"
-          title={included ? 'Exclude from export' : 'Include in export'}
-          aria-label={included ? 'Exclude from export' : 'Include in export'}
-        >
-          {included ? <EyeIcon /> : <EyeOffIcon />}
-        </button>
+        {!iconsOverflow && trashButton}
+        {!iconsOverflow && commentButton}
+        {!iconsOverflow && eyeButton}
       </div>
+
+      {iconsOverflow && (
+        <div
+          className="absolute top-1 flex h-8 items-center gap-1"
+          style={{ left: left + width + OUTSIDE_ICON_GROUP_GAP_PX }}
+        >
+          {assigneeBadge}
+          {trashButton}
+          {commentButton}
+          {eyeButton}
+        </div>
+      )}
 
       {isNotePopupOpen && (
         <div
