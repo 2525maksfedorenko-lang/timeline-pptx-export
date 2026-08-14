@@ -249,8 +249,14 @@ export function GanttRow({ item, minDate, pxPerDay, timelineWidth }: GanttRowPro
 
       {/* Zone 2: the timeline itself. The bar, plus the one piece of text
           that belongs on it — the progress percentage. Both live inside the
-          same dragged element so they move together. */}
-      <div className="relative flex-shrink-0" style={{ width: timelineWidth }}>
+          same dragged element so they move together, which is also why the
+          z-index sits here on the zone rather than on the text alone: the
+          percentage can't be lifted out of the dragged element to be layered
+          separately. z-10 puts the whole zone over the date grid (z-0) and
+          the dependency/hierarchy connectors (z-1), so a bracket crossing
+          this row is never drawn across its percentage — matching the
+          shapes-then-text order the exporters use for the same reason. */}
+      <div className="relative z-10 flex-shrink-0" style={{ width: timelineWidth }}>
         <div
           ref={barRef}
           onMouseDown={handleMouseDown}

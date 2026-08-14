@@ -13,16 +13,27 @@ export function shiftIsoDate(iso: string, days: number) {
   return date.toISOString().slice(0, 10);
 }
 
-/** ISO dates (YYYY-MM-DD), starting at `startDate`, stepping exactly 7
- * calendar days at a time, up to and including `endDate`. Steps via
- * `setUTCDate` (not raw millisecond/day-of-month arithmetic) so JS Date
- * itself carries the step across a month boundary — 31 -> 1, 28/29/30 -> 1 —
- * instead of hand-rolled rollover logic. UTC-based to match how the rest of
- * this file treats date-only ISO strings (see shiftIsoDate). */
+/** ISO dates (YYYY-MM-DD) of every **Monday** from `startDate` to `endDate`
+ * inclusive. Anchored on the real Monday on or before `startDate` rather
+ * than on `startDate` itself, so the markers land on actual week boundaries
+ * instead of on an arbitrary 7-day rhythm set by whenever the first task
+ * happens to begin. Steps via `setUTCDate` (not raw millisecond/day-of-month
+ * arithmetic) so JS Date itself carries the step across a month boundary —
+ * 31 -> 1, 28/29/30 -> 1 — instead of hand-rolled rollover logic. UTC-based
+ * to match how the rest of this file treats date-only ISO strings (see
+ * shiftIsoDate).
+ *
+ * The first marker can fall *before* `startDate` (when the range doesn't
+ * itself begin on a Monday) — callers that scale markers into a drawing
+ * range need to drop those; see buildDateGrid in dateGrid.ts. */
 export function getWeekMarkers(startDate: string, endDate: string): string[] {
   const end = new Date(endDate).getTime();
   const markers: string[] = [];
   const date = new Date(startDate);
+
+  // getUTCDay() is 0 for Sunday, so the distance back to Monday is
+  // (day + 6) % 7 — 0 on a Monday, 6 on a Sunday.
+  date.setUTCDate(date.getUTCDate() - ((date.getUTCDay() + 6) % 7));
 
   while (date.getTime() <= end) {
     markers.push(date.toISOString().slice(0, 10));

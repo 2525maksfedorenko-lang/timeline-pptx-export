@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useTimelineStore } from '../store/timelineStore';
 import { GanttRow } from './GanttRow';
 import { AddTaskForm } from './AddTaskForm';
+import { DateGridLines } from './DateGridLines';
 import { DependencyConnectors } from './DependencyConnectors';
 import { HierarchyConnectors } from './HierarchyConnectors';
 import { ZONE1_WIDTH_PX, ZONE3_WIDTH_PX } from './ganttLayout';
@@ -63,7 +64,14 @@ export function GanttChart() {
               style={{ width: ZONE3_WIDTH_PX }}
             />
           </div>
+          {/* Explicit z-stack, back to front: date grid, then the connector
+              overlays, then the rows — whose bars and on-bar text carry z-10
+              (see GanttRow) so a connector crossing a row can never be drawn
+              over its percentage. Without the classes this would fall back to
+              DOM order among positioned siblings, which is far too easy to
+              break by reordering a line here. */}
           <div className="relative">
+            <DateGridLines minDate={minDate} totalDays={days.length} pxPerDay={pxPerDay} />
             <HierarchyConnectors items={sortedItems} minDate={minDate} pxPerDay={pxPerDay} />
             <DependencyConnectors items={sortedItems} minDate={minDate} pxPerDay={pxPerDay} />
             {sortedItems.map((item) => (

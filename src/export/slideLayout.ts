@@ -47,15 +47,11 @@ export const MIN_TRACK_WIDTH_IN = 0.15;
 // next bar. = 0.28 + 0.04 = 0.32in
 export const ROW_HEIGHT_IN = BAR_HEIGHT_IN + ROW_GAP_IN;
 
-// Thin vertical grid line dropped from each date-axis tick, running down
-// through the bar area to the bottom of the content area, behind the bars.
-export const GRID_LINE_WIDTH_PT = 0.5;
-
-// Weekly tick marks on the overview slide's date axis: short (not full
-// height like the monthly grid lines above) and hairline-thin, sitting right
-// at the bottom edge of the bar area.
-export const WEEK_TICK_HEIGHT_IN = 6 / 72;
-export const WEEK_GRID_LINE_WIDTH_PT = 0.4;
+// The vertical day/week/month date lines that run down through the bar area
+// behind the bars don't have their weights here: they're shared with the
+// on-screen chart, so both their colors and their stroke widths live in one
+// table next to the geometry that produces them — see DATE_GRID_STYLES in
+// dateGrid.ts.
 
 // Dependency connector: a bracket line ("┐" + "└", no arrowhead) from a
 // predecessor bar's right edge to a successor bar's left edge — right a

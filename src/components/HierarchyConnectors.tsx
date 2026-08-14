@@ -55,7 +55,7 @@ export function HierarchyConnectors({ items, minDate, pxPerDay }: HierarchyConne
   if (connectors.length === 0) return null;
 
   return (
-    <svg className="pointer-events-none absolute inset-0 h-full w-full overflow-visible" aria-hidden="true">
+    <svg className="pointer-events-none absolute inset-0 z-[1] h-full w-full overflow-visible" aria-hidden="true">
       {connectors.map((connector) => (
         <path key={connector.key} d={connector.d} fill="none" stroke={CONNECTOR_COLOR} strokeWidth={0.75} />
       ))}

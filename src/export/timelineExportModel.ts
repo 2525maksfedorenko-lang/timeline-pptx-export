@@ -14,12 +14,17 @@ import { buildTaskHierarchy } from '../utils/taskHierarchy';
 import {
   daysBetween,
   BASE_PX_PER_DAY,
-  MS_PER_DAY,
   formatShortDate,
   getDateRange,
   getItemBar,
-  getWeekMarkers,
 } from './dateScale';
+import {
+  buildDateGrid,
+  DATE_GRID_LEVELS,
+  type DateGrid,
+  type DateGridLevel,
+  type DateGridMark,
+} from './dateGrid';
 import { measureTextWidthIn } from './textMetrics';
 import { COLORS, statusColor } from './theme';
 import {
@@ -80,14 +85,21 @@ export interface OverviewBarModel {
   chevronRight: boolean;
 }
 
-export interface OverviewDateTickModel {
-  label: string;
+// One vertical date line behind the bars. `level` picks its weight/color out
+// of DATE_GRID_STYLES — the same table the on-screen grid draws from.
+export interface OverviewGridLineModel {
+  level: DateGridLevel;
   x: number;
 }
 
-// A short, unlabeled tick mark dropped every 7 days — drawn in addition to
-// (not instead of) the labeled OverviewDateTickModel grid lines above.
-export interface OverviewWeekTickModel {
+// A date caption on the overview's axis. Month-level captions are the
+// primary scale and set at the axis's normal size; week-level ones are
+// smaller and get thinned out when they'd collide (see buildAxisLabels).
+// Daily lines are deliberately never labeled — one caption per day would be
+// an unreadable smear at any realistic range.
+export interface OverviewAxisLabelModel {
+  level: 'month' | 'week';
+  text: string;
   x: number;
 }
 
@@ -112,8 +124,11 @@ export interface OverviewSlideModel {
   kind: 'overview';
   title: string;
   dateAxisY: number;
-  dateTicks: OverviewDateTickModel[];
-  weekTicks: OverviewWeekTickModel[];
+  // Ordered palest-first (day, then week, then month) so a renderer can draw
+  // the array straight through without a month line being overpainted by the
+  // day line at the same x.
+  gridLines: OverviewGridLineModel[];
+  axisLabels: OverviewAxisLabelModel[];
   bars: OverviewBarModel[];
   // Empty when exportOptions.showDependencies is off, or for any dependency
   // whose predecessor/successor didn't make it onto this slide (excluded
@@ -217,33 +232,33 @@ function buildSummarySlide(items: TimelineItem[]): SummarySlideModel {
   };
 }
 
-const OVERVIEW_DATE_TICK_COUNT = 6;
+// Horizontal room a date caption ("Sep 01") needs before the next one may
+// start. Measured against the week captions, which are the smaller of the
+// two sizes and therefore the ones that crowd first.
+const AXIS_LABEL_MIN_PITCH_IN = 0.5;
 
-/** Evenly spaced date labels across the slide's date range (there isn't
- * room for one label per day like the on-screen day header, since an
- * overview slide can span months in ~9in of width). */
-function buildDateTicks(minDate: Date, totalDays: number, scale: number): OverviewDateTickModel[] {
-  const tickCount = Math.max(1, Math.min(OVERVIEW_DATE_TICK_COUNT, totalDays));
-
-  return Array.from({ length: tickCount }, (_, i) => {
-    const dayOffset = tickCount === 1 ? 0 : Math.round((i * (totalDays - 1)) / (tickCount - 1));
-    const tickDate = new Date(minDate.getTime() + dayOffset * MS_PER_DAY);
-    return {
-      label: formatShortDate(tickDate),
-      x: CONTENT_X_IN + dayOffset * BASE_PX_PER_DAY * scale,
-    };
-  });
-}
-
-/** A short tick every 7 days across the slide's date range, in addition to
- * the labeled monthly-scale ticks from buildDateTicks above. */
-function buildWeekTicks(minDate: Date, maxDate: Date, scale: number): OverviewWeekTickModel[] {
-  const minDateIso = minDate.toISOString().slice(0, 10);
-  const maxDateIso = maxDate.toISOString().slice(0, 10);
-
-  return getWeekMarkers(minDateIso, maxDateIso).map((iso) => ({
-    x: CONTENT_X_IN + daysBetween(minDate, new Date(iso)) * BASE_PX_PER_DAY * scale,
+/** Date captions for the overview axis: one per month line, plus week-line
+ * captions wherever they still fit. Week captions are thinned to every Nth
+ * week once consecutive ones would sit closer than a caption is wide (a
+ * 3-month range packs weeks ~0.2in apart at slide scale), and any that would
+ * collide with a month caption is dropped in favor of it. Day lines get no
+ * caption at any range — see OverviewAxisLabelModel. */
+function buildAxisLabels(grid: DateGrid, toX: (mark: DateGridMark) => number): OverviewAxisLabelModel[] {
+  const monthLabels: OverviewAxisLabelModel[] = grid.month.map((mark) => ({
+    level: 'month',
+    text: formatShortDate(mark.date),
+    x: toX(mark),
   }));
+
+  const weekPitch = grid.week.length > 1 ? toX(grid.week[1]) - toX(grid.week[0]) : Infinity;
+  const stride = weekPitch > 0 ? Math.max(1, Math.ceil(AXIS_LABEL_MIN_PITCH_IN / weekPitch)) : 1;
+
+  const weekLabels: OverviewAxisLabelModel[] = grid.week
+    .filter((_, index) => index % stride === 0)
+    .map((mark) => ({ level: 'week' as const, text: formatShortDate(mark.date), x: toX(mark) }))
+    .filter((label) => monthLabels.every((month) => Math.abs(month.x - label.x) >= AXIS_LABEL_MIN_PITCH_IN));
+
+  return [...monthLabels, ...weekLabels];
 }
 
 /** Parent items that overlap the given export timeframe window (any part of
@@ -319,16 +334,21 @@ function buildOverviewSlide(
 ): OverviewSlideModel {
   const bars: OverviewBarModel[] = [];
   const dateAxisY = CONTENT_TOP_IN;
-  let dateTicks: OverviewDateTickModel[] = [];
-  let weekTicks: OverviewWeekTickModel[] = [];
+  let gridLines: OverviewGridLineModel[] = [];
+  let axisLabels: OverviewAxisLabelModel[] = [];
 
   if (dateWindow && items.length > 0) {
     const { minDate, maxDate } = dateWindow;
     const totalDays = daysBetween(minDate, maxDate) + 1;
     const totalWidthPx = totalDays * BASE_PX_PER_DAY;
     const scale = CONTENT_WIDTH_IN / totalWidthPx;
-    dateTicks = buildDateTicks(minDate, totalDays, scale);
-    weekTicks = buildWeekTicks(minDate, maxDate, scale);
+
+    const grid = buildDateGrid(minDate, maxDate);
+    const toX = (mark: DateGridMark) => CONTENT_X_IN + mark.dayOffset * BASE_PX_PER_DAY * scale;
+    gridLines = DATE_GRID_LEVELS.flatMap((level) =>
+      grid[level].map((mark) => ({ level, x: toX(mark) })),
+    );
+    axisLabels = buildAxisLabels(grid, toX);
 
     let y = CONTENT_TOP_IN + GROUP_HEADER_HEIGHT_IN;
 
@@ -407,7 +427,7 @@ function buildOverviewSlide(
 
   const dependencyConnectors = showDependencies ? buildDependencyConnectors(items, bars) : [];
 
-  return { kind: 'overview', title, dateAxisY, dateTicks, weekTicks, bars, dependencyConnectors, omittedCount };
+  return { kind: 'overview', title, dateAxisY, gridLines, axisLabels, bars, dependencyConnectors, omittedCount };
 }
 
 /** The overview slides for an export: one truncated slide in 'compact' mode

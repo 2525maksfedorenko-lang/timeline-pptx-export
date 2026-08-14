@@ -32,14 +32,12 @@ import {
   CONTENT_X_IN,
   DEPENDENCY_LINE_WIDTH_PT,
   FOOTER_HEIGHT_IN,
-  GRID_LINE_WIDTH_PT,
   GROUP_HEADER_HEIGHT_IN,
   HEADER_HEIGHT_IN,
   PAGE_HEIGHT_IN,
   PAGE_WIDTH_IN,
-  WEEK_GRID_LINE_WIDTH_PT,
-  WEEK_TICK_HEIGHT_IN,
 } from './slideLayout';
+import { DATE_GRID_LEVELS, DATE_GRID_STYLES } from './dateGrid';
 
 const PT_TO_IN = 1 / 72;
 const CHEVRON_WIDTH_IN = 0.14;
@@ -109,40 +107,41 @@ function drawOmittedTasksWarning(doc: jsPDF, omittedCount: number) {
   });
 }
 
+/** Painted strictly back to front, because jsPDF has no z-index — draw order
+ * *is* z-order:
+ *   1. the three date-grid densities (palest first)
+ *   2. the bar tracks and fills
+ *   3. the dependency connectors, over the bars so a bracket stub landing on
+ *      a bar's edge isn't undercut by it
+ *   4. every piece of text, over the connectors so a bracket crossing a row
+ *      can never cut through a label, percentage or status
+ * Splitting the bars into a shapes pass and a text pass is what buys step 4;
+ * drawing each bar's shapes and text together would put the first bars' text
+ * under the connectors again. Mirrors pptxExporter.ts's identical ordering. */
 function drawOverviewSlide(doc: jsPDF, model: OverviewSlideModel) {
   drawChrome(doc, model.title);
   drawOmittedTasksWarning(doc, model.omittedCount);
 
-  doc.setFont(PDF_FONT_FACE, 'normal');
-  doc.setFontSize(8);
-  doc.setTextColor(withHash(COLORS.footerText));
-  model.dateTicks.forEach((tick) => {
-    drawText(doc, tick.label, tick.x, model.dateAxisY + GROUP_HEADER_HEIGHT_IN / 2, { baseline: 'middle' });
-  });
+  const axisLineY = model.dateAxisY + GROUP_HEADER_HEIGHT_IN;
 
-  if (model.dateTicks.length > 0) {
-    const axisLineY = model.dateAxisY + GROUP_HEADER_HEIGHT_IN;
+  if (model.gridLines.length > 0) {
     doc.setDrawColor(withHash(COLORS.border));
     doc.setLineWidth(0.01);
     doc.line(CONTENT_X_IN, axisLineY, CONTENT_X_IN + CONTENT_WIDTH_IN, axisLineY);
 
-    // Grid lines dropped from each date-axis tick down through the bar
-    // area — drawn before the bars so they sit behind them in z-order.
-    doc.setDrawColor(withHash(COLORS.gridLine));
-    doc.setLineWidth(GRID_LINE_WIDTH_PT * PT_TO_IN);
-    model.dateTicks.forEach((tick) => {
-      doc.line(tick.x, axisLineY, tick.x, CONTENT_BOTTOM_IN);
-    });
-  }
+    // Day/week/month lines, all full height through the bar area and all
+    // drawn from the one shared style table — only the weight and color
+    // differ per level. Grouped by level (rather than following the model's
+    // flat order) purely so jsPDF's stroke state is set three times instead
+    // of once per line; palest level first either way.
+    DATE_GRID_LEVELS.forEach((level) => {
+      const levelLines = model.gridLines.filter((gridLine) => gridLine.level === level);
+      if (levelLines.length === 0) return;
 
-  // Weekly tick marks: short and faint, sitting at the bottom edge of the
-  // bar area — a lighter secondary rhythm alongside the monthly-scale grid
-  // lines above, not a replacement for them.
-  if (model.weekTicks.length > 0) {
-    doc.setDrawColor(withHash(COLORS.weekGridLine));
-    doc.setLineWidth(WEEK_GRID_LINE_WIDTH_PT * PT_TO_IN);
-    model.weekTicks.forEach((tick) => {
-      doc.line(tick.x, CONTENT_BOTTOM_IN - WEEK_TICK_HEIGHT_IN, tick.x, CONTENT_BOTTOM_IN);
+      const style = DATE_GRID_STYLES[level];
+      doc.setDrawColor(withHash(style.color));
+      doc.setLineWidth(style.widthPt * PT_TO_IN);
+      levelLines.forEach((gridLine) => doc.line(gridLine.x, axisLineY, gridLine.x, CONTENT_BOTTOM_IN));
     });
   }
 
@@ -154,7 +153,29 @@ function drawOverviewSlide(doc: jsPDF, model: OverviewSlideModel) {
       doc.setFillColor(withHash(bar.color));
       doc.roundedRect(bar.barX, bar.y, bar.fillWidth, BAR_HEIGHT_IN, BAR_RADIUS_IN, BAR_RADIUS_IN, 'F');
     }
+  });
 
+  if (model.dependencyConnectors.length > 0) {
+    doc.setDrawColor(withHash(COLORS.dependencyLine));
+    doc.setLineWidth(DEPENDENCY_LINE_WIDTH_PT * PT_TO_IN);
+
+    model.dependencyConnectors.forEach((connector) => {
+      connector.segments.forEach((segment) => {
+        doc.line(segment.x1, segment.y1, segment.x2, segment.y2);
+      });
+    });
+  }
+
+  // Month captions at the axis's normal size, week captions a notch smaller
+  // (the model has already thinned any that would collide).
+  doc.setFont(PDF_FONT_FACE, 'normal');
+  doc.setTextColor(withHash(COLORS.footerText));
+  model.axisLabels.forEach((label) => {
+    doc.setFontSize(label.level === 'month' ? 8 : 7);
+    drawText(doc, label.text, label.x, model.dateAxisY + GROUP_HEADER_HEIGHT_IN / 2, { baseline: 'middle' });
+  });
+
+  model.bars.forEach((bar) => {
     const centerY = bar.y + BAR_HEIGHT_IN / 2;
 
     // Progress rides on the bar itself: centered in the fill when it fits
@@ -198,19 +219,6 @@ function drawOverviewSlide(doc: jsPDF, model: OverviewSlideModel) {
       });
     }
   });
-
-  // Drawn last (on top of the bars) so a bracket stub landing right on a
-  // bar's edge is never undercut by the bar shape painted after it.
-  if (model.dependencyConnectors.length > 0) {
-    doc.setDrawColor(withHash(COLORS.dependencyLine));
-    doc.setLineWidth(DEPENDENCY_LINE_WIDTH_PT * PT_TO_IN);
-
-    model.dependencyConnectors.forEach((connector) => {
-      connector.segments.forEach((segment) => {
-        doc.line(segment.x1, segment.y1, segment.x2, segment.y2);
-      });
-    });
-  }
 }
 
 /** Draws a real jspdf-autotable table (borders, columns, a bold header row)

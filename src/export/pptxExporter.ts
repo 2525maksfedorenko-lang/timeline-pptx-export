@@ -30,16 +30,14 @@ import {
   CONTENT_X_IN,
   DEPENDENCY_LINE_WIDTH_PT,
   FOOTER_HEIGHT_IN,
-  GRID_LINE_WIDTH_PT,
   GROUP_HEADER_HEIGHT_IN,
   HEADER_HEIGHT_IN,
   LIST_ROW_HEIGHT_IN,
   PAGE_HEIGHT_IN,
   PAGE_WIDTH_IN,
   ROW_LABEL_HEIGHT_IN,
-  WEEK_GRID_LINE_WIDTH_PT,
-  WEEK_TICK_HEIGHT_IN,
 } from './slideLayout';
+import { DATE_GRID_STYLES } from './dateGrid';
 
 // Comment blocks are indented slightly from the section's left edge, same as
 // the subtask rows above them.
@@ -118,25 +116,24 @@ function drawOmittedTasksWarning(slide: PptxSlide, omittedCount: number) {
   });
 }
 
+/** Painted strictly back to front, because pptxgenjs has no z-index — shape
+ * order *is* z-order:
+ *   1. the three date-grid densities (palest first)
+ *   2. the bar tracks and fills
+ *   3. the dependency connectors, over the bars so a bracket stub landing on
+ *      a bar's edge isn't undercut by it
+ *   4. every piece of text, over the connectors so a bracket crossing a row
+ *      can never cut through a label, percentage or status
+ * Splitting the bars into a shapes pass and a text pass is what buys step 4;
+ * drawing each bar's shapes and text together would put the first bars' text
+ * under the connectors again. */
 function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel) {
   drawChrome(slide, model.title);
   drawOmittedTasksWarning(slide, model.omittedCount);
 
-  model.dateTicks.forEach((tick) => {
-    slide.addText(tick.label, {
-      x: tick.x,
-      y: model.dateAxisY,
-      w: 1,
-      h: GROUP_HEADER_HEIGHT_IN,
-      fontSize: 8,
-      color: COLORS.footerText,
-      fontFace: PPTX_FONT_FACE,
-      valign: 'middle',
-    });
-  });
+  const axisLineY = model.dateAxisY + GROUP_HEADER_HEIGHT_IN;
 
-  if (model.dateTicks.length > 0) {
-    const axisLineY = model.dateAxisY + GROUP_HEADER_HEIGHT_IN;
+  if (model.gridLines.length > 0) {
     slide.addShape('line', {
       x: CONTENT_X_IN,
       y: axisLineY,
@@ -145,31 +142,21 @@ function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel) {
       line: { color: COLORS.border, width: 0.75 },
     });
 
-    // Grid lines dropped from each date-axis tick down through the bar
-    // area — drawn before the bars so they sit behind them in z-order.
-    model.dateTicks.forEach((tick) => {
+    // Day/week/month lines, all full height through the bar area and all
+    // drawn from the one shared style table — only the weight and color
+    // differ per level. Model order is palest-first, so a month line always
+    // ends up over the day line at the same x.
+    model.gridLines.forEach((gridLine) => {
+      const style = DATE_GRID_STYLES[gridLine.level];
       slide.addShape('line', {
-        x: tick.x,
+        x: gridLine.x,
         y: axisLineY,
         w: 0,
         h: CONTENT_BOTTOM_IN - axisLineY,
-        line: { color: COLORS.gridLine, width: GRID_LINE_WIDTH_PT },
+        line: { color: style.color, width: style.widthPt },
       });
     });
   }
-
-  // Weekly tick marks: short and faint, sitting at the bottom edge of the
-  // bar area — a lighter secondary rhythm alongside the monthly-scale grid
-  // lines above, not a replacement for them.
-  model.weekTicks.forEach((tick) => {
-    slide.addShape('line', {
-      x: tick.x,
-      y: CONTENT_BOTTOM_IN - WEEK_TICK_HEIGHT_IN,
-      w: 0,
-      h: WEEK_TICK_HEIGHT_IN,
-      line: { color: COLORS.weekGridLine, width: WEEK_GRID_LINE_WIDTH_PT },
-    });
-  });
 
   model.bars.forEach((bar) => {
     slide.addShape('roundRect', {
@@ -193,7 +180,36 @@ function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel) {
         line: { color: bar.color },
       });
     }
+  });
 
+  model.dependencyConnectors.forEach((connector) => {
+    connector.segments.forEach((segment) => {
+      slide.addShape('line', {
+        x: Math.min(segment.x1, segment.x2),
+        y: Math.min(segment.y1, segment.y2),
+        w: Math.abs(segment.x2 - segment.x1),
+        h: Math.abs(segment.y2 - segment.y1),
+        line: { color: COLORS.dependencyLine, width: DEPENDENCY_LINE_WIDTH_PT },
+      });
+    });
+  });
+
+  // Month captions at the axis's normal size, week captions a notch smaller
+  // (the model has already thinned any that would collide).
+  model.axisLabels.forEach((label) => {
+    slide.addText(label.text, {
+      x: label.x,
+      y: model.dateAxisY,
+      w: 1,
+      h: GROUP_HEADER_HEIGHT_IN,
+      fontSize: label.level === 'month' ? 8 : 7,
+      color: COLORS.footerText,
+      fontFace: PPTX_FONT_FACE,
+      valign: 'middle',
+    });
+  });
+
+  model.bars.forEach((bar) => {
     // Progress rides on the bar itself: centered in the fill when it fits
     // there, otherwise just past the fill on the gray track (see
     // timelineExportModel for the measured fit). `margin: 0` + `wrap: false`
@@ -271,20 +287,6 @@ function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel) {
         valign: 'middle',
       });
     }
-  });
-
-  // Drawn last (on top of the bars) so a bracket stub landing right on a
-  // bar's edge is never undercut by the bar shape painted after it.
-  model.dependencyConnectors.forEach((connector) => {
-    connector.segments.forEach((segment) => {
-      slide.addShape('line', {
-        x: Math.min(segment.x1, segment.x2),
-        y: Math.min(segment.y1, segment.y2),
-        w: Math.abs(segment.x2 - segment.x1),
-        h: Math.abs(segment.y2 - segment.y1),
-        line: { color: COLORS.dependencyLine, width: DEPENDENCY_LINE_WIDTH_PT },
-      });
-    });
   });
 }
 

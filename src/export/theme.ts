@@ -15,11 +15,16 @@ export const COLORS = {
   // De-emphasized body text: present and readable, but visibly secondary to
   // navy (e.g. a detail section's "No assignee" placeholder).
   mutedText: '9AA2AC',
-  // Faint vertical date-axis grid lines on the overview slide.
+  // Vertical date grid lines behind the timeline bars, in three densities
+  // (see dateGrid.ts, which pairs each with its stroke width). Monthly is
+  // the darkest and daily the palest, so the levels read as a hierarchy at
+  // a glance; the values are deliberately spread far enough apart to stay
+  // distinguishable after antialiasing at sub-pixel widths.
   gridLine: 'D8D6CC',
-  // Weekly tick marks on the overview slide's date axis — lighter than
-  // gridLine so they read as secondary to the monthly grid lines.
-  weekGridLine: 'E8E9E4',
+  weekGridLine: 'E0E1D8',
+  // Pale, but deliberately not *as* pale as the slide background it sits on
+  // (slideBg F1F2F4): a lighter daily line simply disappears in the export.
+  dayGridLine: 'E9EAE2',
   // Dependency connector lines between overview bars.
   dependencyLine: '8A94A0',
 } as const;
