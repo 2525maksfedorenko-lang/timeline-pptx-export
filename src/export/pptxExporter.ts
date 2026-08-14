@@ -394,7 +394,7 @@ function drawDetailSlide(slide: PptxSlide, model: DetailSlideModel) {
         h: LIST_ROW_HEIGHT_IN,
         fontSize: 12,
         bold: true,
-        color: COLORS.navy,
+        color: section.assigneeMuted ? COLORS.mutedText : COLORS.navy,
         fontFace: PPTX_FONT_FACE,
       });
     }

@@ -12,6 +12,9 @@ export const COLORS = {
   // Not part of the brand palette itself, but needed for legible gray
   // caption text on the light footer strip.
   footerText: '6B7280',
+  // De-emphasized body text: present and readable, but visibly secondary to
+  // navy (e.g. a detail section's "No assignee" placeholder).
+  mutedText: '9AA2AC',
   // Faint vertical date-axis grid lines on the overview slide.
   gridLine: 'D8D6CC',
   // Dependency connector lines between overview bars.

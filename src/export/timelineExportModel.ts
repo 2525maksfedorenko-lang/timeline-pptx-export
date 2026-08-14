@@ -124,8 +124,13 @@ export interface DetailSectionModel {
   parentTitleY: number;
   subtasksHeadingY?: number;
   subtasks: SubtaskRowModel[];
+  // Present on a parent's first section (absent on its "(continued)"
+  // overflow sections), whether or not the task actually has an assignee —
+  // an unassigned task gets a "No assignee" placeholder instead, drawn in a
+  // muted color via `assigneeMuted` so the gap is visible but not shouty.
   assigneeText?: string;
   assigneeY?: number;
+  assigneeMuted?: boolean;
   commentsHeadingY?: number;
   commentsHeadingText?: string;
   comments: CommentModel[];
@@ -371,6 +376,12 @@ interface CommentFragment {
 interface DetailChunk {
   parentTitle: string;
   children: TimelineItem[];
+  // Whether this chunk carries the parent's assignee row at all — true only
+  // for a parent's first chunk, like its subtasks. Distinct from `assignee`
+  // being undefined, which means the task genuinely has nobody assigned: a
+  // "(continued)" chunk repeating "No assignee" would read as the
+  // continuation itself being unassigned rather than as a repeat.
+  showAssignee: boolean;
   assignee?: TimelineItem['assignee'];
   commentFragments: CommentFragment[];
   commentsHeadingText: string;
@@ -473,9 +484,11 @@ function buildDetailSection(chunk: DetailChunk, startY: number): { section: Deta
 
   let assigneeText: string | undefined;
   let assigneeY: number | undefined;
+  let assigneeMuted: boolean | undefined;
 
-  if (chunk.assignee) {
-    assigneeText = `Assigned to: ${chunk.assignee.name}`;
+  if (chunk.showAssignee) {
+    assigneeText = chunk.assignee ? `Assigned to: ${chunk.assignee.name}` : 'No assignee';
+    assigneeMuted = !chunk.assignee;
     assigneeY = y;
     y += LIST_ROW_HEIGHT_IN + SECTION_GAP_IN;
   }
@@ -516,6 +529,7 @@ function buildDetailSection(chunk: DetailChunk, startY: number): { section: Deta
       subtasks,
       assigneeText,
       assigneeY,
+      assigneeMuted,
       commentsHeadingY,
       commentsHeadingText: chunk.commentFragments.length > 0 ? chunk.commentsHeadingText : undefined,
       comments,
@@ -543,6 +557,7 @@ function expandCandidateToChunks(candidate: DetailCandidate): DetailChunk[] {
   const makeChunk = (isFirst: boolean): DetailChunk => ({
     parentTitle: isFirst ? parent.label : `${parent.label} (continued)`,
     children: isFirst ? children : [],
+    showAssignee: isFirst,
     assignee: isFirst ? parent.assignee : undefined,
     commentFragments: [],
     commentsHeadingText: isFirst ? 'Comments' : 'Comments (continued)',

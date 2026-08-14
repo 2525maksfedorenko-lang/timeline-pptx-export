@@ -302,7 +302,7 @@ function drawDetailSlide(doc: jsPDF, model: DetailSlideModel) {
     if (section.assigneeText !== undefined && section.assigneeY !== undefined) {
       doc.setFont(PDF_FONT_FACE, 'bold');
       doc.setFontSize(12);
-      doc.setTextColor(withHash(COLORS.navy));
+      doc.setTextColor(withHash(section.assigneeMuted ? COLORS.mutedText : COLORS.navy));
       drawText(doc, section.assigneeText, CONTENT_X_IN, section.assigneeY, { baseline: 'top' });
     }
 
