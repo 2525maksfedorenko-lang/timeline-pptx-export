@@ -15,7 +15,7 @@ export const COLORS = {
   // Faint vertical date-axis grid lines on the overview slide.
   gridLine: 'D8D6CC',
   // Dependency connector lines between overview bars.
-  dependencyLine: '94A3B8',
+  dependencyLine: '8A94A0',
 } as const;
 
 export function withHash(hex: string) {

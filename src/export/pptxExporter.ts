@@ -237,22 +237,16 @@ function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel) {
     }
   });
 
-  // Drawn last (on top of the bars) so an arrowhead landing right on a bar's
-  // edge is never undercut by the bar shape painted after it.
+  // Drawn last (on top of the bars) so a bracket stub landing right on a
+  // bar's edge is never undercut by the bar shape painted after it.
   model.dependencyConnectors.forEach((connector) => {
-    connector.segments.forEach((segment, index) => {
+    connector.segments.forEach((segment) => {
       slide.addShape('line', {
         x: Math.min(segment.x1, segment.x2),
         y: Math.min(segment.y1, segment.y2),
         w: Math.abs(segment.x2 - segment.x1),
         h: Math.abs(segment.y2 - segment.y1),
-        flipH: segment.x2 < segment.x1,
-        flipV: segment.y2 < segment.y1,
-        line: {
-          color: COLORS.dependencyLine,
-          width: DEPENDENCY_LINE_WIDTH_PT,
-          endArrowType: index === connector.segments.length - 1 ? 'triangle' : 'none',
-        },
+        line: { color: COLORS.dependencyLine, width: DEPENDENCY_LINE_WIDTH_PT },
       });
     });
   });

@@ -41,6 +41,7 @@ export function ExportSettingsPanel() {
   const comments = useTimelineStore((state) => state.comments);
   const commentMode = useTimelineStore((state) => state.exportOptions.commentMode);
   const showDependencies = useTimelineStore((state) => state.exportOptions.showDependencies);
+  const showHierarchyLines = useTimelineStore((state) => state.exportOptions.showHierarchyLines);
   const sortMode = useTimelineStore((state) => state.exportOptions.sortMode);
   const exportTimeframe = useTimelineStore((state) => state.exportOptions.exportTimeframe);
   const updateExportOptions = useTimelineStore((state) => state.updateExportOptions);
@@ -196,6 +197,16 @@ export function ExportSettingsPanel() {
               className="h-4 w-4 rounded border-[#E5E5E1] text-[#2A9D90] focus:ring-[#2A9D90]"
             />
             Show dependencies
+          </label>
+
+          <label className="mt-2 flex items-center gap-2 text-sm text-[#1E2B38]">
+            <input
+              type="checkbox"
+              checked={showHierarchyLines}
+              onChange={(event) => updateExportOptions({ showHierarchyLines: event.target.checked })}
+              className="h-4 w-4 rounded border-[#E5E5E1] text-[#2A9D90] focus:ring-[#2A9D90]"
+            />
+            Show hierarchy lines
           </label>
 
           <div className="mt-4 border-t border-[#E5E5E1] pt-4">

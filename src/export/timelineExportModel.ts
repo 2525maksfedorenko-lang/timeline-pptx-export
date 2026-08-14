@@ -71,8 +71,8 @@ export interface DependencyConnectorSegment {
 
 export interface OverviewConnectorModel {
   id: string;
-  // 1 segment for a same-row (straight) connector, 3 for the right/down-or-up/right
-  // elbow — always in draw order, so the arrowhead belongs on the last one.
+  // 1 segment for a same-row (straight) connector, 3 for the bracket-shaped
+  // right/down-or-up/right elbow ("┐" + "└") otherwise.
   segments: DependencyConnectorSegment[];
 }
 
@@ -85,7 +85,7 @@ export interface OverviewSlideModel {
   // Empty when exportOptions.showDependencies is off, or for any dependency
   // whose predecessor/successor didn't make it onto this slide (excluded
   // from export, outside the timeframe window, or truncated by overflow) —
-  // silently omitted rather than drawn as a half-arrow to nowhere.
+  // silently omitted rather than drawn as a bracket to nowhere.
   dependencyConnectors: OverviewConnectorModel[];
   // How many in-range parent tasks didn't fit on this slide and were left
   // off entirely — surfaced in the footer so the omission is visible in the
