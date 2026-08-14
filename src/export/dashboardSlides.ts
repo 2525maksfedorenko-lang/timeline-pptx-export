@@ -1,25 +1,11 @@
 import type { TimelineItem } from '../types/timeline';
-import {
-  getAtRiskTasks,
-  getDaysOverdue,
-  getDelayedTasks,
-  getStatusSegments,
-  type StatusSegment,
-} from '../utils/dashboardMetrics';
+import { getAtRiskTasks, getDaysOverdue, getDelayedTasks } from '../utils/dashboardMetrics';
 import { formatShortDate } from './dateScale';
-import { EXPORT_LINK_DISPLAY, EXPORT_LINK_URL } from './qrCode';
+import { dashboardDeepLink } from './qrCode';
 
 export interface DashboardTable {
   headers: string[];
   rows: string[][];
-}
-
-export interface DashboardStatusSlideModel {
-  kind: 'dashboard-status';
-  title: string;
-  segments: StatusSegment[];
-  qrUrl: string;
-  qrDisplay: string;
 }
 
 export interface DashboardTableSlideModel {
@@ -34,34 +20,23 @@ export interface DashboardTableSlideModel {
   qrDisplay: string;
 }
 
-export type DashboardSlideModel = DashboardStatusSlideModel | DashboardTableSlideModel;
-
-function dashboardDeepLink(view: 'status' | 'delayed' | 'atrisk'): { url: string; display: string } {
-  const path = `/?dashboardView=${view}`;
-  return { url: `${EXPORT_LINK_URL}${path}`, display: `${EXPORT_LINK_DISPLAY}${path}` };
-}
+export type DashboardSlideModel = DashboardTableSlideModel;
 
 function assigneeText(item: TimelineItem): string {
   return item.assignee?.name ?? '—';
 }
 
-/** Builds the 3 dashboard slides (status breakdown, delayed tasks, at-risk
- * tasks) appended after the existing summary slide — see exportTimelineToPptx
- * / exportTimelineToPdf. Reuses the exact same status/delayed/at-risk logic
- * as the on-screen Dashboard (src/components/Dashboard.tsx) via
- * utils/dashboardMetrics.ts, and is scoped to exportable items just like the
- * rest of the export pipeline (buildExportSlides). */
+/** Builds the 2 dashboard table slides (delayed tasks, at-risk tasks)
+ * appended after the summary slide — see exportTimelineToPptx /
+ * exportTimelineToPdf. There's deliberately no status-breakdown slide here:
+ * the summary slide already shows the same segments, and links to the
+ * on-screen status view via its own QR code. Reuses the exact same
+ * delayed/at-risk logic as the on-screen Dashboard
+ * (src/components/Dashboard.tsx) via utils/dashboardMetrics.ts, and is
+ * scoped to exportable items just like the rest of the export pipeline
+ * (buildExportSlides). */
 export function buildDashboardSlides(items: TimelineItem[], today: Date): DashboardSlideModel[] {
   const exportableItems = items.filter((item) => item.includeInExport !== false);
-
-  const statusLink = dashboardDeepLink('status');
-  const statusSlide: DashboardStatusSlideModel = {
-    kind: 'dashboard-status',
-    title: 'Status breakdown',
-    segments: getStatusSegments(exportableItems),
-    qrUrl: statusLink.url,
-    qrDisplay: statusLink.display,
-  };
 
   const delayedLink = dashboardDeepLink('delayed');
   const delayedTasks = getDelayedTasks(exportableItems, today);
@@ -102,5 +77,5 @@ export function buildDashboardSlides(items: TimelineItem[], today: Date): Dashbo
     qrDisplay: atRiskLink.display,
   };
 
-  return [statusSlide, delayedSlide, atRiskSlide];
+  return [delayedSlide, atRiskSlide];
 }

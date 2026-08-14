@@ -9,13 +9,8 @@ import {
   type OverviewSlideModel,
   type SummarySlideModel,
 } from './timelineExportModel';
-import {
-  buildDashboardSlides,
-  type DashboardStatusSlideModel,
-  type DashboardTable,
-  type DashboardTableSlideModel,
-} from './dashboardSlides';
-import { EXPORT_LINK_DISPLAY, getExportQrCodeDataUrl, getQrCodeDataUrl } from './qrCode';
+import { buildDashboardSlides, type DashboardTable, type DashboardTableSlideModel } from './dashboardSlides';
+import { getQrCodeDataUrl, getSummaryQrCodes, type QrCodeModel } from './qrCode';
 import { COLORS, FOOTER_TEXT, PPTX_FONT_FACE } from './theme';
 import {
   BAR_HEIGHT_IN,
@@ -514,11 +509,14 @@ function drawQrWithLink(
 const SUMMARY_CHART_WIDTH_IN = 3.6;
 const SUMMARY_CHART_GAP_IN = 0.3;
 const SUMMARY_STAT_GAP_IN = 0.3;
-const SUMMARY_STATS_WIDTH_IN = 3.0;
+// The stats text is left-aligned and never wraps at these widths, so this
+// box is narrower than it used to be purely to free up room for the second
+// QR code — the donut and the stat figures render in exactly the same spot.
+const SUMMARY_STATS_WIDTH_IN = 2.2;
 const SUMMARY_QR_GAP_IN = 0.3;
-const SUMMARY_QR_SIZE_IN = 1.4;
+const SUMMARY_QR_SIZE_IN = 1.15;
 
-function drawSummarySlide(slide: PptxSlide, model: SummarySlideModel, qrCodeDataUrl: string) {
+function drawSummarySlide(slide: PptxSlide, model: SummarySlideModel, qrCodes: QrCodeModel[]) {
   drawChrome(slide, model.title);
 
   const chartH = CONTENT_BOTTOM_IN - CONTENT_TOP_IN;
@@ -554,25 +552,23 @@ function drawSummarySlide(slide: PptxSlide, model: SummarySlideModel, qrCodeData
     });
   });
 
+  // The QR codes split the right-hand column into equal cells, side by side
+  // and symmetric about its center — the export link plus a deep link to the
+  // status view that used to have its own slide.
   const qrX = statsX + statsW + SUMMARY_QR_GAP_IN;
-  const qrColumnWidth = CONTENT_X_IN + CONTENT_WIDTH_IN - qrX;
-  drawQrWithLink(slide, qrCodeDataUrl, EXPORT_LINK_DISPLAY, qrX, qrColumnWidth, CONTENT_TOP_IN, SUMMARY_QR_SIZE_IN);
-}
+  const qrCellWidth = (CONTENT_X_IN + CONTENT_WIDTH_IN - qrX) / qrCodes.length;
 
-const DASHBOARD_CHART_WIDTH_IN = 5.2;
-const DASHBOARD_CHART_GAP_IN = 0.4;
-const DASHBOARD_QR_SIZE_IN = 1.6;
-
-function drawDashboardStatusSlide(slide: PptxSlide, model: DashboardStatusSlideModel, qrCodeDataUrl: string) {
-  drawChrome(slide, model.title);
-
-  const chartH = CONTENT_BOTTOM_IN - CONTENT_TOP_IN;
-  drawStatusDonutChart(slide, model.segments, CONTENT_X_IN, CONTENT_TOP_IN, DASHBOARD_CHART_WIDTH_IN, chartH);
-
-  const qrX = CONTENT_X_IN + DASHBOARD_CHART_WIDTH_IN + DASHBOARD_CHART_GAP_IN;
-  const qrColumnWidth = CONTENT_X_IN + CONTENT_WIDTH_IN - qrX;
-  const qrY = CONTENT_TOP_IN + (chartH - DASHBOARD_QR_SIZE_IN) / 2;
-  drawQrWithLink(slide, qrCodeDataUrl, model.qrDisplay, qrX, qrColumnWidth, qrY, DASHBOARD_QR_SIZE_IN);
+  qrCodes.forEach((qr, index) => {
+    drawQrWithLink(
+      slide,
+      qr.dataUrl,
+      qr.display,
+      qrX + index * qrCellWidth,
+      qrCellWidth,
+      CONTENT_TOP_IN,
+      SUMMARY_QR_SIZE_IN,
+    );
+  });
 }
 
 const DASHBOARD_TABLE_QR_COLUMN_WIDTH_IN = 2.0;
@@ -625,7 +621,7 @@ export async function exportTimelineToPptx(
     exportOptions.showDependencies,
   );
   const dashboardSlides = buildDashboardSlides(sortedItems, new Date());
-  const qrCodeDataUrl = await getExportQrCodeDataUrl();
+  const summaryQrCodes = await getSummaryQrCodes();
   const dashboardQrCodeDataUrls = await Promise.all(
     dashboardSlides.map((slideModel) => getQrCodeDataUrl(slideModel.qrUrl)),
   );
@@ -640,18 +636,12 @@ export async function exportTimelineToPptx(
     } else if (slideModel.kind === 'detail') {
       drawDetailSlide(slide, slideModel);
     } else {
-      drawSummarySlide(slide, slideModel, qrCodeDataUrl);
+      drawSummarySlide(slide, slideModel, summaryQrCodes);
     }
   });
 
   dashboardSlides.forEach((slideModel, index) => {
-    const slide = pptx.addSlide();
-    const dashboardQrCodeDataUrl = dashboardQrCodeDataUrls[index];
-    if (slideModel.kind === 'dashboard-status') {
-      drawDashboardStatusSlide(slide, slideModel, dashboardQrCodeDataUrl);
-    } else {
-      drawDashboardTableSlide(slide, slideModel, dashboardQrCodeDataUrl);
-    }
+    drawDashboardTableSlide(pptx.addSlide(), slideModel, dashboardQrCodeDataUrls[index]);
   });
 
   await pptx.writeFile({ fileName }).catch((error) => {

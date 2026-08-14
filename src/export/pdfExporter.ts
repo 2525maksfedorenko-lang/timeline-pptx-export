@@ -11,13 +11,8 @@ import {
   type OverviewSlideModel,
   type SummarySlideModel,
 } from './timelineExportModel';
-import {
-  buildDashboardSlides,
-  type DashboardStatusSlideModel,
-  type DashboardTable,
-  type DashboardTableSlideModel,
-} from './dashboardSlides';
-import { EXPORT_LINK_DISPLAY, getExportQrCodeDataUrl, getQrCodeDataUrl } from './qrCode';
+import { buildDashboardSlides, type DashboardTable, type DashboardTableSlideModel } from './dashboardSlides';
+import { getQrCodeDataUrl, getSummaryQrCodes, type QrCodeModel } from './qrCode';
 import { COLORS, FOOTER_TEXT, PDF_FONT_FACE, withHash } from './theme';
 import {
   BAR_HEIGHT_IN,
@@ -339,6 +334,10 @@ const SUMMARY_CHIP_SIZE_IN = 0.14;
 const SUMMARY_STATS_GAP_IN = 0.55;
 const SUMMARY_QR_GAP_ABOVE_IN = 0.9;
 const SUMMARY_QR_SIZE_IN = 1.3;
+// Each summary QR gets a fixed-width cell (wide enough for its caption on
+// one line); the cells are then centered as a block, so the pair sits
+// symmetrically either side of the slide's center line.
+const SUMMARY_QR_CELL_WIDTH_IN = 3.0;
 
 /** Draws the status-breakdown stacked bar + legend at an arbitrary
  * position/width, returning the Y just below the legend — jsPDF has no
@@ -394,7 +393,7 @@ function drawQrWithLink(doc: jsPDF, qrCodeDataUrl: string, linkDisplay: string, 
   drawText(doc, linkDisplay, x + width / 2, y + size + 0.15, { align: 'center', baseline: 'top', maxWidth: width });
 }
 
-function drawSummarySlide(doc: jsPDF, model: SummarySlideModel, qrCodeDataUrl: string) {
+function drawSummarySlide(doc: jsPDF, model: SummarySlideModel, qrCodes: QrCodeModel[]) {
   drawChrome(doc, model.title);
 
   const legendY = drawStatusBreakdown(doc, model.segments, CONTENT_X_IN, CONTENT_TOP_IN, CONTENT_WIDTH_IN);
@@ -415,19 +414,23 @@ function drawSummarySlide(doc: jsPDF, model: SummarySlideModel, qrCodeDataUrl: s
     drawText(doc, stat.value, x, statsY + 0.3, { baseline: 'top' });
   });
 
+  // Both QR codes sit side by side below the stats — the export link, plus a
+  // deep link to the status view that used to have its own slide.
   const qrY = statsY + SUMMARY_QR_GAP_ABOVE_IN;
-  drawQrWithLink(doc, qrCodeDataUrl, EXPORT_LINK_DISPLAY, CONTENT_X_IN, CONTENT_WIDTH_IN, qrY, SUMMARY_QR_SIZE_IN);
-}
+  const qrBlockWidth = qrCodes.length * SUMMARY_QR_CELL_WIDTH_IN;
+  const qrBlockX = CONTENT_X_IN + (CONTENT_WIDTH_IN - qrBlockWidth) / 2;
 
-const DASHBOARD_STATUS_QR_GAP_ABOVE_IN = 0.6;
-const DASHBOARD_STATUS_QR_SIZE_IN = 1.5;
-
-function drawDashboardStatusSlide(doc: jsPDF, model: DashboardStatusSlideModel, qrCodeDataUrl: string) {
-  drawChrome(doc, model.title);
-
-  const legendY = drawStatusBreakdown(doc, model.segments, CONTENT_X_IN, CONTENT_TOP_IN, CONTENT_WIDTH_IN);
-  const qrY = legendY + DASHBOARD_STATUS_QR_GAP_ABOVE_IN;
-  drawQrWithLink(doc, qrCodeDataUrl, model.qrDisplay, CONTENT_X_IN, CONTENT_WIDTH_IN, qrY, DASHBOARD_STATUS_QR_SIZE_IN);
+  qrCodes.forEach((qr, index) => {
+    drawQrWithLink(
+      doc,
+      qr.dataUrl,
+      qr.display,
+      qrBlockX + index * SUMMARY_QR_CELL_WIDTH_IN,
+      SUMMARY_QR_CELL_WIDTH_IN,
+      qrY,
+      SUMMARY_QR_SIZE_IN,
+    );
+  });
 }
 
 const DASHBOARD_TABLE_QR_COLUMN_WIDTH_IN = 2.0;
@@ -491,7 +494,7 @@ export async function exportTimelineToPdf(
     exportOptions.showDependencies,
   );
   const dashboardSlides = buildDashboardSlides(sortedItems, new Date());
-  const qrCodeDataUrl = await getExportQrCodeDataUrl();
+  const summaryQrCodes = await getSummaryQrCodes();
   const dashboardQrCodeDataUrls = await Promise.all(
     dashboardSlides.map((slideModel) => getQrCodeDataUrl(slideModel.qrUrl)),
   );
@@ -512,9 +515,7 @@ export async function exportTimelineToPdf(
     } else if (slideModel.kind === 'detail') {
       drawDetailSlide(doc, slideModel);
     } else if (slideModel.kind === 'summary') {
-      drawSummarySlide(doc, slideModel, qrCodeDataUrl);
-    } else if (slideModel.kind === 'dashboard-status') {
-      drawDashboardStatusSlide(doc, slideModel, dashboardQrCodeDataUrls[index - slides.length]);
+      drawSummarySlide(doc, slideModel, summaryQrCodes);
     } else {
       drawDashboardTableSlide(doc, slideModel, dashboardQrCodeDataUrls[index - slides.length]);
     }
