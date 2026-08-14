@@ -8,20 +8,24 @@ export type OrderedSlideModel = ExportSlideModel | DashboardSlideModel;
  * never drift apart:
  *   1. overview slide(s) — one in compact mode, N in full
  *   2. the dashboard tables (at risk, then delayed)
- *   3. the detail slides (subtasks & comments)
- *   4. the summary slide
- * buildExportSlides already returns 1/3/4 in that relative order and always
- * leads with its overview slides, so this only has to splice the dashboard
- * slides in right after the last of them. */
+ *   3. the summary slide
+ *   4. the detail slides (subtasks & comments) — an appendix at the very
+ *      back, so the deck reaches its conclusion before its supporting detail
+ * Selecting each group by `kind` rather than slicing keeps every group's own
+ * internal order intact (overview 1/N, appendix 1/N) while making the deck
+ * order readable straight off this array — and independent of whatever order
+ * buildExportSlides happens to return. */
 export function orderExportSlides(
   exportSlides: ExportSlideModel[],
   dashboardSlides: DashboardSlideModel[],
 ): OrderedSlideModel[] {
-  const overviewCount = exportSlides.filter((slide) => slide.kind === 'overview').length;
+  const slidesOfKind = (kind: ExportSlideModel['kind']) =>
+    exportSlides.filter((slide) => slide.kind === kind);
 
   return [
-    ...exportSlides.slice(0, overviewCount),
+    ...slidesOfKind('overview'),
     ...dashboardSlides,
-    ...exportSlides.slice(overviewCount),
+    ...slidesOfKind('summary'),
+    ...slidesOfKind('detail'),
   ];
 }
