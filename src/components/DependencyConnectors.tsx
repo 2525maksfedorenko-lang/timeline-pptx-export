@@ -1,7 +1,7 @@
 import { useTimelineStore } from '../store/timelineStore';
 import { getItemBar } from '../export/dateScale';
 import type { TimelineItem } from '../types/timeline';
-import { BAR_CENTER_Y_PX, ROW_HEIGHT_PX, ZONE1_WIDTH_PX } from './ganttLayout';
+import { BAR_CENTER_Y_PX, ROW_HEIGHT_PX } from './ganttLayout';
 import { buildConnectorPath } from './connectorGeometry';
 
 interface DependencyConnectorsProps {
@@ -11,6 +11,7 @@ interface DependencyConnectorsProps {
   items: TimelineItem[];
   minDate: Date;
   pxPerDay: number;
+  zone1Width: number;
 }
 
 const CONNECTOR_COLOR = '#8A94A0';
@@ -24,7 +25,7 @@ const CONNECTOR_COLOR = '#8A94A0';
  * the same bracket shape for parent→subtask structure instead — a
  * different concept (composition, not sequencing), kept as separate logic
  * on purpose even though the two share their path geometry. */
-export function DependencyConnectors({ items, minDate, pxPerDay }: DependencyConnectorsProps) {
+export function DependencyConnectors({ items, minDate, pxPerDay, zone1Width }: DependencyConnectorsProps) {
   const showDependencies = useTimelineStore((state) => state.exportOptions.showDependencies);
 
   if (!showDependencies) return null;
@@ -45,9 +46,9 @@ export function DependencyConnectors({ items, minDate, pxPerDay }: DependencyCon
       const predecessorIndex = rowIndexById.get(predecessor.id)!;
       const { left: predecessorLeft, width: predecessorWidth } = getItemBar(predecessor, minDate, pxPerDay);
 
-      const x1 = ZONE1_WIDTH_PX + predecessorLeft + predecessorWidth;
+      const x1 = zone1Width + predecessorLeft + predecessorWidth;
       const y1 = predecessorIndex * ROW_HEIGHT_PX + BAR_CENTER_Y_PX;
-      const x2 = ZONE1_WIDTH_PX + successorLeft;
+      const x2 = zone1Width + successorLeft;
       const y2 = successorIndex * ROW_HEIGHT_PX + BAR_CENTER_Y_PX;
 
       return [{ key: `${predecessor.id}->${successor.id}`, d: buildConnectorPath(x1, y1, x2, y2) }];

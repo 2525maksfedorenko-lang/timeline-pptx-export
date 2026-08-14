@@ -4,7 +4,7 @@ import { useTimelineStore } from '../store/timelineStore';
 import { usePeopleStore } from '../store/peopleStore';
 import { AssigneeSelect } from './AssigneeSelect';
 import { resolveAssignee } from './assigneeSelection';
-import { ZONE1_WIDTH_PX, ZONE3_WIDTH_PX } from './ganttLayout';
+import { ZONE3_WIDTH_PX } from './ganttLayout';
 import { getItemBar, shiftIsoDate } from '../export/dateScale';
 import { clampProgress } from '../utils/clampProgress';
 import { needsDarkText } from '../utils/colorContrast';
@@ -20,6 +20,10 @@ interface GanttRowProps {
   // from GanttChart so every row's zone 2 is pixel-identical to the day
   // header above it, regardless of any single task's own bar width.
   timelineWidth: number;
+  // Zone 1's width (see computeZone1Width) — sized to the longest label
+  // across all rows, so it's the same for every row and every row's label
+  // fits on one line with no ellipsis.
+  zone1Width: number;
 }
 
 interface DragState {
@@ -86,7 +90,7 @@ const DEFAULT_BAR_COLOR = '#3b82f6';
 const PROGRESS_FONT = '600 11px ui-sans-serif, system-ui, sans-serif';
 const PROGRESS_PADDING_PX = 5;
 
-export function GanttRow({ item, minDate, pxPerDay, timelineWidth }: GanttRowProps) {
+export function GanttRow({ item, minDate, pxPerDay, timelineWidth, zone1Width }: GanttRowProps) {
   const items = useTimelineStore((state) => state.items);
   const updateItem = useTimelineStore((state) => state.updateItem);
   const addComment = useTimelineStore((state) => state.addComment);
@@ -235,16 +239,14 @@ export function GanttRow({ item, minDate, pxPerDay, timelineWidth }: GanttRowPro
           a label is exactly as visible on a 1-day task as a 3-month one. */}
       <div
         className="sticky left-0 z-10 flex flex-shrink-0 items-center gap-1.5 border-r border-slate-100 bg-white px-2"
-        style={{ width: ZONE1_WIDTH_PX }}
+        style={{ width: zone1Width }}
       >
         <span
           className="h-2 w-2 flex-shrink-0 rounded-full"
           style={{ backgroundColor: `#${TASK_STATUS_COLORS[status]}` }}
           title={TASK_STATUS_LABELS[status]}
         />
-        <span className="min-w-0 flex-1 truncate text-xs font-medium text-slate-900" title={item.label}>
-          {item.label}
-        </span>
+        <span className="flex-1 whitespace-nowrap text-xs font-medium text-slate-900">{item.label}</span>
       </div>
 
       {/* Zone 2: the timeline itself. The bar, plus the one piece of text

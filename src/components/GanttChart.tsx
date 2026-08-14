@@ -5,7 +5,8 @@ import { AddTaskForm } from './AddTaskForm';
 import { DateGridLines } from './DateGridLines';
 import { DependencyConnectors } from './DependencyConnectors';
 import { HierarchyConnectors } from './HierarchyConnectors';
-import { ZONE1_WIDTH_PX, ZONE3_WIDTH_PX } from './ganttLayout';
+import { ZONE3_WIDTH_PX, computeZone1Width } from './ganttLayout';
+import { ZoomControl } from './ZoomControl';
 import { BASE_PX_PER_DAY, MS_PER_DAY, formatShortDate, getDateRange } from '../export/dateScale';
 import { sortItems } from '../utils/sortItems';
 
@@ -15,6 +16,7 @@ export function GanttChart() {
   const zoomLevel = useTimelineStore((state) => state.ui.zoomLevel);
 
   const pxPerDay = BASE_PX_PER_DAY * zoomLevel;
+  const zone1Width = useMemo(() => computeZone1Width(items), [items]);
   const sortedItems = useMemo(() => sortItems(items, sortMode), [items, sortMode]);
 
   const { minDate, days } = useMemo(() => {
@@ -31,20 +33,23 @@ export function GanttChart() {
   // the two fixed zones — matches GanttRow's own zone math exactly so bars
   // line up under the day headers below.
   const timelineWidth = days.length * pxPerDay;
-  const rowWidth = ZONE1_WIDTH_PX + timelineWidth + ZONE3_WIDTH_PX;
+  const rowWidth = zone1Width + timelineWidth + ZONE3_WIDTH_PX;
 
   return (
     <div>
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-lg font-semibold text-[#1E2B38]">Timeline</h2>
-        <AddTaskForm />
+        <div className="flex items-center gap-3">
+          <ZoomControl />
+          <AddTaskForm />
+        </div>
       </div>
       <div className="w-full overflow-x-auto rounded-lg border border-slate-200 bg-white">
         <div style={{ width: rowWidth }}>
           <div className="flex border-b border-slate-200 bg-slate-50">
             <div
               className="sticky left-0 z-20 flex-shrink-0 border-r border-slate-200 bg-slate-50 px-2 py-2 text-xs font-medium text-slate-500"
-              style={{ width: ZONE1_WIDTH_PX }}
+              style={{ width: zone1Width }}
             >
               Task
             </div>
@@ -71,11 +76,18 @@ export function GanttChart() {
               DOM order among positioned siblings, which is far too easy to
               break by reordering a line here. */}
           <div className="relative">
-            <DateGridLines minDate={minDate} totalDays={days.length} pxPerDay={pxPerDay} />
-            <HierarchyConnectors items={sortedItems} minDate={minDate} pxPerDay={pxPerDay} />
-            <DependencyConnectors items={sortedItems} minDate={minDate} pxPerDay={pxPerDay} />
+            <DateGridLines minDate={minDate} totalDays={days.length} pxPerDay={pxPerDay} zone1Width={zone1Width} />
+            <HierarchyConnectors items={sortedItems} minDate={minDate} pxPerDay={pxPerDay} zone1Width={zone1Width} />
+            <DependencyConnectors items={sortedItems} minDate={minDate} pxPerDay={pxPerDay} zone1Width={zone1Width} />
             {sortedItems.map((item) => (
-              <GanttRow key={item.id} item={item} minDate={minDate} pxPerDay={pxPerDay} timelineWidth={timelineWidth} />
+              <GanttRow
+                key={item.id}
+                item={item}
+                minDate={minDate}
+                pxPerDay={pxPerDay}
+                timelineWidth={timelineWidth}
+                zone1Width={zone1Width}
+              />
             ))}
           </div>
         </div>

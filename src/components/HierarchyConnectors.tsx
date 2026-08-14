@@ -1,7 +1,7 @@
 import { useTimelineStore } from '../store/timelineStore';
 import { getItemBar } from '../export/dateScale';
 import type { TimelineItem } from '../types/timeline';
-import { BAR_CENTER_Y_PX, ROW_HEIGHT_PX, ZONE1_WIDTH_PX } from './ganttLayout';
+import { BAR_CENTER_Y_PX, ROW_HEIGHT_PX } from './ganttLayout';
 import { buildConnectorPath } from './connectorGeometry';
 
 interface HierarchyConnectorsProps {
@@ -11,6 +11,7 @@ interface HierarchyConnectorsProps {
   items: TimelineItem[];
   minDate: Date;
   pxPerDay: number;
+  zone1Width: number;
 }
 
 const CONNECTOR_COLOR = '#C7CDD4';
@@ -24,7 +25,7 @@ const CONNECTOR_COLOR = '#C7CDD4';
  * showDependencies, showHierarchyLines never reaches the PPTX/PDF exporters
  * — the exported detail slides already show this structure their own way,
  * see CLAUDE.md's scope-discipline note against duplicating it there. */
-export function HierarchyConnectors({ items, minDate, pxPerDay }: HierarchyConnectorsProps) {
+export function HierarchyConnectors({ items, minDate, pxPerDay, zone1Width }: HierarchyConnectorsProps) {
   const showHierarchyLines = useTimelineStore((state) => state.exportOptions.showHierarchyLines);
 
   if (!showHierarchyLines) return null;
@@ -44,9 +45,9 @@ export function HierarchyConnectors({ items, minDate, pxPerDay }: HierarchyConne
     const { left: parentLeft, width: parentWidth } = getItemBar(parent, minDate, pxPerDay);
     const { left: childLeft } = getItemBar(child, minDate, pxPerDay);
 
-    const x1 = ZONE1_WIDTH_PX + parentLeft + parentWidth;
+    const x1 = zone1Width + parentLeft + parentWidth;
     const y1 = parentIndex * ROW_HEIGHT_PX + BAR_CENTER_Y_PX;
-    const x2 = ZONE1_WIDTH_PX + childLeft;
+    const x2 = zone1Width + childLeft;
     const y2 = childIndex * ROW_HEIGHT_PX + BAR_CENTER_Y_PX;
 
     return [{ key: `${parent.id}=>${child.id}`, d: buildConnectorPath(x1, y1, x2, y2) }];

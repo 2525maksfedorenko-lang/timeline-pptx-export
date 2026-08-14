@@ -1,12 +1,12 @@
 import { useMemo } from 'react';
 import { buildDateGrid, DATE_GRID_LEVELS, DATE_GRID_STYLES } from '../export/dateGrid';
 import { MS_PER_DAY } from '../export/dateScale';
-import { ZONE1_WIDTH_PX } from './ganttLayout';
 
 interface DateGridLinesProps {
   minDate: Date;
   totalDays: number;
   pxPerDay: number;
+  zone1Width: number;
 }
 
 /** SVG overlay drawing the day/week/month date lines behind the Gantt bars,
@@ -20,7 +20,7 @@ interface DateGridLinesProps {
  * bars, with the weekly and monthly lines standing out of it. Sits at the
  * bottom of the row area's z-stack, under the connector overlays and well
  * under the bars themselves. */
-export function DateGridLines({ minDate, totalDays, pxPerDay }: DateGridLinesProps) {
+export function DateGridLines({ minDate, totalDays, pxPerDay, zone1Width }: DateGridLinesProps) {
   const grid = useMemo(
     () => buildDateGrid(minDate, new Date(minDate.getTime() + (totalDays - 1) * MS_PER_DAY)),
     [minDate, totalDays],
@@ -35,7 +35,7 @@ export function DateGridLines({ minDate, totalDays, pxPerDay }: DateGridLinesPro
           strokeWidth={DATE_GRID_STYLES[level].widthPx}
         >
           {grid[level].map((mark) => {
-            const x = ZONE1_WIDTH_PX + mark.dayOffset * pxPerDay;
+            const x = zone1Width + mark.dayOffset * pxPerDay;
             return <line key={mark.dayOffset} x1={x} x2={x} y1={0} y2="100%" />;
           })}
         </g>
