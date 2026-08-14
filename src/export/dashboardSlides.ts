@@ -26,9 +26,9 @@ function assigneeText(item: TimelineItem): string {
   return item.assignee?.name ?? '—';
 }
 
-/** Builds the 2 dashboard table slides (delayed tasks, at-risk tasks)
- * appended after the summary slide — see exportTimelineToPptx /
- * exportTimelineToPdf. There's deliberately no status-breakdown slide here:
+/** Builds the 2 dashboard table slides (at-risk tasks, then delayed tasks),
+ * which sit directly after the overview slide(s) — see slideOrder.ts for the
+ * full deck order. There's deliberately no status-breakdown slide here:
  * the summary slide already shows the same segments, and links to the
  * on-screen status view via its own QR code. Reuses the exact same
  * delayed/at-risk logic as the on-screen Dashboard
@@ -77,5 +77,5 @@ export function buildDashboardSlides(items: TimelineItem[], today: Date): Dashbo
     qrDisplay: atRiskLink.display,
   };
 
-  return [delayedSlide, atRiskSlide];
+  return [atRiskSlide, delayedSlide];
 }

@@ -10,8 +10,14 @@ import {
   type OverviewSlideModel,
   type SummarySlideModel,
 } from './timelineExportModel';
-import { buildDashboardSlides, type DashboardTable, type DashboardTableSlideModel } from './dashboardSlides';
+import {
+  buildDashboardSlides,
+  type DashboardSlideModel,
+  type DashboardTable,
+  type DashboardTableSlideModel,
+} from './dashboardSlides';
 import { getQrCodeDataUrl, getSummaryQrCodes, type QrCodeModel } from './qrCode';
+import { orderExportSlides } from './slideOrder';
 import { COLORS, FOOTER_TEXT, PPTX_FONT_FACE } from './theme';
 import {
   BAR_HEIGHT_IN,
@@ -659,26 +665,31 @@ export async function exportTimelineToPptx(
   );
   const dashboardSlides = buildDashboardSlides(sortedItems, new Date());
   const summaryQrCodes = await getSummaryQrCodes();
-  const dashboardQrCodeDataUrls = await Promise.all(
-    dashboardSlides.map((slideModel) => getQrCodeDataUrl(slideModel.qrUrl)),
+  // Keyed by the slide model itself rather than by position, so the deck
+  // order (see slideOrder.ts) can change without silently pairing a slide
+  // with another slide's QR code.
+  const dashboardQrCodeDataUrls = new Map<DashboardSlideModel, string>(
+    await Promise.all(
+      dashboardSlides.map(
+        async (slideModel) => [slideModel, await getQrCodeDataUrl(slideModel.qrUrl)] as const,
+      ),
+    ),
   );
 
   const pptx = new pptxgen();
   pptx.layout = 'LAYOUT_16x9';
 
-  slides.forEach((slideModel) => {
+  orderExportSlides(slides, dashboardSlides).forEach((slideModel) => {
     const slide = pptx.addSlide();
     if (slideModel.kind === 'overview') {
       drawOverviewSlide(slide, slideModel);
     } else if (slideModel.kind === 'detail') {
       drawDetailSlide(slide, slideModel);
-    } else {
+    } else if (slideModel.kind === 'summary') {
       drawSummarySlide(slide, slideModel, summaryQrCodes);
+    } else {
+      drawDashboardTableSlide(slide, slideModel, dashboardQrCodeDataUrls.get(slideModel)!);
     }
-  });
-
-  dashboardSlides.forEach((slideModel, index) => {
-    drawDashboardTableSlide(pptx.addSlide(), slideModel, dashboardQrCodeDataUrls[index]);
   });
 
   await pptx.writeFile({ fileName }).catch((error) => {

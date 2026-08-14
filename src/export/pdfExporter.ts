@@ -12,8 +12,14 @@ import {
   type OverviewSlideModel,
   type SummarySlideModel,
 } from './timelineExportModel';
-import { buildDashboardSlides, type DashboardTable, type DashboardTableSlideModel } from './dashboardSlides';
+import {
+  buildDashboardSlides,
+  type DashboardSlideModel,
+  type DashboardTable,
+  type DashboardTableSlideModel,
+} from './dashboardSlides';
 import { getQrCodeDataUrl, getSummaryQrCodes, type QrCodeModel } from './qrCode';
+import { orderExportSlides } from './slideOrder';
 import { COLORS, FOOTER_TEXT, PDF_FONT_FACE, withHash } from './theme';
 import {
   BAR_HEIGHT_IN,
@@ -519,8 +525,15 @@ export async function exportTimelineToPdf(
   );
   const dashboardSlides = buildDashboardSlides(sortedItems, new Date());
   const summaryQrCodes = await getSummaryQrCodes();
-  const dashboardQrCodeDataUrls = await Promise.all(
-    dashboardSlides.map((slideModel) => getQrCodeDataUrl(slideModel.qrUrl)),
+  // Keyed by the slide model itself rather than by position, so the deck
+  // order (see slideOrder.ts) can change without silently pairing a slide
+  // with another slide's QR code.
+  const dashboardQrCodeDataUrls = new Map<DashboardSlideModel, string>(
+    await Promise.all(
+      dashboardSlides.map(
+        async (slideModel) => [slideModel, await getQrCodeDataUrl(slideModel.qrUrl)] as const,
+      ),
+    ),
   );
 
   const doc = new jsPDF({
@@ -529,9 +542,7 @@ export async function exportTimelineToPdf(
     format: [PAGE_WIDTH_IN, PAGE_HEIGHT_IN],
   });
 
-  const allSlides = [...slides, ...dashboardSlides];
-
-  allSlides.forEach((slideModel, index) => {
+  orderExportSlides(slides, dashboardSlides).forEach((slideModel, index) => {
     if (index > 0) doc.addPage([PAGE_WIDTH_IN, PAGE_HEIGHT_IN], 'landscape');
 
     if (slideModel.kind === 'overview') {
@@ -541,7 +552,7 @@ export async function exportTimelineToPdf(
     } else if (slideModel.kind === 'summary') {
       drawSummarySlide(doc, slideModel, summaryQrCodes);
     } else {
-      drawDashboardTableSlide(doc, slideModel, dashboardQrCodeDataUrls[index - slides.length]);
+      drawDashboardTableSlide(doc, slideModel, dashboardQrCodeDataUrls.get(slideModel)!);
     }
   });
 
