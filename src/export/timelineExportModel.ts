@@ -11,7 +11,15 @@ import { getStatusSegments, type StatusSegment } from '../utils/dashboardMetrics
 import { clampProgress } from '../utils/clampProgress';
 import { needsDarkText } from '../utils/colorContrast';
 import { buildTaskHierarchy } from '../utils/taskHierarchy';
-import { daysBetween, BASE_PX_PER_DAY, MS_PER_DAY, formatShortDate, getDateRange, getItemBar } from './dateScale';
+import {
+  daysBetween,
+  BASE_PX_PER_DAY,
+  MS_PER_DAY,
+  formatShortDate,
+  getDateRange,
+  getItemBar,
+  getWeekMarkers,
+} from './dateScale';
 import { measureTextWidthIn } from './textMetrics';
 import { COLORS, statusColor } from './theme';
 import {
@@ -77,6 +85,12 @@ export interface OverviewDateTickModel {
   x: number;
 }
 
+// A short, unlabeled tick mark dropped every 7 days — drawn in addition to
+// (not instead of) the labeled OverviewDateTickModel grid lines above.
+export interface OverviewWeekTickModel {
+  x: number;
+}
+
 // One straight (horizontal or vertical) leg of a dependency connector's
 // elbow path — drawn as its own line by both exporters, since neither
 // pptxgenjs nor jsPDF can draw an arbitrary multi-segment path directly.
@@ -99,6 +113,7 @@ export interface OverviewSlideModel {
   title: string;
   dateAxisY: number;
   dateTicks: OverviewDateTickModel[];
+  weekTicks: OverviewWeekTickModel[];
   bars: OverviewBarModel[];
   // Empty when exportOptions.showDependencies is off, or for any dependency
   // whose predecessor/successor didn't make it onto this slide (excluded
@@ -212,6 +227,17 @@ function buildDateTicks(minDate: Date, totalDays: number, scale: number): Overvi
   });
 }
 
+/** A short tick every 7 days across the slide's date range, in addition to
+ * the labeled monthly-scale ticks from buildDateTicks above. */
+function buildWeekTicks(minDate: Date, maxDate: Date, scale: number): OverviewWeekTickModel[] {
+  const minDateIso = minDate.toISOString().slice(0, 10);
+  const maxDateIso = maxDate.toISOString().slice(0, 10);
+
+  return getWeekMarkers(minDateIso, maxDateIso).map((iso) => ({
+    x: CONTENT_X_IN + daysBetween(minDate, new Date(iso)) * BASE_PX_PER_DAY * scale,
+  }));
+}
+
 /** Parent items that overlap the given export timeframe window (any part of
  * the task's real date span inside the window counts). With no timeframe,
  * every parent item is "in range" — the window is implicitly the full date
@@ -267,6 +293,7 @@ function buildOverviewSlide(
   const bars: OverviewBarModel[] = [];
   const dateAxisY = CONTENT_TOP_IN;
   let dateTicks: OverviewDateTickModel[] = [];
+  let weekTicks: OverviewWeekTickModel[] = [];
 
   if (items.length > 0) {
     const fullRange = getDateRange(items);
@@ -276,6 +303,7 @@ function buildOverviewSlide(
     const totalWidthPx = totalDays * BASE_PX_PER_DAY;
     const scale = CONTENT_WIDTH_IN / totalWidthPx;
     dateTicks = buildDateTicks(minDate, totalDays, scale);
+    weekTicks = buildWeekTicks(minDate, maxDate, scale);
 
     let y = CONTENT_TOP_IN + GROUP_HEADER_HEIGHT_IN;
 
@@ -354,7 +382,7 @@ function buildOverviewSlide(
 
   const dependencyConnectors = showDependencies ? buildDependencyConnectors(items, bars) : [];
 
-  return { kind: 'overview', title, dateAxisY, dateTicks, bars, dependencyConnectors, omittedCount };
+  return { kind: 'overview', title, dateAxisY, dateTicks, weekTicks, bars, dependencyConnectors, omittedCount };
 }
 
 /** One connector per (successor, predecessor-id) pair, reusing each bar's

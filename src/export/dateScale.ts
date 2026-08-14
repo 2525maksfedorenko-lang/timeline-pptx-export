@@ -13,6 +13,25 @@ export function shiftIsoDate(iso: string, days: number) {
   return date.toISOString().slice(0, 10);
 }
 
+/** ISO dates (YYYY-MM-DD), starting at `startDate`, stepping exactly 7
+ * calendar days at a time, up to and including `endDate`. Steps via
+ * `setUTCDate` (not raw millisecond/day-of-month arithmetic) so JS Date
+ * itself carries the step across a month boundary — 31 -> 1, 28/29/30 -> 1 —
+ * instead of hand-rolled rollover logic. UTC-based to match how the rest of
+ * this file treats date-only ISO strings (see shiftIsoDate). */
+export function getWeekMarkers(startDate: string, endDate: string): string[] {
+  const end = new Date(endDate).getTime();
+  const markers: string[] = [];
+  const date = new Date(startDate);
+
+  while (date.getTime() <= end) {
+    markers.push(date.toISOString().slice(0, 10));
+    date.setUTCDate(date.getUTCDate() + 7);
+  }
+
+  return markers;
+}
+
 /** ISO date (YYYY-MM-DD) for the 1st of the given UTC month — `month` is
  * 0-indexed (0 = January), matching Date's own convention. */
 export function firstDayOfMonthIso(year: number, month: number): string {

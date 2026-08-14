@@ -30,6 +30,8 @@ import {
   PAGE_HEIGHT_IN,
   PAGE_WIDTH_IN,
   ROW_LABEL_HEIGHT_IN,
+  WEEK_GRID_LINE_WIDTH_PT,
+  WEEK_TICK_HEIGHT_IN,
 } from './slideLayout';
 
 // Comment blocks are indented slightly from the section's left edge, same as
@@ -148,6 +150,19 @@ function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel) {
       });
     });
   }
+
+  // Weekly tick marks: short and faint, sitting at the bottom edge of the
+  // bar area — a lighter secondary rhythm alongside the monthly-scale grid
+  // lines above, not a replacement for them.
+  model.weekTicks.forEach((tick) => {
+    slide.addShape('line', {
+      x: tick.x,
+      y: CONTENT_BOTTOM_IN - WEEK_TICK_HEIGHT_IN,
+      w: 0,
+      h: WEEK_TICK_HEIGHT_IN,
+      line: { color: COLORS.weekGridLine, width: WEEK_GRID_LINE_WIDTH_PT },
+    });
+  });
 
   model.bars.forEach((bar) => {
     slide.addShape('roundRect', {

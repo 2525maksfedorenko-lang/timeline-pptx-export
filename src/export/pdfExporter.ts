@@ -30,6 +30,8 @@ import {
   HEADER_HEIGHT_IN,
   PAGE_HEIGHT_IN,
   PAGE_WIDTH_IN,
+  WEEK_GRID_LINE_WIDTH_PT,
+  WEEK_TICK_HEIGHT_IN,
 } from './slideLayout';
 
 const PT_TO_IN = 1 / 72;
@@ -123,6 +125,17 @@ function drawOverviewSlide(doc: jsPDF, model: OverviewSlideModel) {
     doc.setLineWidth(GRID_LINE_WIDTH_PT * PT_TO_IN);
     model.dateTicks.forEach((tick) => {
       doc.line(tick.x, axisLineY, tick.x, CONTENT_BOTTOM_IN);
+    });
+  }
+
+  // Weekly tick marks: short and faint, sitting at the bottom edge of the
+  // bar area — a lighter secondary rhythm alongside the monthly-scale grid
+  // lines above, not a replacement for them.
+  if (model.weekTicks.length > 0) {
+    doc.setDrawColor(withHash(COLORS.weekGridLine));
+    doc.setLineWidth(WEEK_GRID_LINE_WIDTH_PT * PT_TO_IN);
+    model.weekTicks.forEach((tick) => {
+      doc.line(tick.x, CONTENT_BOTTOM_IN - WEEK_TICK_HEIGHT_IN, tick.x, CONTENT_BOTTOM_IN);
     });
   }
 

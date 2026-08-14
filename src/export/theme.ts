@@ -17,6 +17,9 @@ export const COLORS = {
   mutedText: '9AA2AC',
   // Faint vertical date-axis grid lines on the overview slide.
   gridLine: 'D8D6CC',
+  // Weekly tick marks on the overview slide's date axis — lighter than
+  // gridLine so they read as secondary to the monthly grid lines.
+  weekGridLine: 'E8E9E4',
   // Dependency connector lines between overview bars.
   dependencyLine: '8A94A0',
 } as const;
