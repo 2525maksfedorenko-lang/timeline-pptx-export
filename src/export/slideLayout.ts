@@ -21,13 +21,20 @@ export const ROW_LABEL_HEIGHT_IN = 0.22;
 
 // Overview bars: one merged line per task instead of a separate label row
 // stacked above the bar (which doubled the height every task actually
-// needed). The track itself stays purely visual; the label+progress and the
-// status text are drawn beside it, in their own zones, so text is never
-// overlaid on top of the (possibly narrow) colored/track bar.
+// needed). The task label and the status text are drawn beside the track, in
+// their own zones; the only text on the track itself is the progress
+// percentage, placed against a measured fit (see below).
 export const ROW_GAP_IN = 0.04;
 export const BAR_HEIGHT_IN = 0.28;
 export const BAR_RADIUS_IN = 0.05;
 export const BAR_LABEL_PADDING_IN = 0.06;
+// Progress text ("70%") drawn on the bar: centered inside the filled part
+// when that part measurably fits it, otherwise immediately after the fill,
+// on the gray track. The font size lives here rather than in the exporters
+// because the layout math has to measure the text at exactly the size both
+// engines then draw it at.
+export const BAR_PROGRESS_FONT_SIZE_PT = 9;
+export const BAR_PROGRESS_PADDING_IN = 0.05;
 // Space always reserved after the track for its label + status text, so a
 // bar positioned late in the date range (long duration or near the right
 // edge) never grows wide enough to push its label into the status column.

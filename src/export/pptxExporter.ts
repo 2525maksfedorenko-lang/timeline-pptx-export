@@ -14,7 +14,7 @@ import { getQrCodeDataUrl, getSummaryQrCodes, type QrCodeModel } from './qrCode'
 import { COLORS, FOOTER_TEXT, PPTX_FONT_FACE } from './theme';
 import {
   BAR_HEIGHT_IN,
-  BAR_LABEL_PADDING_IN,
+  BAR_PROGRESS_FONT_SIZE_PT,
   BAR_RADIUS_IN,
   COMMENT_META_ROW_HEIGHT_IN,
   CONTENT_BOTTOM_IN,
@@ -172,12 +172,31 @@ function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel) {
       });
     }
 
+    // Progress rides on the bar itself: centered in the fill when it fits
+    // there, otherwise just past the fill on the gray track (see
+    // timelineExportModel for the measured fit). `margin: 0` + `wrap: false`
+    // keep it on one line inside a box sized to the glyphs themselves.
+    slide.addText(bar.progressText, {
+      x: bar.progressX,
+      y: bar.y,
+      w: bar.progressWidth,
+      h: BAR_HEIGHT_IN,
+      fontSize: BAR_PROGRESS_FONT_SIZE_PT,
+      bold: true,
+      color: bar.progressColor,
+      fontFace: PPTX_FONT_FACE,
+      align: bar.progressInsideFill ? 'center' : 'left',
+      valign: 'middle',
+      margin: 0,
+      wrap: false,
+    });
+
     // Label sits outside the track, immediately to its right — never on top
     // of it — so it never gets split across the filled/unfilled boundary.
     slide.addText(bar.label, {
-      x: bar.barX + bar.trackWidth + BAR_LABEL_PADDING_IN,
+      x: bar.labelX,
       y: bar.y,
-      w: CONTENT_WIDTH_IN - (bar.barX + bar.trackWidth - CONTENT_X_IN) - BAR_LABEL_PADDING_IN,
+      w: bar.labelWidth,
       h: BAR_HEIGHT_IN,
       fontSize: 11,
       bold: true,

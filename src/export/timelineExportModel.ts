@@ -9,12 +9,17 @@ import {
 import { parseMarkdownBlocks, type MarkdownBlock } from '../utils/renderMarkdown';
 import { getStatusSegments, type StatusSegment } from '../utils/dashboardMetrics';
 import { clampProgress } from '../utils/clampProgress';
+import { needsDarkText } from '../utils/colorContrast';
 import { buildTaskHierarchy } from '../utils/taskHierarchy';
 import { daysBetween, BASE_PX_PER_DAY, MS_PER_DAY, formatShortDate, getDateRange, getItemBar } from './dateScale';
-import { statusColor } from './theme';
+import { measureTextWidthIn } from './textMetrics';
+import { COLORS, statusColor } from './theme';
 import {
   BAR_HEIGHT_IN,
+  BAR_LABEL_PADDING_IN,
   BAR_LABEL_ZONE_MIN_IN,
+  BAR_PROGRESS_FONT_SIZE_PT,
+  BAR_PROGRESS_PADDING_IN,
   COMMENT_BLOCK_GAP_IN,
   COMMENT_GAP_IN,
   COMMENT_HEADING_ROW_HEIGHT_IN,
@@ -41,6 +46,11 @@ import {
 export interface OverviewBarModel {
   id: string;
   label: string;
+  // Where the label starts and how much room it gets — normally just past
+  // the track, but pushed further right when a progress text drawn outside a
+  // narrow fill ends past the track's own right edge.
+  labelX: number;
+  labelWidth: number;
   color: string;
   statusText: string;
   statusColor: string;
@@ -48,6 +58,14 @@ export interface OverviewBarModel {
   barX: number;
   trackWidth: number;
   fillWidth: number;
+  // Progress percentage drawn on the bar itself, in the box
+  // (progressX, progressWidth): centered in it when it sits inside the fill,
+  // left-aligned when it sits just after the fill on the gray track.
+  progressText: string;
+  progressX: number;
+  progressWidth: number;
+  progressInsideFill: boolean;
+  progressColor: string;
   // True when the task's real start/end falls outside the export timeframe
   // window, so the bar is drawn clipped at that edge with a chevron marker.
   chevronLeft: boolean;
@@ -291,17 +309,41 @@ function buildOverviewSlide(
       const maxTrackWidth = Math.max(MIN_TRACK_WIDTH_IN, CONTENT_X_IN + CONTENT_WIDTH_IN - BAR_LABEL_ZONE_MIN_IN - barX);
       const windowClippedWidth = Math.max(clippedRightIn - (barX - CONTENT_X_IN), 0);
       const trackWidth = Math.min(Math.max(windowClippedWidth, MIN_TRACK_WIDTH_IN), maxTrackWidth);
+      const fillWidth = progress > 0 ? Math.max((trackWidth * progress) / 100, 0.05) : 0;
+      const barColor = statusColor(progress);
+
+      // The progress text goes inside the fill only when the fill measurably
+      // holds it at the size it's actually drawn — not at some percentage of
+      // the bar, which says nothing about how wide "100%" renders on a track
+      // that may itself be a fraction of an inch wide.
+      const progressText = `${progress}%`;
+      const progressTextWidth = measureTextWidthIn(progressText, BAR_PROGRESS_FONT_SIZE_PT);
+      const progressInsideFill = fillWidth >= progressTextWidth + BAR_PROGRESS_PADDING_IN * 2;
+      const progressX = progressInsideFill ? barX : barX + fillWidth + BAR_PROGRESS_PADDING_IN;
+      const progressWidth = progressInsideFill ? fillWidth : progressTextWidth;
+
+      const labelX = Math.max(barX + trackWidth, progressX + progressWidth) + BAR_LABEL_PADDING_IN;
 
       bars.push({
         id: item.id,
-        label: `${item.label}  ${progress}%`,
-        color: statusColor(progress),
+        label: item.label,
+        labelX,
+        labelWidth: CONTENT_X_IN + CONTENT_WIDTH_IN - labelX,
+        color: barColor,
         statusText: TASK_STATUS_LABELS[status],
         statusColor: TASK_STATUS_COLORS[status],
         y,
         barX,
         trackWidth,
-        fillWidth: progress > 0 ? Math.max((trackWidth * progress) / 100, 0.05) : 0,
+        fillWidth,
+        progressText,
+        progressX,
+        progressWidth,
+        progressInsideFill,
+        // Light text only where it's readable: on the fill when that fill is
+        // dark enough, dark navy otherwise (including every outside label,
+        // which sits on the light gray track).
+        progressColor: progressInsideFill && !needsDarkText(barColor) ? COLORS.lightText : COLORS.navy,
         chevronLeft,
         chevronRight,
       });

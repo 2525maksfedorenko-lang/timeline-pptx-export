@@ -16,7 +16,7 @@ import { getQrCodeDataUrl, getSummaryQrCodes, type QrCodeModel } from './qrCode'
 import { COLORS, FOOTER_TEXT, PDF_FONT_FACE, withHash } from './theme';
 import {
   BAR_HEIGHT_IN,
-  BAR_LABEL_PADDING_IN,
+  BAR_PROGRESS_FONT_SIZE_PT,
   BAR_RADIUS_IN,
   COMMENT_LINE_HEIGHT_IN,
   CONTENT_BOTTOM_IN,
@@ -135,16 +135,24 @@ function drawOverviewSlide(doc: jsPDF, model: OverviewSlideModel) {
       doc.roundedRect(bar.barX, bar.y, bar.fillWidth, BAR_HEIGHT_IN, BAR_RADIUS_IN, BAR_RADIUS_IN, 'F');
     }
 
-    // Label sits outside the track, immediately to its right — never on top
-    // of it — so it never gets split across the filled/unfilled boundary.
     const centerY = bar.y + BAR_HEIGHT_IN / 2;
 
+    // Progress rides on the bar itself: centered in the fill when it fits
+    // there, otherwise just past the fill on the gray track (see
+    // timelineExportModel for the measured fit).
     doc.setFont(PDF_FONT_FACE, 'bold');
+    doc.setFontSize(BAR_PROGRESS_FONT_SIZE_PT);
+    doc.setTextColor(withHash(bar.progressColor));
+    drawText(doc, bar.progressText, bar.progressX + (bar.progressInsideFill ? bar.progressWidth / 2 : 0), centerY, {
+      baseline: 'middle',
+      align: bar.progressInsideFill ? 'center' : 'left',
+    });
+
+    // Label sits outside the track, immediately to its right — never on top
+    // of it — so it never gets split across the filled/unfilled boundary.
     doc.setFontSize(11);
     doc.setTextColor(withHash(COLORS.navy));
-    const labelX = bar.barX + bar.trackWidth + BAR_LABEL_PADDING_IN;
-    const labelMaxWidth = CONTENT_X_IN + CONTENT_WIDTH_IN - labelX;
-    drawText(doc, bar.label, labelX, centerY, { baseline: 'middle', maxWidth: labelMaxWidth });
+    drawText(doc, bar.label, bar.labelX, centerY, { baseline: 'middle', maxWidth: bar.labelWidth });
 
     doc.setFontSize(9);
     doc.setTextColor(withHash(bar.statusColor));

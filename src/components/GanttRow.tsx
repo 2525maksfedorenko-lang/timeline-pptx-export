@@ -7,7 +7,9 @@ import { resolveAssignee } from './assigneeSelection';
 import { ZONE1_WIDTH_PX, ZONE3_WIDTH_PX } from './ganttLayout';
 import { getItemBar, shiftIsoDate } from '../export/dateScale';
 import { clampProgress } from '../utils/clampProgress';
+import { needsDarkText } from '../utils/colorContrast';
 import { getInitials } from '../utils/initials';
+import { measureTextWidthPx } from '../utils/measureTextWidth';
 import { getDescendantIds } from '../utils/taskHierarchy';
 
 interface GanttRowProps {
@@ -77,6 +79,13 @@ function PersonIcon() {
 
 const ICON_BUTTON_CLASS = 'flex h-4 w-4 flex-shrink-0 items-center justify-center';
 
+const DEFAULT_BAR_COLOR = '#3b82f6';
+// Must match how the progress text on the bar is actually styled below
+// (`text-[11px] font-semibold`, app font stack), since it's what the fit
+// measurement is made against.
+const PROGRESS_FONT = '600 11px ui-sans-serif, system-ui, sans-serif';
+const PROGRESS_PADDING_PX = 5;
+
 export function GanttRow({ item, minDate, pxPerDay, timelineWidth }: GanttRowProps) {
   const items = useTimelineStore((state) => state.items);
   const updateItem = useTimelineStore((state) => state.updateItem);
@@ -100,6 +109,27 @@ export function GanttRow({ item, minDate, pxPerDay, timelineWidth }: GanttRowPro
   const progress = clampProgress(item.progress ?? 0);
   const status = getTaskStatus(item);
   const included = item.includeInExport !== false;
+
+  // Progress text rides on the bar: centered in the filled part when that
+  // part is measurably wide enough to hold it, otherwise immediately after
+  // the fill, in dark text on the gray track. The fit is a real measurement
+  // against the fill's own pixel width — a percentage cutoff would say
+  // nothing about how wide "100%" renders on a two-day bar.
+  const barColor = item.color ?? DEFAULT_BAR_COLOR;
+  const progressText = item.progress != null ? `${progress}%` : '';
+  const fillWidth = (barWidth * progress) / 100;
+  const progressInsideFill =
+    progressText !== '' &&
+    fillWidth >= measureTextWidthPx(progressText, PROGRESS_FONT) + PROGRESS_PADDING_PX * 2;
+
+  const progressTextStyle: React.CSSProperties = progressInsideFill
+    ? {
+        left: 0,
+        width: fillWidth,
+        justifyContent: 'center',
+        color: needsDarkText(barColor) ? '#1E2B38' : '#FFFFFF',
+      }
+    : { left: fillWidth + PROGRESS_PADDING_PX, color: '#334155' };
 
   const descendantIds = useMemo(() => getDescendantIds(items, item.id), [items, item.id]);
   const hasSubtasks = descendantIds.length > 0;
@@ -217,31 +247,39 @@ export function GanttRow({ item, minDate, pxPerDay, timelineWidth }: GanttRowPro
         </span>
       </div>
 
-      {/* Zone 2: the timeline itself. Only ever a colored bar here — no
-          text, no icons, ever, so nothing on it can overlap. */}
+      {/* Zone 2: the timeline itself. The bar, plus the one piece of text
+          that belongs on it — the progress percentage. Both live inside the
+          same dragged element so they move together. */}
       <div className="relative flex-shrink-0" style={{ width: timelineWidth }}>
         <div
           ref={barRef}
           onMouseDown={handleMouseDown}
-          className="absolute top-1 h-8 cursor-grab select-none overflow-hidden rounded-md bg-slate-200 shadow-sm active:cursor-grabbing"
+          className="absolute top-1 h-8 cursor-grab select-none active:cursor-grabbing"
           style={{ left, width: barWidth }}
         >
-          <div className="h-full" style={{ width: `${progress}%`, backgroundColor: item.color ?? '#3b82f6' }} />
+          <div className="h-full overflow-hidden rounded-md bg-slate-200 shadow-sm">
+            <div className="h-full" style={{ width: `${progress}%`, backgroundColor: barColor }} />
+          </div>
+
+          {progressText && (
+            <span
+              className="pointer-events-none absolute top-0 flex h-full items-center whitespace-nowrap text-[11px] font-semibold"
+              style={progressTextStyle}
+            >
+              {progressText}
+            </span>
+          )}
         </div>
       </div>
 
-      {/* Zone 3: progress %, assignee, comment, eye, trash. Fixed width and
-          fixed set of slots (trash reserves its slot even when hidden) so
-          every row's zone 3 is pixel-identical, never overlapping the row
-          above or below it. */}
+      {/* Zone 3: assignee, comment, eye, trash. Fixed width and fixed set of
+          slots (trash reserves its slot even when hidden) so every row's
+          zone 3 is pixel-identical, never overlapping the row above or below
+          it. */}
       <div
         className="sticky right-0 z-10 flex flex-shrink-0 items-center gap-1.5 border-l border-slate-100 bg-white px-2"
         style={{ width: ZONE3_WIDTH_PX }}
       >
-        <span className="w-8 flex-shrink-0 text-right text-[11px] text-slate-500">
-          {item.progress != null ? `${item.progress}%` : ''}
-        </span>
-
         <button
           type="button"
           onMouseDown={(event) => event.stopPropagation()}
