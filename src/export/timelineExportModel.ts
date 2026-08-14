@@ -122,8 +122,9 @@ export interface OverviewSlideModel {
   dependencyConnectors: OverviewConnectorModel[];
   // How many in-range parent tasks didn't fit on this slide and were left
   // off entirely — surfaced in the footer so the omission is visible in the
-  // exported file itself, not just in the confirm() dialog shown before
-  // export (see App.tsx's confirmOverviewCapacity).
+  // exported file itself, not just in the dialog shown before export (see
+  // ExportOverflowModal). Always 0 in 'full' mode, which pages the overflow
+  // onto further slides instead of dropping it.
   omittedCount: number;
 }
 
@@ -190,6 +191,13 @@ export interface SummarySlideModel {
 }
 
 export type ExportSlideModel = OverviewSlideModel | DetailSlideModel | SummarySlideModel;
+
+/** How to handle more in-range top-level tasks than fit on one overview
+ * slide: 'compact' keeps the single slide and notes the rest as omitted in
+ * the footer, 'full' splits them across as many overview slides as needed.
+ * Only meaningful when there's an overflow at all — with everything fitting,
+ * both modes produce the same single slide. */
+export type ExportMode = 'compact' | 'full';
 
 function buildSummarySlide(items: TimelineItem[]): SummarySlideModel {
   const segments = getStatusSegments(items);
@@ -279,13 +287,32 @@ export function planOverview(parentItems: TimelineItem[], timeframe: ExportTimef
   };
 }
 
-/** Lays out the (single) overview slide: a date-scale axis at the top, then
- * one bar per item. If an export timeframe window is set and a task's real
- * dates fall outside it, the bar is clipped to the content edge and flagged
- * with a chevron — but its progress is unaffected by the clip. */
+/** The date span every overview slide of one export is drawn against. */
+interface OverviewWindow {
+  minDate: Date;
+  maxDate: Date;
+}
+
+/** The window for a set of overview slides: the export timeframe when one is
+ * set, otherwise the full span of the items being drawn. Computed once for
+ * the whole export rather than per slide, so 'full' mode's pages all share a
+ * single axis — pages drawn to their own scales couldn't be read against
+ * each other. Null when there's nothing to draw. */
+function getOverviewWindow(items: TimelineItem[], timeframe: ExportTimeframe | null): OverviewWindow | null {
+  if (items.length === 0) return null;
+  if (timeframe) return { minDate: new Date(timeframe.start), maxDate: new Date(timeframe.end) };
+
+  const { minDate, maxDate } = getDateRange(items);
+  return { minDate, maxDate };
+}
+
+/** Lays out one overview slide: a date-scale axis at the top, then one bar
+ * per item. If a task's real dates fall outside `dateWindow`, the bar is
+ * clipped to the content edge and flagged with a chevron — but its progress
+ * is unaffected by the clip. */
 function buildOverviewSlide(
   items: TimelineItem[],
-  timeframe: ExportTimeframe | null,
+  dateWindow: OverviewWindow | null,
   title: string,
   omittedCount: number,
   showDependencies: boolean,
@@ -295,10 +322,8 @@ function buildOverviewSlide(
   let dateTicks: OverviewDateTickModel[] = [];
   let weekTicks: OverviewWeekTickModel[] = [];
 
-  if (items.length > 0) {
-    const fullRange = getDateRange(items);
-    const minDate = timeframe ? new Date(timeframe.start) : fullRange.minDate;
-    const maxDate = timeframe ? new Date(timeframe.end) : fullRange.maxDate;
+  if (dateWindow && items.length > 0) {
+    const { minDate, maxDate } = dateWindow;
     const totalDays = daysBetween(minDate, maxDate) + 1;
     const totalWidthPx = totalDays * BASE_PX_PER_DAY;
     const scale = CONTENT_WIDTH_IN / totalWidthPx;
@@ -385,11 +410,48 @@ function buildOverviewSlide(
   return { kind: 'overview', title, dateAxisY, dateTicks, weekTicks, bars, dependencyConnectors, omittedCount };
 }
 
+/** The overview slides for an export: one truncated slide in 'compact' mode
+ * (and whenever everything fits anyway), or the in-range items split across
+ * one slide per `plan.capacity` in 'full' mode, titled "… (1/N)". Every
+ * slide shares one date window, so bar positions mean the same thing on
+ * each. */
+function buildOverviewSlides(
+  plan: OverviewPlan,
+  timeframe: ExportTimeframe | null,
+  exportMode: ExportMode,
+  showDependencies: boolean,
+): OverviewSlideModel[] {
+  const isPaged = exportMode === 'full' && plan.inRange.length > plan.capacity;
+  const drawnItems = isPaged ? plan.inRange : plan.included;
+  const dateWindow = getOverviewWindow(drawnItems, timeframe);
+
+  if (!isPaged) {
+    const omittedCount = plan.inRange.length - plan.included.length;
+    return [buildOverviewSlide(drawnItems, dateWindow, 'Timeline Overview', omittedCount, showDependencies)];
+  }
+
+  const pages: TimelineItem[][] = [];
+  for (let i = 0; i < drawnItems.length; i += plan.capacity) {
+    pages.push(drawnItems.slice(i, i + plan.capacity));
+  }
+
+  return pages.map((pageItems, index) =>
+    buildOverviewSlide(
+      pageItems,
+      dateWindow,
+      `Timeline Overview (${index + 1}/${pages.length})`,
+      0,
+      showDependencies,
+    ),
+  );
+}
+
 /** One connector per (successor, predecessor-id) pair, reusing each bar's
  * already-computed position — never recomputed from item dates. A
  * predecessor/successor missing from `barById` means it isn't on this slide
- * (excluded from export, outside the timeframe window, or cut by overflow
- * truncation), so that connector is dropped rather than drawn to nowhere. */
+ * (excluded from export, outside the timeframe window, cut by compact-mode
+ * truncation, or sitting on another page in 'full' mode), so that connector
+ * is dropped rather than drawn to nowhere. */
 function buildDependencyConnectors(items: TimelineItem[], bars: OverviewBarModel[]): OverviewConnectorModel[] {
   const barById = new Map(bars.map((bar) => [bar.id, bar]));
 
@@ -790,6 +852,7 @@ export function buildExportSlides(
   commentMode: ExportOptions['commentMode'],
   exportTimeframe: ExportTimeframe | null,
   showDependencies: boolean,
+  exportMode: ExportMode = 'compact',
 ): ExportSlideModel[] {
   const exportableItems = items.filter((item) => item.includeInExport !== false);
   const { roots } = buildTaskHierarchy(exportableItems);
@@ -808,9 +871,8 @@ export function buildExportSlides(
     detailCandidates.push({ parent, children, relevantComments });
   });
 
-  const omittedCount = overviewPlan.inRange.length - overviewPlan.included.length;
   const slides: ExportSlideModel[] = [
-    buildOverviewSlide(overviewPlan.included, exportTimeframe, 'Timeline Overview', omittedCount, showDependencies),
+    ...buildOverviewSlides(overviewPlan, exportTimeframe, exportMode, showDependencies),
     ...buildDetailSlides(detailCandidates),
   ];
 

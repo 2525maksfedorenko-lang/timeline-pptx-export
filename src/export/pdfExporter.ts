@@ -8,6 +8,7 @@ import {
   buildExportSlides,
   type CommentBlockRowModel,
   type DetailSlideModel,
+  type ExportMode,
   type OverviewSlideModel,
   type SummarySlideModel,
 } from './timelineExportModel';
@@ -505,6 +506,7 @@ export async function exportTimelineToPdf(
   exportOptions: ExportOptions,
   comments: TaskComment[],
   fileName: string = 'timeline-export.pdf',
+  exportMode: ExportMode = 'compact',
 ): Promise<void> {
   const sortedItems = sortItems(items, exportOptions.sortMode);
   const slides = buildExportSlides(
@@ -513,6 +515,7 @@ export async function exportTimelineToPdf(
     exportOptions.commentMode,
     exportOptions.exportTimeframe,
     exportOptions.showDependencies,
+    exportMode,
   );
   const dashboardSlides = buildDashboardSlides(sortedItems, new Date());
   const summaryQrCodes = await getSummaryQrCodes();

@@ -2,16 +2,26 @@ import { useEffect, useState } from 'react'
 import { GanttChart } from './components/GanttChart'
 import { Dashboard, type DashboardSection } from './components/Dashboard'
 import { ExportSettingsPanel } from './components/ExportSettingsPanel'
+import { ExportOverflowModal } from './components/ExportOverflowModal'
 import { PlanSwitcher } from './components/PlanSwitcher'
 import { exportTimelineToPptx } from './export/pptxExporter'
 import { exportTimelineToPdf } from './export/pdfExporter'
-import { getExportParentItems, planOverview } from './export/timelineExportModel'
+import { getExportParentItems, planOverview, type ExportMode } from './export/timelineExportModel'
 import { buildExportFilename } from './export/dateScale'
 import { sortItems } from './utils/sortItems'
 import { useTimelineStore } from './store/timelineStore'
 import { usePeopleStore } from './store/peopleStore'
 
 type Tab = 'timeline' | 'dashboard'
+type ExportFormat = 'pptx' | 'pdf'
+
+/** The export the user asked for, held while the overflow modal asks how to
+ * handle the tasks that don't fit on one overview slide. */
+interface PendingOverflowExport {
+  format: ExportFormat
+  totalTasks: number
+  capacity: number
+}
 
 const DASHBOARD_VIEW_SECTIONS: DashboardSection[] = ['status', 'delayed', 'atrisk']
 
@@ -32,6 +42,7 @@ function App() {
 
   const [highlightSection] = useState<DashboardSection | null>(readDashboardViewParam)
   const [activeTab, setActiveTab] = useState<Tab>(highlightSection ? 'dashboard' : 'timeline')
+  const [overflow, setOverflow] = useState<PendingOverflowExport | null>(null)
 
   useEffect(() => {
     void loadPlans()
@@ -41,34 +52,26 @@ function App() {
     void loadPeople()
   }, [loadPeople])
 
-  // Overview is always a single slide: if more top-level tasks fall in the
-  // effective date range than fit on it, confirm with the user before
-  // silently truncating which ones get exported.
-  const confirmOverviewCapacity = () => {
-    const sortedItems = sortItems(items, exportOptions.sortMode)
-    const parentItems = getExportParentItems(sortedItems)
+  const runExport = (format: ExportFormat, exportMode: ExportMode) => {
+    const fileName = buildExportFilename(exportOptions.exportTimeframe, format)
+    const exportTimeline = format === 'pptx' ? exportTimelineToPptx : exportTimelineToPdf
+    void exportTimeline(items, exportOptions, comments, fileName, exportMode)
+  }
+
+  // More top-level tasks in the effective date range than fit on one overview
+  // slide is a real choice (truncate to one slide vs. page across several),
+  // so it goes to the user rather than being decided here. Everything fitting
+  // exports straight away — the two modes would produce the same file.
+  const handleExport = (format: ExportFormat) => {
+    const parentItems = getExportParentItems(sortItems(items, exportOptions.sortMode))
     const plan = planOverview(parentItems, exportOptions.exportTimeframe)
 
-    if (plan.inRange.length <= plan.capacity) return true
+    if (plan.inRange.length <= plan.capacity) {
+      runExport(format, 'compact')
+      return
+    }
 
-    const omittedCount = plan.inRange.length - plan.capacity
-
-    return window.confirm(
-      `Your plan has ${plan.inRange.length} tasks, only ${plan.capacity} fit on one slide. ` +
-        'Click Cancel to select a narrower month/year range in Export settings before exporting, ' +
-        `or OK to export only the first ${plan.capacity} tasks ` +
-        `(the other ${omittedCount} will be noted as omitted at the bottom of the overview slide).`,
-    )
-  }
-
-  const handleExportPptx = () => {
-    if (!confirmOverviewCapacity()) return
-    void exportTimelineToPptx(items, exportOptions, comments, buildExportFilename(exportOptions.exportTimeframe, 'pptx'))
-  }
-
-  const handleExportPdf = () => {
-    if (!confirmOverviewCapacity()) return
-    void exportTimelineToPdf(items, exportOptions, comments, buildExportFilename(exportOptions.exportTimeframe, 'pdf'))
+    setOverflow({ format, totalTasks: plan.inRange.length, capacity: plan.capacity })
   }
 
   return (
@@ -80,14 +83,14 @@ function App() {
         <div className="flex gap-3">
           <button
             type="button"
-            onClick={handleExportPptx}
+            onClick={() => handleExport('pptx')}
             className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700"
           >
             Export to PowerPoint
           </button>
           <button
             type="button"
-            onClick={handleExportPdf}
+            onClick={() => handleExport('pdf')}
             className="rounded-md bg-slate-700 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-slate-800"
           >
             Export as PDF
@@ -116,6 +119,18 @@ function App() {
       <div className="mt-6" style={{ maxWidth: '50%' }}>
         <ExportSettingsPanel />
       </div>
+
+      {overflow && (
+        <ExportOverflowModal
+          totalTasks={overflow.totalTasks}
+          capacity={overflow.capacity}
+          onSelect={(exportMode) => {
+            runExport(overflow.format, exportMode)
+            setOverflow(null)
+          }}
+          onCancel={() => setOverflow(null)}
+        />
+      )}
     </div>
   )
 }

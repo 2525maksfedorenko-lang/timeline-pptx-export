@@ -6,6 +6,7 @@ import {
   buildExportSlides,
   type CommentBlockRowModel,
   type DetailSlideModel,
+  type ExportMode,
   type OverviewSlideModel,
   type SummarySlideModel,
 } from './timelineExportModel';
@@ -645,6 +646,7 @@ export async function exportTimelineToPptx(
   exportOptions: ExportOptions,
   comments: TaskComment[],
   fileName: string = 'timeline-export.pptx',
+  exportMode: ExportMode = 'compact',
 ): Promise<void> {
   const sortedItems = sortItems(items, exportOptions.sortMode);
   const slides = buildExportSlides(
@@ -653,6 +655,7 @@ export async function exportTimelineToPptx(
     exportOptions.commentMode,
     exportOptions.exportTimeframe,
     exportOptions.showDependencies,
+    exportMode,
   );
   const dashboardSlides = buildDashboardSlides(sortedItems, new Date());
   const summaryQrCodes = await getSummaryQrCodes();
