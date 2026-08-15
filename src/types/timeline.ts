@@ -38,6 +38,7 @@ export interface TimelineItem {
   parentId?: string;
   includeInExport?: boolean;
   assignee?: { name: string; email?: string };
+  tags?: string[];
 }
 
 export interface Timeline {

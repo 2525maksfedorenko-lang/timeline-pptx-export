@@ -73,6 +73,20 @@ export const LABEL_STATUS_GAP_IN = 0.1;
 // smaller than LABEL_STATUS_GAP_IN (rather than reusing it) so tightening
 // this one doesn't also widen the overview bar's label column.
 export const SUBTASK_META_STATUS_GAP_IN = 0.05;
+
+// An overview bar's tag pills (item.tags — see TimelineItem) sit right
+// after its label, before the status text: mini gray pills, small enough
+// not to compete with the label for attention. Their total width (measured
+// against TAG_PILL_FONT_SIZE_PT, same as the label/status pattern above) is
+// reserved out of the label's box the same way the status text already is,
+// so a label long enough to reach them still truncates instead of
+// overlapping.
+export const TAG_PILL_FONT_SIZE_PT = 8;
+export const TAG_PILL_PADDING_IN = 0.04;
+export const TAG_PILL_HEIGHT_IN = 0.16;
+export const TAG_PILL_RADIUS_IN = 0.03;
+export const TAG_PILL_GAP_IN = 0.05;
+export const LABEL_TAG_GAP_IN = 0.08;
 // Left indent of a detail slide's subtask rows from the content edge —
 // shared with the model so it can size the row's available text width the
 // same way the exporters position it.

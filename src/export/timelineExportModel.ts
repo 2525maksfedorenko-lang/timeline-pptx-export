@@ -51,6 +51,7 @@ import {
   DETAIL_ROW_INDENT_IN,
   GROUP_HEADER_HEIGHT_IN,
   LABEL_STATUS_GAP_IN,
+  LABEL_TAG_GAP_IN,
   LIST_ROW_HEIGHT_IN,
   MAX_OVERVIEW_BARS_PER_SLIDE,
   MIN_TRACK_WIDTH_IN,
@@ -62,6 +63,9 @@ import {
   SUBTASK_META_STATUS_GAP_IN,
   SUBTASK_STATUS_FONT_SIZE_PT,
   SUBTASK_TEXT_FONT_SIZE_PT,
+  TAG_PILL_FONT_SIZE_PT,
+  TAG_PILL_GAP_IN,
+  TAG_PILL_PADDING_IN,
 } from './slideLayout';
 
 /** Shortens `text` with a trailing "..." until it measures at or under
@@ -84,6 +88,16 @@ function truncateToWidth(text: string, fontSizePt: number, maxWidthIn: number): 
   return end > 0 ? text.slice(0, end) + ellipsis : ellipsis;
 }
 
+// One tag pill drawn right after an overview bar's label, before its status
+// text — position and width are already resolved here so a renderer just
+// draws a rounded rect (TAG_PILL_HEIGHT_IN tall) and centers `text` in it,
+// the same way it draws the bar's own track.
+export interface OverviewBarTagModel {
+  text: string;
+  x: number;
+  width: number;
+}
+
 export interface OverviewBarModel {
   id: string;
   label: string;
@@ -92,6 +106,7 @@ export interface OverviewBarModel {
   // narrow fill ends past the track's own right edge.
   labelX: number;
   labelWidth: number;
+  tags: OverviewBarTagModel[];
   color: string;
   statusText: string;
   statusColor: string;
@@ -434,25 +449,48 @@ function buildOverviewSlide(
 
       const labelX = Math.max(barX + trackWidth, progressX + progressWidth) + BAR_LABEL_PADDING_IN;
 
-      // The label and the status text are two independently-positioned
-      // textboxes sharing one row. Reserve the status's own measured width
-      // (plus a small gap) out of the label's box first, so a label long
-      // enough to reach that far is truncated with an ellipsis instead of
-      // visually overlapping the status — which stays untouched and fully
-      // readable either way.
+      // The label, the tag pills and the status text are all independently-
+      // positioned, sharing one row. Reserve the status's own measured width
+      // (plus a small gap) and every tag pill's width (each measured the
+      // same way) out of the label's box first, so a label long enough to
+      // reach that far is truncated with an ellipsis instead of visually
+      // overlapping either — which both stay untouched and fully readable
+      // either way, same reasoning as truncateToWidth below.
       const statusText = TASK_STATUS_LABELS[status];
       const statusTextWidth = measureTextWidthIn(statusText, BAR_STATUS_FONT_SIZE_PT);
+      const tagTexts = item.tags ?? [];
+      const tagPillWidths = tagTexts.map(
+        (tag) => measureTextWidthIn(tag, TAG_PILL_FONT_SIZE_PT) + TAG_PILL_PADDING_IN * 2,
+      );
+      const tagsReservedWidth =
+        tagPillWidths.length > 0
+          ? tagPillWidths.reduce((sum, width) => sum + width, 0) +
+            TAG_PILL_GAP_IN * (tagPillWidths.length - 1) +
+            LABEL_TAG_GAP_IN
+          : 0;
       const labelWidth = Math.max(
-        CONTENT_X_IN + CONTENT_WIDTH_IN - labelX - statusTextWidth - LABEL_STATUS_GAP_IN,
+        CONTENT_X_IN + CONTENT_WIDTH_IN - labelX - statusTextWidth - LABEL_STATUS_GAP_IN - tagsReservedWidth,
         0,
       );
       const label = truncateToWidth(item.label, BAR_LABEL_FONT_SIZE_PT, labelWidth);
+
+      // Tag pills start right after the label's own actual (already
+      // truncated) text, not at the edge of its reserved box — otherwise a
+      // short label would leave a visible gap before the first pill.
+      let tagX = labelX + measureTextWidthIn(label, BAR_LABEL_FONT_SIZE_PT) + (tagTexts.length > 0 ? LABEL_TAG_GAP_IN : 0);
+      const tags: OverviewBarTagModel[] = tagTexts.map((text, index) => {
+        const width = tagPillWidths[index];
+        const tag: OverviewBarTagModel = { text, x: tagX, width };
+        tagX += width + TAG_PILL_GAP_IN;
+        return tag;
+      });
 
       bars.push({
         id: item.id,
         label,
         labelX,
         labelWidth,
+        tags,
         color: barColor,
         statusText,
         statusColor: TASK_STATUS_COLORS[status],

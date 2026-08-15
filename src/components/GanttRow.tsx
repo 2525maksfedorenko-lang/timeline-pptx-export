@@ -35,6 +35,8 @@ interface GanttRowProps {
   onSelectedAssigneeIdChange: (value: string) => void;
   newPersonName: string;
   onNewPersonNameChange: (value: string) => void;
+  tagInput: string;
+  onTagInputChange: (value: string) => void;
   onToggleTrigger: (initialAssigneeId: string) => void;
   onRequestClosePopup: () => void;
 }
@@ -128,6 +130,8 @@ export function GanttRow({
   onSelectedAssigneeIdChange,
   newPersonName,
   onNewPersonNameChange,
+  tagInput,
+  onTagInputChange,
   onToggleTrigger,
   onRequestClosePopup,
 }: GanttRowProps) {
@@ -230,6 +234,24 @@ export function GanttRow({
     onRequestClosePopup();
   };
 
+  // Tags save straight to the item on Enter — unlike the comment/assignee
+  // above, there's no Save button gating them, so each one shows up on the
+  // bar immediately rather than waiting on an unrelated field to be filled.
+  const handleTagInputKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    const trimmed = tagInput.trim();
+    if (trimmed === '') return;
+    if (!(item.tags ?? []).includes(trimmed)) {
+      updateItem(item.id, { tags: [...(item.tags ?? []), trimmed] });
+    }
+    onTagInputChange('');
+  };
+
+  const handleRemoveTag = (tag: string) => {
+    updateItem(item.id, { tags: (item.tags ?? []).filter((existing) => existing !== tag) });
+  };
+
   const handleMouseDown = (event: React.MouseEvent) => {
     event.preventDefault();
     dragState.current = { startX: event.clientX, startLeft: left };
@@ -268,10 +290,17 @@ export function GanttRow({
 
   return (
     <div className="flex h-10 border-b border-slate-100" style={{ opacity: included ? 1 : 0.5 }}>
-      {/* Zone 1: status dot + label. Fixed width, independent of the bar —
-          a label is exactly as visible on a 1-day task as a 3-month one. */}
+      {/* Zone 1: status dot + label (+ tags, if any). Fixed width,
+          independent of the bar — a label is exactly as visible on a 1-day
+          task as a 3-month one. overflow-hidden is the hard guarantee that
+          tags wrapping onto a second line never bleed into the row below —
+          the zone's own height still comes from the row's fixed h-10 (see
+          ROW_HEIGHT_PX in ganttLayout.ts, which every other overlay's
+          position math assumes is constant across rows), not from content,
+          so tags that don't fit even wrapped are clipped rather than
+          growing the row. */}
       <div
-        className="sticky left-0 z-10 flex flex-shrink-0 items-center gap-1.5 border-r border-slate-100 bg-white px-2"
+        className="sticky left-0 z-10 flex flex-shrink-0 items-center gap-1.5 overflow-hidden border-r border-slate-100 bg-white px-2"
         style={{ width: zone1Width }}
       >
         <span
@@ -279,7 +308,17 @@ export function GanttRow({
           style={{ backgroundColor: `#${TASK_STATUS_COLORS[status]}` }}
           title={TASK_STATUS_LABELS[status]}
         />
-        <span className="flex-1 whitespace-nowrap text-xs font-medium text-slate-900">{item.label}</span>
+        <div className="flex min-w-0 flex-1 flex-wrap content-center items-center gap-x-1.5 gap-y-0.5">
+          <span className="whitespace-nowrap text-xs font-medium text-slate-900">{item.label}</span>
+          {item.tags?.map((tag) => (
+            <span
+              key={tag}
+              className="whitespace-nowrap rounded bg-slate-100 px-1 text-[9px] font-medium leading-[14px] text-slate-600"
+            >
+              {tag}
+            </span>
+          ))}
+        </div>
       </div>
 
       {/* Zone 2: the timeline itself. The bar, plus the one piece of text
@@ -416,6 +455,41 @@ export function GanttRow({
                 newPersonName={newPersonName}
                 onNewPersonNameChange={onNewPersonNameChange}
                 placeholderLabel={item.assignee ? `Keep: ${item.assignee.name}` : 'Select assignee…'}
+              />
+            </div>
+
+            <div className="mt-2 flex flex-col gap-1">
+              <label htmlFor={`tag-${item.id}`} className="text-xs font-medium text-slate-500">
+                Tags
+              </label>
+              {item.tags && item.tags.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {item.tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="inline-flex items-center gap-1 rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-700"
+                    >
+                      {tag}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveTag(tag)}
+                        className="leading-none text-slate-400 hover:text-slate-600"
+                        aria-label={`Remove tag ${tag}`}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <input
+                id={`tag-${item.id}`}
+                type="text"
+                value={tagInput}
+                onChange={(event) => onTagInputChange(event.target.value)}
+                onKeyDown={handleTagInputKeyDown}
+                placeholder="Add a tag, press Enter…"
+                className="rounded-md border border-[#E5E5E1] px-2 py-1 text-sm text-[#1E2B38] focus:border-[#2A9D90] focus:outline-none"
               />
             </div>
 

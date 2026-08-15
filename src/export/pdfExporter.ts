@@ -51,6 +51,9 @@ import {
   PAGE_WIDTH_IN,
   SUBTASK_STATUS_FONT_SIZE_PT,
   SUBTASK_TEXT_FONT_SIZE_PT,
+  TAG_PILL_FONT_SIZE_PT,
+  TAG_PILL_HEIGHT_IN,
+  TAG_PILL_RADIUS_IN,
 } from './slideLayout';
 import { DATE_GRID_LEVELS, DATE_GRID_STYLES } from './dateGrid';
 
@@ -259,6 +262,27 @@ function drawOverviewSlide(doc: jsPDF, model: OverviewSlideModel, links: SlideLi
     doc.setFontSize(BAR_LABEL_FONT_SIZE_PT);
     doc.setTextColor(withHash(COLORS.navy));
     drawText(doc, bar.label, bar.labelX, centerY, { baseline: 'middle' });
+
+    // Mini gray pills for item.tags, right after the label (which the model
+    // has already truncated to leave room for them) — same mini-pill
+    // pattern as the bar/track itself (a filled roundedRect), just much
+    // smaller, with the tag text centered on top.
+    bar.tags.forEach((tag) => {
+      doc.setFillColor(withHash(COLORS.border));
+      doc.roundedRect(
+        tag.x,
+        bar.y + (BAR_HEIGHT_IN - TAG_PILL_HEIGHT_IN) / 2,
+        tag.width,
+        TAG_PILL_HEIGHT_IN,
+        TAG_PILL_RADIUS_IN,
+        TAG_PILL_RADIUS_IN,
+        'F',
+      );
+      doc.setFont(PDF_FONT_FACE, 'bold');
+      doc.setFontSize(TAG_PILL_FONT_SIZE_PT);
+      doc.setTextColor(withHash(COLORS.navy));
+      drawText(doc, tag.text, tag.x + tag.width / 2, centerY, { baseline: 'middle', align: 'center' });
+    });
 
     doc.setFontSize(BAR_STATUS_FONT_SIZE_PT);
     doc.setTextColor(withHash(bar.statusColor));

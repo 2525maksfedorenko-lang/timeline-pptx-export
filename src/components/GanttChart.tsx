@@ -23,6 +23,11 @@ interface PopupDraft {
   selectedAssigneeId: string;
   newPersonName: string;
   initialAssigneeId: string;
+  // Text typed into the tag input but not yet committed with Enter — unlike
+  // the tags themselves (saved straight to the item on Enter, see
+  // GanttRow's handleAddTag), this is real draft state: worth protecting
+  // from an accidental backdrop close same as an unsent comment.
+  tagInput: string;
 }
 
 export function GanttChart() {
@@ -62,6 +67,7 @@ export function GanttChart() {
         const hasChanges =
           current.commentText.trim() !== '' ||
           current.newPersonName.trim() !== '' ||
+          current.tagInput.trim() !== '' ||
           current.selectedAssigneeId !== current.initialAssigneeId;
         return hasChanges ? current : null;
       });
@@ -74,7 +80,14 @@ export function GanttChart() {
     setPopupDraft((current) =>
       current?.taskId === taskId
         ? null
-        : { taskId, commentText: '', selectedAssigneeId: initialAssigneeId, newPersonName: '', initialAssigneeId },
+        : {
+            taskId,
+            commentText: '',
+            selectedAssigneeId: initialAssigneeId,
+            newPersonName: '',
+            initialAssigneeId,
+            tagInput: '',
+          },
     );
   };
 
@@ -166,6 +179,8 @@ export function GanttChart() {
                   onSelectedAssigneeIdChange={(value) => updatePopupDraft(item.id, { selectedAssigneeId: value })}
                   newPersonName={isPopupOpen ? popupDraft.newPersonName : ''}
                   onNewPersonNameChange={(value) => updatePopupDraft(item.id, { newPersonName: value })}
+                  tagInput={isPopupOpen ? popupDraft.tagInput : ''}
+                  onTagInputChange={(value) => updatePopupDraft(item.id, { tagInput: value })}
                   onToggleTrigger={(initialAssigneeId) => handleToggleTaskPopup(item.id, initialAssigneeId)}
                   onRequestClosePopup={closeTaskPopup}
                 />

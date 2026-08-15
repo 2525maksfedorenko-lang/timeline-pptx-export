@@ -50,6 +50,9 @@ import {
   ROW_LABEL_HEIGHT_IN,
   SUBTASK_STATUS_FONT_SIZE_PT,
   SUBTASK_TEXT_FONT_SIZE_PT,
+  TAG_PILL_FONT_SIZE_PT,
+  TAG_PILL_HEIGHT_IN,
+  TAG_PILL_RADIUS_IN,
 } from './slideLayout';
 import { DATE_GRID_STYLES } from './dateGrid';
 
@@ -309,6 +312,35 @@ function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel, links: S
       valign: 'middle',
       wrap: false,
       ...barJump(bar),
+    });
+
+    // Mini gray pills for item.tags, right after the label (which the model
+    // has already truncated to leave room for them) — same mini-pill
+    // pattern as the bar/track itself (a filled roundRect), just much
+    // smaller, with the tag text centered on top.
+    bar.tags.forEach((tag) => {
+      slide.addShape('roundRect', {
+        x: tag.x,
+        y: bar.y + (BAR_HEIGHT_IN - TAG_PILL_HEIGHT_IN) / 2,
+        w: tag.width,
+        h: TAG_PILL_HEIGHT_IN,
+        rectRadius: TAG_PILL_RADIUS_IN,
+        fill: { color: COLORS.border },
+        line: { color: COLORS.border },
+      });
+      slide.addText(tag.text, {
+        x: tag.x,
+        y: bar.y,
+        w: tag.width,
+        h: BAR_HEIGHT_IN,
+        fontSize: TAG_PILL_FONT_SIZE_PT,
+        bold: true,
+        color: COLORS.navy,
+        fontFace: PPTX_FONT_FACE,
+        align: 'center',
+        valign: 'middle',
+        wrap: false,
+      });
     });
 
     slide.addText(bar.statusText, {
