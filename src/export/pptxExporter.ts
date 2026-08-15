@@ -21,14 +21,17 @@ import { orderExportSlides } from './slideOrder';
 import { COLORS, FOOTER_TEXT, PPTX_FONT_FACE } from './theme';
 import {
   BAR_HEIGHT_IN,
+  BAR_LABEL_FONT_SIZE_PT,
   BAR_PROGRESS_FONT_SIZE_PT,
   BAR_RADIUS_IN,
+  BAR_STATUS_FONT_SIZE_PT,
   COMMENT_META_ROW_HEIGHT_IN,
   CONTENT_BOTTOM_IN,
   CONTENT_TOP_IN,
   CONTENT_WIDTH_IN,
   CONTENT_X_IN,
   DEPENDENCY_LINE_WIDTH_PT,
+  DETAIL_ROW_INDENT_IN,
   FOOTER_HEIGHT_IN,
   GROUP_HEADER_HEIGHT_IN,
   HEADER_HEIGHT_IN,
@@ -36,6 +39,8 @@ import {
   PAGE_HEIGHT_IN,
   PAGE_WIDTH_IN,
   ROW_LABEL_HEIGHT_IN,
+  SUBTASK_STATUS_FONT_SIZE_PT,
+  SUBTASK_TEXT_FONT_SIZE_PT,
 } from './slideLayout';
 import { DATE_GRID_STYLES } from './dateGrid';
 
@@ -231,16 +236,22 @@ function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel) {
 
     // Label sits outside the track, immediately to its right — never on top
     // of it — so it never gets split across the filled/unfilled boundary.
+    // The model has already truncated it (with an ellipsis) to leave room
+    // for the status text below, so `wrap: false` keeps it on the one line
+    // that room was measured against instead of PowerPoint auto-wrapping a
+    // measurement-approximation edge case onto a second line that would
+    // land on top of the status text's own row.
     slide.addText(bar.label, {
       x: bar.labelX,
       y: bar.y,
       w: bar.labelWidth,
       h: BAR_HEIGHT_IN,
-      fontSize: 11,
+      fontSize: BAR_LABEL_FONT_SIZE_PT,
       bold: true,
       color: COLORS.navy,
       fontFace: PPTX_FONT_FACE,
       valign: 'middle',
+      wrap: false,
     });
 
     slide.addText(bar.statusText, {
@@ -248,7 +259,7 @@ function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel) {
       y: bar.y,
       w: CONTENT_WIDTH_IN,
       h: BAR_HEIGHT_IN,
-      fontSize: 9,
+      fontSize: BAR_STATUS_FONT_SIZE_PT,
       bold: true,
       color: bar.statusColor,
       fontFace: PPTX_FONT_FACE,
@@ -406,14 +417,18 @@ function drawDetailSlide(slide: PptxSlide, model: DetailSlideModel) {
     }
 
     section.subtasks.forEach((row) => {
+      // The model has already truncated the label portion of row.text (with
+      // an ellipsis) to leave room for the status text on the same line —
+      // `wrap: false` for the same reason as the overview bar's label.
       slide.addText(row.text, {
-        x: CONTENT_X_IN + 0.2,
+        x: CONTENT_X_IN + DETAIL_ROW_INDENT_IN,
         y: row.y,
-        w: CONTENT_WIDTH_IN - 0.2,
+        w: CONTENT_WIDTH_IN - DETAIL_ROW_INDENT_IN,
         h: LIST_ROW_HEIGHT_IN,
-        fontSize: 12,
+        fontSize: SUBTASK_TEXT_FONT_SIZE_PT,
         color: COLORS.navy,
         fontFace: PPTX_FONT_FACE,
+        wrap: false,
       });
 
       slide.addText(row.statusText, {
@@ -421,7 +436,7 @@ function drawDetailSlide(slide: PptxSlide, model: DetailSlideModel) {
         y: row.y,
         w: CONTENT_WIDTH_IN,
         h: LIST_ROW_HEIGHT_IN,
-        fontSize: 10,
+        fontSize: SUBTASK_STATUS_FONT_SIZE_PT,
         bold: true,
         color: row.statusColor,
         fontFace: PPTX_FONT_FACE,

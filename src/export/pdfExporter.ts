@@ -23,19 +23,24 @@ import { orderExportSlides } from './slideOrder';
 import { COLORS, FOOTER_TEXT, PDF_FONT_FACE, withHash } from './theme';
 import {
   BAR_HEIGHT_IN,
+  BAR_LABEL_FONT_SIZE_PT,
   BAR_PROGRESS_FONT_SIZE_PT,
   BAR_RADIUS_IN,
+  BAR_STATUS_FONT_SIZE_PT,
   COMMENT_LINE_HEIGHT_IN,
   CONTENT_BOTTOM_IN,
   CONTENT_TOP_IN,
   CONTENT_WIDTH_IN,
   CONTENT_X_IN,
   DEPENDENCY_LINE_WIDTH_PT,
+  DETAIL_ROW_INDENT_IN,
   FOOTER_HEIGHT_IN,
   GROUP_HEADER_HEIGHT_IN,
   HEADER_HEIGHT_IN,
   PAGE_HEIGHT_IN,
   PAGE_WIDTH_IN,
+  SUBTASK_STATUS_FONT_SIZE_PT,
+  SUBTASK_TEXT_FONT_SIZE_PT,
 } from './slideLayout';
 import { DATE_GRID_LEVELS, DATE_GRID_STYLES } from './dateGrid';
 
@@ -191,11 +196,15 @@ function drawOverviewSlide(doc: jsPDF, model: OverviewSlideModel) {
 
     // Label sits outside the track, immediately to its right — never on top
     // of it — so it never gets split across the filled/unfilled boundary.
-    doc.setFontSize(11);
+    // The model has already truncated it (with an ellipsis) to leave room
+    // for the status text below, so no `maxWidth` here — jsPDF's own
+    // wrapping would otherwise push a measurement-approximation edge case
+    // onto a second line landing on top of the status text's row.
+    doc.setFontSize(BAR_LABEL_FONT_SIZE_PT);
     doc.setTextColor(withHash(COLORS.navy));
-    drawText(doc, bar.label, bar.labelX, centerY, { baseline: 'middle', maxWidth: bar.labelWidth });
+    drawText(doc, bar.label, bar.labelX, centerY, { baseline: 'middle' });
 
-    doc.setFontSize(9);
+    doc.setFontSize(BAR_STATUS_FONT_SIZE_PT);
     doc.setTextColor(withHash(bar.statusColor));
     drawText(doc, bar.statusText, CONTENT_X_IN + CONTENT_WIDTH_IN, centerY, {
       baseline: 'middle',
@@ -321,13 +330,15 @@ function drawDetailSlide(doc: jsPDF, model: DetailSlideModel) {
     }
 
     section.subtasks.forEach((row) => {
+      // The model has already truncated the label portion of row.text (with
+      // an ellipsis) to leave room for the status text on the same line.
       doc.setFont(PDF_FONT_FACE, 'normal');
-      doc.setFontSize(12);
+      doc.setFontSize(SUBTASK_TEXT_FONT_SIZE_PT);
       doc.setTextColor(withHash(COLORS.navy));
-      drawText(doc, row.text, CONTENT_X_IN + 0.2, row.y, { baseline: 'top' });
+      drawText(doc, row.text, CONTENT_X_IN + DETAIL_ROW_INDENT_IN, row.y, { baseline: 'top' });
 
       doc.setFont(PDF_FONT_FACE, 'bold');
-      doc.setFontSize(10);
+      doc.setFontSize(SUBTASK_STATUS_FONT_SIZE_PT);
       doc.setTextColor(withHash(row.statusColor));
       drawText(doc, row.statusText, CONTENT_X_IN + CONTENT_WIDTH_IN, row.y, {
         baseline: 'top',

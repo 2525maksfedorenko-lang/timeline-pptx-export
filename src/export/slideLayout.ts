@@ -35,6 +35,28 @@ export const BAR_LABEL_PADDING_IN = 0.06;
 // engines then draw it at.
 export const BAR_PROGRESS_FONT_SIZE_PT = 9;
 export const BAR_PROGRESS_PADDING_IN = 0.05;
+// Same reasoning as BAR_PROGRESS_FONT_SIZE_PT: the label and status sizes
+// live here so the model can measure a bar's label/status text at exactly
+// the size both engines draw it at, to reserve the status's own width out of
+// the label's box instead of the two overlapping (see truncateToWidth in
+// timelineExportModel.ts).
+export const BAR_LABEL_FONT_SIZE_PT = 11;
+export const BAR_STATUS_FONT_SIZE_PT = 9;
+// Same purpose, one row down: a detail slide's subtask row packs a label
+// (plus dates/progress) on the left and a status on the right of the same
+// line.
+export const SUBTASK_TEXT_FONT_SIZE_PT = 12;
+export const SUBTASK_STATUS_FONT_SIZE_PT = 10;
+// Minimum clear gap always kept between a label and the status text sharing
+// its row, even after the label has been reserved room / truncated against
+// the status's own measured width — a small buffer against the font-metric
+// approximation in textMetrics.ts, so a truncated label never visually
+// touches the status next to it.
+export const LABEL_STATUS_GAP_IN = 0.1;
+// Left indent of a detail slide's subtask rows from the content edge —
+// shared with the model so it can size the row's available text width the
+// same way the exporters position it.
+export const DETAIL_ROW_INDENT_IN = 0.2;
 // Space always reserved after the track for its label + status text, so a
 // bar positioned late in the date range (long duration or near the right
 // edge) never grows wide enough to push its label into the status column.

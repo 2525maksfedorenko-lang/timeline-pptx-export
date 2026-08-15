@@ -29,10 +29,12 @@ import { measureTextWidthIn } from './textMetrics';
 import { COLORS, statusColor } from './theme';
 import {
   BAR_HEIGHT_IN,
+  BAR_LABEL_FONT_SIZE_PT,
   BAR_LABEL_PADDING_IN,
   BAR_LABEL_ZONE_MIN_IN,
   BAR_PROGRESS_FONT_SIZE_PT,
   BAR_PROGRESS_PADDING_IN,
+  BAR_STATUS_FONT_SIZE_PT,
   COMMENT_BLOCK_GAP_IN,
   COMMENT_GAP_IN,
   COMMENT_HEADING_ROW_HEIGHT_IN,
@@ -45,7 +47,9 @@ import {
   CONTENT_X_IN,
   CONTENT_WIDTH_IN,
   DEPENDENCY_JOG_IN,
+  DETAIL_ROW_INDENT_IN,
   GROUP_HEADER_HEIGHT_IN,
+  LABEL_STATUS_GAP_IN,
   LIST_ROW_HEIGHT_IN,
   MAX_OVERVIEW_BARS_PER_SLIDE,
   MIN_TRACK_WIDTH_IN,
@@ -54,7 +58,29 @@ import {
   ROW_HEIGHT_IN,
   ROW_LABEL_HEIGHT_IN,
   SECTION_GAP_IN,
+  SUBTASK_STATUS_FONT_SIZE_PT,
+  SUBTASK_TEXT_FONT_SIZE_PT,
 } from './slideLayout';
+
+/** Shortens `text` with a trailing "..." until it measures at or under
+ * `maxWidthIn` at `fontSizePt` — the shared strategy for a label sharing a
+ * row with a fixed-position status text drawn independently of it: the
+ * label is what gives way (truncated, never silently dropped), so the
+ * shorter/higher-priority status text is never pushed into or overlapped by
+ * it. A no-op when the text already fits. */
+function truncateToWidth(text: string, fontSizePt: number, maxWidthIn: number): string {
+  if (maxWidthIn <= 0) return '';
+  if (measureTextWidthIn(text, fontSizePt) <= maxWidthIn) return text;
+
+  const ellipsis = '...';
+  if (measureTextWidthIn(ellipsis, fontSizePt) > maxWidthIn) return '';
+
+  let end = text.length;
+  while (end > 0 && measureTextWidthIn(text.slice(0, end) + ellipsis, fontSizePt) > maxWidthIn) {
+    end -= 1;
+  }
+  return end > 0 ? text.slice(0, end) + ellipsis : ellipsis;
+}
 
 export interface OverviewBarModel {
   id: string;
@@ -397,13 +423,27 @@ function buildOverviewSlide(
 
       const labelX = Math.max(barX + trackWidth, progressX + progressWidth) + BAR_LABEL_PADDING_IN;
 
+      // The label and the status text are two independently-positioned
+      // textboxes sharing one row. Reserve the status's own measured width
+      // (plus a small gap) out of the label's box first, so a label long
+      // enough to reach that far is truncated with an ellipsis instead of
+      // visually overlapping the status — which stays untouched and fully
+      // readable either way.
+      const statusText = TASK_STATUS_LABELS[status];
+      const statusTextWidth = measureTextWidthIn(statusText, BAR_STATUS_FONT_SIZE_PT);
+      const labelWidth = Math.max(
+        CONTENT_X_IN + CONTENT_WIDTH_IN - labelX - statusTextWidth - LABEL_STATUS_GAP_IN,
+        0,
+      );
+      const label = truncateToWidth(item.label, BAR_LABEL_FONT_SIZE_PT, labelWidth);
+
       bars.push({
         id: item.id,
-        label: item.label,
+        label,
         labelX,
-        labelWidth: CONTENT_X_IN + CONTENT_WIDTH_IN - labelX,
+        labelWidth,
         color: barColor,
-        statusText: TASK_STATUS_LABELS[status],
+        statusText,
         statusColor: TASK_STATUS_COLORS[status],
         y,
         barX,
@@ -621,10 +661,26 @@ function buildDetailSection(chunk: DetailChunk, startY: number): { section: Deta
     chunk.children.forEach((child) => {
       const progress = clampProgress(child.progress ?? 0);
       const status = getTaskStatus(child);
+      const statusText = TASK_STATUS_LABELS[status];
+
+      // Same collision to guard against as an overview bar's label/status
+      // (see truncateToWidth): the row's label is the flexible part, so it's
+      // what gets truncated — the trailing dates/progress and the status
+      // both stay intact and fully readable.
+      const meta = `  —  ${child.start} → ${child.end}  —  ${progress}%`;
+      const statusTextWidth = measureTextWidthIn(statusText, SUBTASK_STATUS_FONT_SIZE_PT);
+      const availableWidth =
+        CONTENT_WIDTH_IN -
+        DETAIL_ROW_INDENT_IN -
+        statusTextWidth -
+        LABEL_STATUS_GAP_IN -
+        measureTextWidthIn(meta, SUBTASK_TEXT_FONT_SIZE_PT);
+      const label = truncateToWidth(child.label, SUBTASK_TEXT_FONT_SIZE_PT, Math.max(availableWidth, 0));
+
       subtasks.push({
-        text: `${child.label}  —  ${child.start} → ${child.end}  —  ${progress}%`,
+        text: `${label}${meta}`,
         color: statusColor(progress),
-        statusText: TASK_STATUS_LABELS[status],
+        statusText,
         statusColor: TASK_STATUS_COLORS[status],
         y,
       });
