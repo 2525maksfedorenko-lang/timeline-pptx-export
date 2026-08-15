@@ -19,9 +19,15 @@ import {
   type DashboardTableSlideModel,
 } from './dashboardSlides';
 import { getQrCodeDataUrl, getSummaryQrCodes, type QrCodeModel } from './qrCode';
+import { buildSlideLinks, type SlideLinks } from './slideLinks';
 import { orderExportSlides } from './slideOrder';
 import { COLORS, FOOTER_TEXT, PDF_FONT_FACE, withHash } from './theme';
 import {
+  BACK_LINK_FONT_SIZE_PT,
+  BACK_LINK_HEIGHT_IN,
+  BACK_LINK_TEXT,
+  BACK_LINK_WIDTH_IN,
+  BACK_LINK_Y_IN,
   BAR_HEIGHT_IN,
   BAR_LABEL_FONT_SIZE_PT,
   BAR_PROGRESS_FONT_SIZE_PT,
@@ -65,7 +71,39 @@ function toPdfSafeText(text: string): string {
     .replace(/[–—]/g, '-')
     .replace(/\u{1F4CC}/gu, '[pinned] ')
     .replace(/◀/g, '<')
-    .replace(/▶/g, '>');
+    .replace(/▶/g, '>')
+    .replace(/←/g, '<-');
+}
+
+/** Marks a rectangle as an internal jump to `pageNumber`. jsPDF resolves the
+ * page number to that page's own PDF object at output time, so this may name
+ * a page that hasn't been added yet — which is what lets slide 1's bars link
+ * forward into the appendix. A no-op without a target, leaving the region
+ * inert exactly like a PPTX shape with no hyperlink (see slideLinks.ts). */
+function linkToPage(
+  doc: jsPDF,
+  pageNumber: number | null | undefined,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+) {
+  if (!pageNumber) return;
+  doc.link(x, y, w, h, { pageNumber });
+}
+
+/** The "← Back to overview" affordance shared by every appendix slide — one
+ * per slide, not one per parent section, since the whole slide returns to the
+ * same place. Mirrors pptxExporter.ts's placement and styling. */
+function drawBackToOverviewLink(doc: jsPDF, overviewSlideNumber: number | null) {
+  if (!overviewSlideNumber) return;
+
+  doc.setFont(PDF_FONT_FACE, 'bold');
+  doc.setFontSize(BACK_LINK_FONT_SIZE_PT);
+  doc.setTextColor(withHash(COLORS.teal));
+  drawText(doc, BACK_LINK_TEXT, CONTENT_X_IN, BACK_LINK_Y_IN + BACK_LINK_HEIGHT_IN / 2, { baseline: 'middle' });
+
+  linkToPage(doc, overviewSlideNumber, CONTENT_X_IN, BACK_LINK_Y_IN, BACK_LINK_WIDTH_IN, BACK_LINK_HEIGHT_IN);
 }
 
 function drawText(doc: jsPDF, text: string, x: number, y: number, options?: TextOptionsLight) {
@@ -123,7 +161,7 @@ function drawOmittedTasksWarning(doc: jsPDF, omittedCount: number) {
  * Splitting the bars into a shapes pass and a text pass is what buys step 4;
  * drawing each bar's shapes and text together would put the first bars' text
  * under the connectors again. Mirrors pptxExporter.ts's identical ordering. */
-function drawOverviewSlide(doc: jsPDF, model: OverviewSlideModel) {
+function drawOverviewSlide(doc: jsPDF, model: OverviewSlideModel, links: SlideLinks) {
   drawChrome(doc, model.title);
   drawOmittedTasksWarning(doc, model.omittedCount);
 
@@ -182,6 +220,20 @@ function drawOverviewSlide(doc: jsPDF, model: OverviewSlideModel) {
 
   model.bars.forEach((bar) => {
     const centerY = bar.y + BAR_HEIGHT_IN / 2;
+
+    // A bar is clickable exactly when its task has an appendix slide to open.
+    // One rectangle covers the track and its label: they're contiguous
+    // (labelX starts just past whichever of the track/progress text ends
+    // furthest right), so the row the PPTX makes clickable across three
+    // separate objects is a single annotation here.
+    linkToPage(
+      doc,
+      links.detailSlideNumberByTaskId.get(bar.id),
+      bar.barX,
+      bar.y,
+      bar.labelX + bar.labelWidth - bar.barX,
+      BAR_HEIGHT_IN,
+    );
 
     // Progress rides on the bar itself: centered in the fill when it fits
     // there, otherwise just past the fill on the gray track (see
@@ -313,8 +365,9 @@ function drawCommentBlock(doc: jsPDF, block: CommentBlockRowModel) {
   drawTableBlock(doc, block, COMMENT_BODY_X_IN, block.y, COMMENT_BODY_WIDTH_IN);
 }
 
-function drawDetailSlide(doc: jsPDF, model: DetailSlideModel) {
+function drawDetailSlide(doc: jsPDF, model: DetailSlideModel, links: SlideLinks) {
   drawChrome(doc, model.title);
+  drawBackToOverviewLink(doc, links.overviewSlideNumber);
 
   model.sections.forEach((section) => {
     doc.setFont(PDF_FONT_FACE, 'bold');
@@ -561,13 +614,18 @@ export async function exportTimelineToPdf(
     format: [PAGE_WIDTH_IN, PAGE_HEIGHT_IN],
   });
 
-  orderExportSlides(slides, dashboardSlides).forEach((slideModel, index) => {
+  // Resolved from the ordered deck up front, so a bar drawn on page 1 can
+  // link forward to an appendix page that hasn't been added yet.
+  const orderedSlides = orderExportSlides(slides, dashboardSlides);
+  const links = buildSlideLinks(orderedSlides);
+
+  orderedSlides.forEach((slideModel, index) => {
     if (index > 0) doc.addPage([PAGE_WIDTH_IN, PAGE_HEIGHT_IN], 'landscape');
 
     if (slideModel.kind === 'overview') {
-      drawOverviewSlide(doc, slideModel);
+      drawOverviewSlide(doc, slideModel, links);
     } else if (slideModel.kind === 'detail') {
-      drawDetailSlide(doc, slideModel);
+      drawDetailSlide(doc, slideModel, links);
     } else if (slideModel.kind === 'summary') {
       drawSummarySlide(doc, slideModel, summaryQrCodes);
     } else {

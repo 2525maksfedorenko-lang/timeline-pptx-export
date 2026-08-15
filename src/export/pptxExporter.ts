@@ -17,9 +17,15 @@ import {
   type DashboardTableSlideModel,
 } from './dashboardSlides';
 import { getQrCodeDataUrl, getSummaryQrCodes, type QrCodeModel } from './qrCode';
+import { buildSlideLinks, type SlideLinks } from './slideLinks';
 import { orderExportSlides } from './slideOrder';
 import { COLORS, FOOTER_TEXT, PPTX_FONT_FACE } from './theme';
 import {
+  BACK_LINK_FONT_SIZE_PT,
+  BACK_LINK_HEIGHT_IN,
+  BACK_LINK_TEXT,
+  BACK_LINK_WIDTH_IN,
+  BACK_LINK_Y_IN,
   BAR_HEIGHT_IN,
   BAR_LABEL_FONT_SIZE_PT,
   BAR_PROGRESS_FONT_SIZE_PT,
@@ -121,6 +127,38 @@ function drawOmittedTasksWarning(slide: PptxSlide, omittedCount: number) {
   });
 }
 
+/** Spread into a shape's or textbox's options to turn it into an internal
+ * jump to `slideNumber`, or into nothing at all when there's no target.
+ * Absent-means-inert is the whole point: an overview bar whose task has
+ * neither subtasks nor comments has no appendix slide to open, so it must
+ * stay unclickable rather than link somewhere arbitrary. */
+function slideJump(slideNumber: number | null | undefined, tooltip: string) {
+  return slideNumber ? { hyperlink: { slide: slideNumber, tooltip } } : {};
+}
+
+/** The "← Back to overview" affordance shared by every appendix slide — one
+ * per slide, not one per parent section, since the whole slide returns to the
+ * same place. Drawn as a plain teal caption rather than a button/chrome
+ * shape: it's a breadcrumb, and the deck's other links are unadorned too. */
+function drawBackToOverviewLink(slide: PptxSlide, overviewSlideNumber: number | null) {
+  if (!overviewSlideNumber) return;
+
+  slide.addText(BACK_LINK_TEXT, {
+    x: CONTENT_X_IN,
+    y: BACK_LINK_Y_IN,
+    w: BACK_LINK_WIDTH_IN,
+    h: BACK_LINK_HEIGHT_IN,
+    fontSize: BACK_LINK_FONT_SIZE_PT,
+    bold: true,
+    color: COLORS.teal,
+    fontFace: PPTX_FONT_FACE,
+    valign: 'middle',
+    margin: 0,
+    wrap: false,
+    ...slideJump(overviewSlideNumber, 'Back to the timeline overview'),
+  });
+}
+
 /** Painted strictly back to front, because pptxgenjs has no z-index — shape
  * order *is* z-order:
  *   1. the three date-grid densities (palest first)
@@ -132,7 +170,16 @@ function drawOmittedTasksWarning(slide: PptxSlide, omittedCount: number) {
  * Splitting the bars into a shapes pass and a text pass is what buys step 4;
  * drawing each bar's shapes and text together would put the first bars' text
  * under the connectors again. */
-function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel) {
+function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel, links: SlideLinks) {
+  // A bar is clickable exactly when its task has an appendix slide to open.
+  // The link goes on the track, the fill *and* the label because those are
+  // three separate objects making up one visual row: the fill sits over the
+  // track (so linking only the track would leave the colored part dead), and
+  // a track clipped to MIN_TRACK_WIDTH_IN is a 0.15in sliver that nobody can
+  // reasonably hit — the label beside it is the readable handle for the task.
+  const barJump = (bar: OverviewSlideModel['bars'][number]) =>
+    slideJump(links.detailSlideNumberByTaskId.get(bar.id), 'Open subtasks & comments');
+
   drawChrome(slide, model.title);
   drawOmittedTasksWarning(slide, model.omittedCount);
 
@@ -164,6 +211,10 @@ function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel) {
   }
 
   model.bars.forEach((bar) => {
+    // barJump() is called per object rather than shared between the two
+    // shapes: pptxgenjs stamps its own `_rId` onto whatever hyperlink object
+    // it's handed, so reusing one would leave both shapes rendering the
+    // second one's relationship.
     slide.addShape('roundRect', {
       x: bar.barX,
       y: bar.y,
@@ -172,6 +223,7 @@ function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel) {
       rectRadius: BAR_RADIUS_IN,
       fill: { color: COLORS.border },
       line: { color: COLORS.border },
+      ...barJump(bar),
     });
 
     if (bar.fillWidth > 0) {
@@ -183,6 +235,7 @@ function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel) {
         rectRadius: BAR_RADIUS_IN,
         fill: { color: bar.color },
         line: { color: bar.color },
+        ...barJump(bar),
       });
     }
   });
@@ -252,6 +305,7 @@ function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel) {
       fontFace: PPTX_FONT_FACE,
       valign: 'middle',
       wrap: false,
+      ...barJump(bar),
     });
 
     slide.addText(bar.statusText, {
@@ -388,8 +442,9 @@ function drawCommentBlock(slide: PptxSlide, block: CommentBlockRowModel) {
   }
 }
 
-function drawDetailSlide(slide: PptxSlide, model: DetailSlideModel) {
+function drawDetailSlide(slide: PptxSlide, model: DetailSlideModel, links: SlideLinks) {
   drawChrome(slide, model.title);
+  drawBackToOverviewLink(slide, links.overviewSlideNumber);
 
   model.sections.forEach((section) => {
     slide.addText(section.parentTitle, {
@@ -696,12 +751,17 @@ export async function exportTimelineToPptx(
   const pptx = new pptxgen();
   pptx.layout = 'LAYOUT_16x9';
 
-  orderExportSlides(slides, dashboardSlides).forEach((slideModel) => {
+  // Resolved from the ordered deck up front, so a bar drawn on slide 1 can
+  // link forward to an appendix slide that hasn't been added yet.
+  const orderedSlides = orderExportSlides(slides, dashboardSlides);
+  const links = buildSlideLinks(orderedSlides);
+
+  orderedSlides.forEach((slideModel) => {
     const slide = pptx.addSlide();
     if (slideModel.kind === 'overview') {
-      drawOverviewSlide(slide, slideModel);
+      drawOverviewSlide(slide, slideModel, links);
     } else if (slideModel.kind === 'detail') {
-      drawDetailSlide(slide, slideModel);
+      drawDetailSlide(slide, slideModel, links);
     } else if (slideModel.kind === 'summary') {
       drawSummarySlide(slide, slideModel, summaryQrCodes);
     } else {

@@ -195,6 +195,11 @@ export interface CommentModel {
 }
 
 export interface DetailSectionModel {
+  // The parent task this section documents. Carried through purely so a
+  // renderer can resolve "which slide holds task X's detail" from the final
+  // deck order (see slideLinks.ts) — nothing about the section is drawn from
+  // it. A parent split across "(continued)" sections repeats the same id.
+  taskId: string;
   parentTitle: string;
   parentTitleY: number;
   subtasksHeadingY?: number;
@@ -566,6 +571,7 @@ interface CommentFragment {
  * if needed, so a block is never silently cut off instead of continuing on
  * a new slide. */
 interface DetailChunk {
+  taskId: string;
   parentTitle: string;
   children: TimelineItem[];
   // Whether this chunk carries the parent's assignee row at all — true only
@@ -731,6 +737,7 @@ function buildDetailSection(chunk: DetailChunk, startY: number): { section: Deta
 
   return {
     section: {
+      taskId: chunk.taskId,
       parentTitle: chunk.parentTitle,
       parentTitleY,
       subtasksHeadingY,
@@ -763,6 +770,7 @@ function expandCandidateToChunks(candidate: DetailCandidate): DetailChunk[] {
   const { parent, children, relevantComments } = candidate;
 
   const makeChunk = (isFirst: boolean): DetailChunk => ({
+    taskId: parent.id,
     parentTitle: isFirst ? parent.label : `${parent.label} (continued)`,
     children: isFirst ? children : [],
     showAssignee: isFirst,

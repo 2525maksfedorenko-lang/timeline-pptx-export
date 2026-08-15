@@ -19,6 +19,21 @@ export const CONTENT_HEIGHT_IN = CONTENT_BOTTOM_IN - CONTENT_TOP_IN;
 
 export const ROW_LABEL_HEIGHT_IN = 0.22;
 
+// "Back to overview" link on the appendix slides. It sits in the strip of
+// whitespace between the header bar and the content area — the top-left of
+// the slide body, where a breadcrumb belongs — rather than inside the header
+// itself, which is already fully occupied by the 24pt slide title starting at
+// this same left edge. Sized to end above CONTENT_TOP_IN, so it adds a
+// navigation affordance without shifting a single row of content (and hence
+// without changing how much fits on an appendix slide).
+export const BACK_LINK_TEXT = '← Back to overview';
+export const BACK_LINK_FONT_SIZE_PT = 9;
+export const BACK_LINK_Y_IN = HEADER_HEIGHT_IN + 0.02;
+export const BACK_LINK_HEIGHT_IN = 0.24;
+// Comfortably wider than the caption measures at 9pt (~1.15in), so the whole
+// phrase stays on one line and the clickable box extends a little past it.
+export const BACK_LINK_WIDTH_IN = 1.5;
+
 // Overview bars: one merged line per task instead of a separate label row
 // stacked above the bar (which doubled the height every task actually
 // needed). The task label and the status text are drawn beside the track, in
