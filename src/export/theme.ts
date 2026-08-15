@@ -21,7 +21,7 @@ export const COLORS = {
   // a glance; the values are deliberately spread far enough apart to stay
   // distinguishable after antialiasing at sub-pixel widths.
   gridLine: 'D8D6CC',
-  weekGridLine: 'E0E1D8',
+  weekGridLine: 'DCDBD2',
   // Pale, but deliberately not *as* pale as the slide background it sits on
   // (slideBg F1F2F4): a lighter daily line simply disappears in the export.
   dayGridLine: 'E9EAE2',
