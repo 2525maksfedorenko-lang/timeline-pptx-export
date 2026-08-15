@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTimelineStore } from '../store/timelineStore';
 import { GanttRow } from './GanttRow';
 import { AddTaskForm } from './AddTaskForm';
@@ -10,10 +10,79 @@ import { ZoomControl } from './ZoomControl';
 import { BASE_PX_PER_DAY, MS_PER_DAY, formatShortDate, getDateRange } from '../export/dateScale';
 import { sortItems } from '../utils/sortItems';
 
+/** The one comment/assignee popup that may be open at a time, across every
+ * row — lifted up here (instead of living in each GanttRow) so opening one
+ * bar's popup is guaranteed to close any other bar's, rather than each row
+ * tracking "am I open" independently and letting two show at once.
+ * `initialAssigneeId` is a snapshot of what selectedAssigneeId was when the
+ * popup opened, so a backdrop click can tell "untouched" apart from
+ * "user actually picked something" without a second effect/ref in GanttRow. */
+interface PopupDraft {
+  taskId: string;
+  commentText: string;
+  selectedAssigneeId: string;
+  newPersonName: string;
+  initialAssigneeId: string;
+}
+
 export function GanttChart() {
   const items = useTimelineStore((state) => state.items);
   const sortMode = useTimelineStore((state) => state.exportOptions.sortMode);
   const zoomLevel = useTimelineStore((state) => state.ui.zoomLevel);
+
+  const [popupDraft, setPopupDraft] = useState<PopupDraft | null>(null);
+  const popupRef = useRef<HTMLDivElement | null>(null);
+
+  // Escape always discards and closes, no matter what's been typed.
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setPopupDraft((current) => (current ? null : current));
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Backdrop click: closes without saving, but only when there's nothing to
+  // lose (fields empty or untouched since the popup opened) — otherwise a
+  // stray click elsewhere on the page would silently drop a half-written
+  // comment. Runs in the capture phase, ahead of the row buttons' own
+  // stopPropagation()-ing mousedown handlers, and explicitly ignores clicks
+  // on any [data-popup-trigger] icon so switching to a different bar's popup
+  // (which those buttons' own onClick already does unconditionally) never
+  // races with this conditional close.
+  useEffect(() => {
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as Element | null;
+      if (popupRef.current?.contains(target)) return;
+      if (target?.closest('[data-popup-trigger]')) return;
+      setPopupDraft((current) => {
+        if (!current) return current;
+        const hasChanges =
+          current.commentText.trim() !== '' ||
+          current.newPersonName.trim() !== '' ||
+          current.selectedAssigneeId !== current.initialAssigneeId;
+        return hasChanges ? current : null;
+      });
+    };
+    document.addEventListener('mousedown', handlePointerDown, true);
+    return () => document.removeEventListener('mousedown', handlePointerDown, true);
+  }, []);
+
+  const handleToggleTaskPopup = (taskId: string, initialAssigneeId: string) => {
+    setPopupDraft((current) =>
+      current?.taskId === taskId
+        ? null
+        : { taskId, commentText: '', selectedAssigneeId: initialAssigneeId, newPersonName: '', initialAssigneeId },
+    );
+  };
+
+  const closeTaskPopup = () => setPopupDraft(null);
+
+  const updatePopupDraft = (taskId: string, patch: Partial<Omit<PopupDraft, 'taskId' | 'initialAssigneeId'>>) => {
+    setPopupDraft((current) => (current && current.taskId === taskId ? { ...current, ...patch } : current));
+  };
 
   const pxPerDay = BASE_PX_PER_DAY * zoomLevel;
   const zone1Width = useMemo(() => computeZone1Width(items), [items]);
@@ -79,16 +148,29 @@ export function GanttChart() {
             <DateGridLines minDate={minDate} totalDays={days.length} pxPerDay={pxPerDay} zone1Width={zone1Width} />
             <HierarchyConnectors items={sortedItems} minDate={minDate} pxPerDay={pxPerDay} zone1Width={zone1Width} />
             <DependencyConnectors items={sortedItems} minDate={minDate} pxPerDay={pxPerDay} zone1Width={zone1Width} />
-            {sortedItems.map((item) => (
-              <GanttRow
-                key={item.id}
-                item={item}
-                minDate={minDate}
-                pxPerDay={pxPerDay}
-                timelineWidth={timelineWidth}
-                zone1Width={zone1Width}
-              />
-            ))}
+            {sortedItems.map((item) => {
+              const isPopupOpen = popupDraft?.taskId === item.id;
+              return (
+                <GanttRow
+                  key={item.id}
+                  item={item}
+                  minDate={minDate}
+                  pxPerDay={pxPerDay}
+                  timelineWidth={timelineWidth}
+                  zone1Width={zone1Width}
+                  isPopupOpen={isPopupOpen}
+                  popupRef={popupRef}
+                  commentText={isPopupOpen ? popupDraft.commentText : ''}
+                  onCommentTextChange={(value) => updatePopupDraft(item.id, { commentText: value })}
+                  selectedAssigneeId={isPopupOpen ? popupDraft.selectedAssigneeId : ''}
+                  onSelectedAssigneeIdChange={(value) => updatePopupDraft(item.id, { selectedAssigneeId: value })}
+                  newPersonName={isPopupOpen ? popupDraft.newPersonName : ''}
+                  onNewPersonNameChange={(value) => updatePopupDraft(item.id, { newPersonName: value })}
+                  onToggleTrigger={(initialAssigneeId) => handleToggleTaskPopup(item.id, initialAssigneeId)}
+                  onRequestClosePopup={closeTaskPopup}
+                />
+              );
+            })}
           </div>
         </div>
       </div>

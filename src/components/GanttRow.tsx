@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef } from 'react';
 import { getTaskStatus, TASK_STATUS_COLORS, TASK_STATUS_LABELS, type TimelineItem } from '../types/timeline';
 import { useTimelineStore } from '../store/timelineStore';
 import { usePeopleStore } from '../store/peopleStore';
@@ -24,6 +24,19 @@ interface GanttRowProps {
   // across all rows, so it's the same for every row and every row's label
   // fits on one line with no ellipsis.
   zone1Width: number;
+  // The comment/assignee popup's open/closed state and draft fields live in
+  // GanttChart (see PopupDraft there), not here — that's what guarantees
+  // only one row's popup can ever be open at once.
+  isPopupOpen: boolean;
+  popupRef: React.RefObject<HTMLDivElement | null>;
+  commentText: string;
+  onCommentTextChange: (value: string) => void;
+  selectedAssigneeId: string;
+  onSelectedAssigneeIdChange: (value: string) => void;
+  newPersonName: string;
+  onNewPersonNameChange: (value: string) => void;
+  onToggleTrigger: (initialAssigneeId: string) => void;
+  onRequestClosePopup: () => void;
 }
 
 interface DragState {
@@ -95,7 +108,23 @@ const BAR_TRACK_COLOR = '#E2E8F0';
 const PROGRESS_FONT = '600 11px ui-sans-serif, system-ui, sans-serif';
 const PROGRESS_PADDING_PX = 5;
 
-export function GanttRow({ item, minDate, pxPerDay, timelineWidth, zone1Width }: GanttRowProps) {
+export function GanttRow({
+  item,
+  minDate,
+  pxPerDay,
+  timelineWidth,
+  zone1Width,
+  isPopupOpen,
+  popupRef,
+  commentText,
+  onCommentTextChange,
+  selectedAssigneeId,
+  onSelectedAssigneeIdChange,
+  newPersonName,
+  onNewPersonNameChange,
+  onToggleTrigger,
+  onRequestClosePopup,
+}: GanttRowProps) {
   const items = useTimelineStore((state) => state.items);
   const updateItem = useTimelineStore((state) => state.updateItem);
   const addComment = useTimelineStore((state) => state.addComment);
@@ -105,14 +134,6 @@ export function GanttRow({ item, minDate, pxPerDay, timelineWidth, zone1Width }:
   const addPerson = usePeopleStore((state) => state.addPerson);
   const barRef = useRef<HTMLDivElement>(null);
   const dragState = useRef<DragState | null>(null);
-
-  const [isNotePopupOpen, setIsNotePopupOpen] = useState(false);
-  const [commentText, setCommentText] = useState('');
-  // '' = no change (keep the item's current assignee, if any); a person's
-  // id = switch to them; NEW_PERSON_OPTION (see AssigneeSelect) = show the
-  // "add new person" field.
-  const [selectedAssigneeId, setSelectedAssigneeId] = useState('');
-  const [newPersonName, setNewPersonName] = useState('');
 
   const { left, width: barWidth } = getItemBar(item, minDate, pxPerDay);
   const progress = clampProgress(item.progress ?? 0);
@@ -161,25 +182,17 @@ export function GanttRow({ item, minDate, pxPerDay, timelineWidth, zone1Width }:
     deleteTaskCascade(item.id);
   };
 
-  const handleOpenNotePopup = (event: React.MouseEvent) => {
+  const handleTriggerClick = (event: React.MouseEvent) => {
     event.stopPropagation();
     // Preselect the item's current assignee if they're a known person, so
     // reopening the popup doesn't look like the assignment was lost — but
     // if there's no match (e.g. a name set before this picker existed),
-    // default to "no change" rather than guessing.
+    // default to "no change" rather than guessing. onToggleTrigger closes
+    // the popup instead if this row's is already the one open.
     const currentAssigneeId = item.assignee
       ? people.find((person) => person.name === item.assignee?.name)?.id
       : undefined;
-    setSelectedAssigneeId(currentAssigneeId ?? '');
-    setNewPersonName('');
-    setIsNotePopupOpen(true);
-  };
-
-  const closeNotePopup = () => {
-    setIsNotePopupOpen(false);
-    setCommentText('');
-    setSelectedAssigneeId('');
-    setNewPersonName('');
+    onToggleTrigger(currentAssigneeId ?? '');
   };
 
   const canSaveNote = commentText.trim() !== '';
@@ -199,7 +212,7 @@ export function GanttRow({ item, minDate, pxPerDay, timelineWidth, zone1Width }:
       createdAt: new Date().toISOString(),
     });
 
-    closeNotePopup();
+    onRequestClosePopup();
   };
 
   const handleMouseDown = (event: React.MouseEvent) => {
@@ -298,8 +311,9 @@ export function GanttRow({ item, minDate, pxPerDay, timelineWidth, zone1Width }:
       >
         <button
           type="button"
+          data-popup-trigger
           onMouseDown={(event) => event.stopPropagation()}
-          onClick={handleOpenNotePopup}
+          onClick={handleTriggerClick}
           className={`${ICON_BUTTON_CLASS} rounded-full ${item.assignee ? '' : 'text-slate-400 hover:text-slate-600'}`}
           style={item.assignee ? { backgroundColor: '#2A9D90' } : undefined}
           title={item.assignee ? item.assignee.name : 'Set assignee'}
@@ -314,8 +328,9 @@ export function GanttRow({ item, minDate, pxPerDay, timelineWidth, zone1Width }:
 
         <button
           type="button"
+          data-popup-trigger
           onMouseDown={(event) => event.stopPropagation()}
-          onClick={handleOpenNotePopup}
+          onClick={handleTriggerClick}
           className={`${ICON_BUTTON_CLASS} text-slate-700/70 hover:text-slate-900`}
           title="Add comment / assignee"
           aria-label="Add comment / assignee"
@@ -349,8 +364,9 @@ export function GanttRow({ item, minDate, pxPerDay, timelineWidth, zone1Width }:
           <span className={ICON_BUTTON_CLASS} aria-hidden="true" />
         )}
 
-        {isNotePopupOpen && (
+        {isPopupOpen && (
           <div
+            ref={popupRef}
             className="absolute right-0 top-full z-20 mt-1 w-64 rounded-md border border-[#E5E5E1] bg-white p-3 text-left shadow-lg"
             onMouseDown={(event) => event.stopPropagation()}
           >
@@ -363,7 +379,7 @@ export function GanttRow({ item, minDate, pxPerDay, timelineWidth, zone1Width }:
                 autoFocus
                 rows={3}
                 value={commentText}
-                onChange={(event) => setCommentText(event.target.value)}
+                onChange={(event) => onCommentTextChange(event.target.value)}
                 placeholder="Add a note about this task…"
                 className="resize-none rounded-md border border-[#E5E5E1] px-2 py-1 text-sm text-[#1E2B38] focus:border-[#2A9D90] focus:outline-none"
               />
@@ -376,9 +392,9 @@ export function GanttRow({ item, minDate, pxPerDay, timelineWidth, zone1Width }:
               <AssigneeSelect
                 idPrefix={`row-${item.id}`}
                 value={selectedAssigneeId}
-                onChange={setSelectedAssigneeId}
+                onChange={onSelectedAssigneeIdChange}
                 newPersonName={newPersonName}
-                onNewPersonNameChange={setNewPersonName}
+                onNewPersonNameChange={onNewPersonNameChange}
                 placeholderLabel={item.assignee ? `Keep: ${item.assignee.name}` : 'Select assignee…'}
               />
             </div>
@@ -394,7 +410,7 @@ export function GanttRow({ item, minDate, pxPerDay, timelineWidth, zone1Width }:
               </button>
               <button
                 type="button"
-                onClick={closeNotePopup}
+                onClick={onRequestClosePopup}
                 className="rounded-md px-3 py-1.5 text-sm font-medium text-slate-500 hover:bg-slate-100"
               >
                 Cancel
