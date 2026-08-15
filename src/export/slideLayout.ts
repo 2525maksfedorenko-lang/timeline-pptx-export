@@ -59,8 +59,9 @@ export const BAR_LABEL_FONT_SIZE_PT = 11;
 export const BAR_STATUS_FONT_SIZE_PT = 9;
 // Same purpose, one row down: a detail slide's subtask row packs a label
 // (plus dates/progress) on the left and a status on the right of the same
-// line.
-export const SUBTASK_TEXT_FONT_SIZE_PT = 12;
+// line. Smaller than the overview bar's label, so the dates/progress tail
+// (which never truncates) leaves more of the row for the label itself.
+export const SUBTASK_TEXT_FONT_SIZE_PT = 10;
 export const SUBTASK_STATUS_FONT_SIZE_PT = 10;
 // Minimum clear gap always kept between a label and the status text sharing
 // its row, even after the label has been reserved room / truncated against
@@ -68,6 +69,10 @@ export const SUBTASK_STATUS_FONT_SIZE_PT = 10;
 // approximation in textMetrics.ts, so a truncated label never visually
 // touches the status next to it.
 export const LABEL_STATUS_GAP_IN = 0.1;
+// Same buffer, but for a detail slide's subtask row specifically — kept
+// smaller than LABEL_STATUS_GAP_IN (rather than reusing it) so tightening
+// this one doesn't also widen the overview bar's label column.
+export const SUBTASK_META_STATUS_GAP_IN = 0.05;
 // Left indent of a detail slide's subtask rows from the content edge —
 // shared with the model so it can size the row's available text width the
 // same way the exporters position it.

@@ -58,6 +58,7 @@ import {
   ROW_HEIGHT_IN,
   ROW_LABEL_HEIGHT_IN,
   SECTION_GAP_IN,
+  SUBTASK_META_STATUS_GAP_IN,
   SUBTASK_STATUS_FONT_SIZE_PT,
   SUBTASK_TEXT_FONT_SIZE_PT,
 } from './slideLayout';
@@ -672,14 +673,17 @@ function buildDetailSection(chunk: DetailChunk, startY: number): { section: Deta
       // Same collision to guard against as an overview bar's label/status
       // (see truncateToWidth): the row's label is the flexible part, so it's
       // what gets truncated — the trailing dates/progress and the status
-      // both stay intact and fully readable.
-      const meta = `  —  ${child.start} → ${child.end}  —  ${progress}%`;
+      // both stay intact and fully readable. Dates use formatShortDate (the
+      // same "Aug 20" the on-screen day header and overview axis already
+      // use) rather than the raw ISO string — no year, short month, so the
+      // fixed non-truncatable tail stays as narrow as possible.
+      const meta = `  —  ${formatShortDate(new Date(child.start))} – ${formatShortDate(new Date(child.end))}  —  ${progress}%`;
       const statusTextWidth = measureTextWidthIn(statusText, SUBTASK_STATUS_FONT_SIZE_PT);
       const availableWidth =
         CONTENT_WIDTH_IN -
         DETAIL_ROW_INDENT_IN -
         statusTextWidth -
-        LABEL_STATUS_GAP_IN -
+        SUBTASK_META_STATUS_GAP_IN -
         measureTextWidthIn(meta, SUBTASK_TEXT_FONT_SIZE_PT);
       const label = truncateToWidth(child.label, SUBTASK_TEXT_FONT_SIZE_PT, Math.max(availableWidth, 0));
 
