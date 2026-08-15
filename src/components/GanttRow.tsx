@@ -84,6 +84,11 @@ function PersonIcon() {
 const ICON_BUTTON_CLASS = 'flex h-4 w-4 flex-shrink-0 items-center justify-center';
 
 const DEFAULT_BAR_COLOR = '#3b82f6';
+// Solid, fully opaque so the date grid lines (drawn behind the bar in
+// z-order) can never bleed through the unfilled part of the bar — an
+// inline color, not the bg-slate-200 utility class, so opacity is never at
+// the mercy of an inherited Tailwind CSS variable.
+const BAR_TRACK_COLOR = '#E2E8F0';
 // Must match how the progress text on the bar is actually styled below
 // (`text-[11px] font-semibold`, app font stack), since it's what the fit
 // measurement is made against.
@@ -265,8 +270,11 @@ export function GanttRow({ item, minDate, pxPerDay, timelineWidth, zone1Width }:
           className="absolute top-1 h-8 cursor-grab select-none active:cursor-grabbing"
           style={{ left, width: barWidth }}
         >
-          <div className="h-full overflow-hidden rounded-md bg-slate-200 shadow-sm">
-            <div className="h-full" style={{ width: `${progress}%`, backgroundColor: barColor }} />
+          <div
+            className="h-full overflow-hidden rounded-md shadow-sm"
+            style={{ backgroundColor: BAR_TRACK_COLOR, opacity: 1 }}
+          >
+            <div className="h-full" style={{ width: `${progress}%`, backgroundColor: barColor, opacity: 1 }} />
           </div>
 
           {progressText && (
