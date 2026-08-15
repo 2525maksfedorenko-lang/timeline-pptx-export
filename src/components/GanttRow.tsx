@@ -5,7 +5,7 @@ import { usePeopleStore } from '../store/peopleStore';
 import { AssigneeSelect } from './AssigneeSelect';
 import { resolveAssignee } from './assigneeSelection';
 import { ZONE3_WIDTH_PX } from './ganttLayout';
-import { getItemBar, shiftIsoDate } from '../export/dateScale';
+import { daysBetween, getItemBar, shiftIsoDate } from '../export/dateScale';
 import { clampProgress } from '../utils/clampProgress';
 import { needsDarkText } from '../utils/colorContrast';
 import { getInitials } from '../utils/initials';
@@ -41,9 +41,17 @@ interface GanttRowProps {
   onRequestClosePopup: () => void;
 }
 
+// One drag state shape for all three bar interactions (move + resize each
+// edge) — they're mutually exclusive at any given moment (only one mousedown
+// can be in flight on a bar at a time), so one ref covers all three instead
+// of a separate one per interaction.
+type DragMode = 'move' | 'resize-start' | 'resize-end';
+
 interface DragState {
+  mode: DragMode;
   startX: number;
   startLeft: number;
+  startWidth: number;
 }
 
 function EyeIcon() {
@@ -115,6 +123,9 @@ const BAR_TRACK_COLOR = '#E2E8F0';
 // measurement is made against.
 const PROGRESS_FONT = '600 11px ui-sans-serif, system-ui, sans-serif';
 const PROGRESS_PADDING_PX = 5;
+// Invisible resize-handle strip at each end of a bar — narrow enough to
+// stay out of the way of the move-drag area covering the rest of it.
+const RESIZE_HANDLE_WIDTH_PX = 6;
 
 export function GanttRow({
   item,
@@ -252,15 +263,47 @@ export function GanttRow({
     updateItem(item.id, { tags: (item.tags ?? []).filter((existing) => existing !== tag) });
   };
 
-  const handleMouseDown = (event: React.MouseEvent) => {
+  // Shared by all three bar interactions — dragging the bar's middle moves
+  // both dates together (mode 'move'), dragging either edge's resize handle
+  // changes just that one date (see the two narrow handles rendered inside
+  // the bar below). stopPropagation matters here specifically for the two
+  // resize handles: they're children of the bar's own onMouseDown="move"
+  // element, so without it a mousedown on a handle would also bubble up and
+  // start a move at the same time.
+  const beginBarInteraction = (event: React.MouseEvent, mode: DragMode) => {
     event.preventDefault();
-    dragState.current = { startX: event.clientX, startLeft: left };
+    event.stopPropagation();
+    dragState.current = { mode, startX: event.clientX, startLeft: left, startWidth: barWidth };
+
+    // How many days this bar currently spans (daysBetween, not the +1
+    // getItemBar renders a track at) — the room a resize has to shrink
+    // into before the edge being dragged would reach, and then pass, the
+    // other edge. 0 for an already single-day task, i.e. that edge can't
+    // shrink any further.
+    const durationDays = daysBetween(new Date(item.start), new Date(item.end));
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
       const drag = dragState.current;
       if (!drag || !barRef.current) return;
-      const deltaX = moveEvent.clientX - drag.startX;
-      barRef.current.style.left = `${drag.startLeft + deltaX}px`;
+      const rawDeltaX = moveEvent.clientX - drag.startX;
+
+      if (drag.mode === 'move') {
+        barRef.current.style.left = `${drag.startLeft + rawDeltaX}px`;
+        return;
+      }
+
+      if (drag.mode === 'resize-start') {
+        // Clamped in pixel space (not just at commit time) so the bar
+        // itself never visually shrinks past the one-day-duration floor
+        // while dragging, not only once the mouse is released.
+        const deltaX = Math.min(rawDeltaX, pxPerDay * durationDays);
+        barRef.current.style.left = `${drag.startLeft + deltaX}px`;
+        barRef.current.style.width = `${drag.startWidth - deltaX}px`;
+        return;
+      }
+
+      const deltaX = Math.max(rawDeltaX, -(pxPerDay * durationDays));
+      barRef.current.style.width = `${drag.startWidth + deltaX}px`;
     };
 
     const handleMouseUp = (upEvent: MouseEvent) => {
@@ -271,22 +314,47 @@ export function GanttRow({
       dragState.current = null;
       if (!drag) return;
 
-      const deltaX = upEvent.clientX - drag.startX;
-      const deltaDays = Math.round(deltaX / pxPerDay);
+      const rawDeltaX = upEvent.clientX - drag.startX;
 
+      if (drag.mode === 'move') {
+        const deltaDays = Math.round(rawDeltaX / pxPerDay);
+        if (deltaDays !== 0) {
+          updateItem(item.id, {
+            start: shiftIsoDate(item.start, deltaDays),
+            end: shiftIsoDate(item.end, deltaDays),
+          });
+        } else if (barRef.current) {
+          barRef.current.style.left = `${left}px`;
+        }
+        return;
+      }
+
+      if (drag.mode === 'resize-start') {
+        const deltaDays = Math.round(Math.min(rawDeltaX, pxPerDay * durationDays) / pxPerDay);
+        if (deltaDays !== 0) {
+          updateItem(item.id, { start: shiftIsoDate(item.start, deltaDays) });
+        } else if (barRef.current) {
+          barRef.current.style.left = `${left}px`;
+          barRef.current.style.width = `${barWidth}px`;
+        }
+        return;
+      }
+
+      const deltaDays = Math.round(Math.max(rawDeltaX, -(pxPerDay * durationDays)) / pxPerDay);
       if (deltaDays !== 0) {
-        updateItem(item.id, {
-          start: shiftIsoDate(item.start, deltaDays),
-          end: shiftIsoDate(item.end, deltaDays),
-        });
+        updateItem(item.id, { end: shiftIsoDate(item.end, deltaDays) });
       } else if (barRef.current) {
-        barRef.current.style.left = `${left}px`;
+        barRef.current.style.width = `${barWidth}px`;
       }
     };
 
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
   };
+
+  const handleMouseDown = (event: React.MouseEvent) => beginBarInteraction(event, 'move');
+  const handleResizeStartMouseDown = (event: React.MouseEvent) => beginBarInteraction(event, 'resize-start');
+  const handleResizeEndMouseDown = (event: React.MouseEvent) => beginBarInteraction(event, 'resize-end');
 
   return (
     <div className="flex h-10 border-b border-slate-100" style={{ opacity: included ? 1 : 0.5 }}>
@@ -352,6 +420,23 @@ export function GanttRow({
               {progressText}
             </span>
           )}
+
+          {/* Resize handles: invisible strips at each edge, drawn after (so
+              stacked above) the fill/progress-text — grabbing one of these
+              narrow zones changes just that end's date instead of moving
+              the whole bar, which is what the wider middle area (still
+              plain cursor-grab, still handleMouseDown="move") continues to
+              do. */}
+          <div
+            onMouseDown={handleResizeStartMouseDown}
+            className="absolute inset-y-0 left-0 cursor-ew-resize"
+            style={{ width: RESIZE_HANDLE_WIDTH_PX }}
+          />
+          <div
+            onMouseDown={handleResizeEndMouseDown}
+            className="absolute inset-y-0 right-0 cursor-ew-resize"
+            style={{ width: RESIZE_HANDLE_WIDTH_PX }}
+          />
         </div>
       </div>
 
