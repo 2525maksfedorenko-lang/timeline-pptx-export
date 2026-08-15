@@ -119,6 +119,12 @@ export const SECTION_GAP_IN = 0.2;
 // parent's block when several are packed onto the same appendix slide.
 export const PARENT_SECTION_GAP_IN = 0.3;
 
+// Small color swatch drawn before "Assigned to: <name>" on a detail slide,
+// vertically centered within the assignee row (LIST_ROW_HEIGHT_IN) — see
+// assigneeColor in timelineExportModel.ts.
+export const ASSIGNEE_SWATCH_SIZE_IN = 0.1;
+export const ASSIGNEE_SWATCH_GAP_IN = 0.08;
+
 // Comment bodies are parsed markdown (see src/utils/renderMarkdown.ts) and
 // rendered as real headings/paragraphs/lists/tables. Heights below reuse the
 // same row-pitch scale as the rest of a detail section (ROW_LABEL_HEIGHT_IN

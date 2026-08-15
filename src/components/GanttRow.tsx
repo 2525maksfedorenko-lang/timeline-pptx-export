@@ -97,6 +97,12 @@ function PersonIcon() {
 const ICON_BUTTON_CLASS = 'flex h-4 w-4 flex-shrink-0 items-center justify-center';
 
 const DEFAULT_BAR_COLOR = '#3b82f6';
+// Neutral badge fill (hex without '#', matching Person.color's own
+// convention) for an assignee whose name no longer matches any saved
+// Person (e.g. removed from peopleStore after the task was assigned) —
+// same value as theme.ts's COLORS.assigneeFallback, used for the same case
+// on the exported detail slide.
+const FALLBACK_ASSIGNEE_COLOR = '94A3B8';
 // Solid, fully opaque so the date grid lines (drawn behind the bar in
 // z-order) can never bleed through the unfilled part of the bar — an
 // inline color, not the bg-slate-200 utility class, so opacity is never at
@@ -139,6 +145,15 @@ export function GanttRow({
   const progress = clampProgress(item.progress ?? 0);
   const status = getTaskStatus(item);
   const included = item.includeInExport !== false;
+
+  // Matched by name, not id — a task only ever remembers its assignee's
+  // name (see Person.color's doc comment in peopleStore.ts), so two people
+  // sharing a name are only as distinguishable here as that lookup allows.
+  // Falls back to a neutral gray for a name that no longer matches anyone
+  // (e.g. removed from peopleStore after the task was assigned).
+  const assigneeColor = item.assignee
+    ? `#${people.find((person) => person.name === item.assignee?.name)?.color ?? FALLBACK_ASSIGNEE_COLOR}`
+    : undefined;
 
   // Progress text rides on the bar: centered in the filled part when that
   // part is measurably wide enough to hold it, otherwise immediately after
@@ -315,12 +330,17 @@ export function GanttRow({
           onMouseDown={(event) => event.stopPropagation()}
           onClick={handleTriggerClick}
           className={`${ICON_BUTTON_CLASS} rounded-full ${item.assignee ? '' : 'text-slate-400 hover:text-slate-600'}`}
-          style={item.assignee ? { backgroundColor: '#2A9D90' } : undefined}
+          style={assigneeColor ? { backgroundColor: assigneeColor } : undefined}
           title={item.assignee ? item.assignee.name : 'Set assignee'}
           aria-label={item.assignee ? `Assignee: ${item.assignee.name}` : 'Set assignee'}
         >
-          {item.assignee ? (
-            <span className="text-[9px] font-semibold text-white">{getInitials(item.assignee.name)}</span>
+          {item.assignee && assigneeColor ? (
+            <span
+              className="text-[9px] font-semibold"
+              style={{ color: needsDarkText(assigneeColor) ? '#1E2B38' : '#FFFFFF' }}
+            >
+              {getInitials(item.assignee.name)}
+            </span>
           ) : (
             <PersonIcon />
           )}

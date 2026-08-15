@@ -38,6 +38,7 @@ function App() {
   const items = useTimelineStore((state) => state.items)
   const exportOptions = useTimelineStore((state) => state.exportOptions)
   const comments = useTimelineStore((state) => state.comments)
+  const people = usePeopleStore((state) => state.people)
   const loadPeople = usePeopleStore((state) => state.loadPeople)
 
   const [highlightSection] = useState<DashboardSection | null>(readDashboardViewParam)
@@ -55,7 +56,7 @@ function App() {
   const runExport = (format: ExportFormat, exportMode: ExportMode) => {
     const fileName = buildExportFilename(exportOptions.exportTimeframe, format)
     const exportTimeline = format === 'pptx' ? exportTimelineToPptx : exportTimelineToPdf
-    void exportTimeline(items, exportOptions, comments, fileName, exportMode)
+    void exportTimeline(items, exportOptions, comments, people, fileName, exportMode)
   }
 
   // More top-level tasks in the effective date range than fit on one overview

@@ -27,6 +27,11 @@ export const COLORS = {
   dayGridLine: 'E9EAE2',
   // Dependency connector lines between overview bars.
   dependencyLine: '8A94A0',
+  // Fallback swatch fill for a detail slide's "Assigned to" line when the
+  // assignee's name no longer matches any saved Person (e.g. removed from
+  // peopleStore after the task was assigned) — a neutral badge instead of
+  // silently guessing a color that isn't really theirs.
+  assigneeFallback: '94A3B8',
 } as const;
 
 export function withHash(hex: string) {

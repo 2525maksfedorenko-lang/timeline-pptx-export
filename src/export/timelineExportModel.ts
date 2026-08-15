@@ -1,4 +1,5 @@
 import type { ExportOptions, ExportTimeframe } from '../store/timelineStore';
+import type { Person } from '../store/peopleStore';
 import {
   getTaskStatus,
   TASK_STATUS_COLORS,
@@ -212,6 +213,10 @@ export interface DetailSectionModel {
   assigneeText?: string;
   assigneeY?: number;
   assigneeMuted?: boolean;
+  // Hex without a leading '#' (theme.ts convention), resolved by matching
+  // the assignee's name against peopleStore — undefined exactly when
+  // assigneeMuted is true (no assignee, so nothing to swatch).
+  assigneeColor?: string;
   commentsHeadingY?: number;
   commentsHeadingText?: string;
   comments: CommentModel[];
@@ -653,7 +658,11 @@ function layoutMarkdownBlocks(blocks: MarkdownBlock[], startY: number): { rows: 
  * with startY = 0) before deciding whether it fits on the current slide, or
  * stack several sections on one slide by chaining `endY` into the next
  * section's `startY`. */
-function buildDetailSection(chunk: DetailChunk, startY: number): { section: DetailSectionModel; endY: number } {
+function buildDetailSection(
+  chunk: DetailChunk,
+  startY: number,
+  people: Person[],
+): { section: DetailSectionModel; endY: number } {
   let y = startY;
   const parentTitleY = y;
   y += ROW_LABEL_HEIGHT_IN + ROW_GAP_IN;
@@ -703,10 +712,17 @@ function buildDetailSection(chunk: DetailChunk, startY: number): { section: Deta
   let assigneeText: string | undefined;
   let assigneeY: number | undefined;
   let assigneeMuted: boolean | undefined;
+  let assigneeColor: string | undefined;
 
   if (chunk.showAssignee) {
     assigneeText = chunk.assignee ? `Assigned to: ${chunk.assignee.name}` : 'No assignee';
     assigneeMuted = !chunk.assignee;
+    // Matched by name (see the Person.color doc comment) — a real person's
+    // color when one's found, COLORS.assigneeFallback for a name that no
+    // longer matches anyone in peopleStore, nothing at all when unassigned.
+    assigneeColor = chunk.assignee
+      ? (people.find((person) => person.name === chunk.assignee?.name)?.color ?? COLORS.assigneeFallback)
+      : undefined;
     assigneeY = y;
     y += LIST_ROW_HEIGHT_IN + SECTION_GAP_IN;
   }
@@ -749,6 +765,7 @@ function buildDetailSection(chunk: DetailChunk, startY: number): { section: Deta
       assigneeText,
       assigneeY,
       assigneeMuted,
+      assigneeColor,
       commentsHeadingY,
       commentsHeadingText: chunk.commentFragments.length > 0 ? chunk.commentsHeadingText : undefined,
       comments,
@@ -770,7 +787,7 @@ function buildDetailSection(chunk: DetailChunk, startY: number): { section: Deta
  * the content area. Chunks (possibly from different parents) are then
  * packed onto slides by buildDetailSlides exactly like whole sections used
  * to be. */
-function expandCandidateToChunks(candidate: DetailCandidate): DetailChunk[] {
+function expandCandidateToChunks(candidate: DetailCandidate, people: Person[]): DetailChunk[] {
   const { parent, children, relevantComments } = candidate;
 
   const makeChunk = (isFirst: boolean): DetailChunk => ({
@@ -788,7 +805,7 @@ function expandCandidateToChunks(candidate: DetailCandidate): DetailChunk[] {
   const chunks: DetailChunk[] = [];
   let current = makeChunk(true);
 
-  const fits = (chunk: DetailChunk) => buildDetailSection(chunk, 0).endY <= CONTENT_HEIGHT_IN;
+  const fits = (chunk: DetailChunk) => buildDetailSection(chunk, 0, people).endY <= CONTENT_HEIGHT_IN;
   const isEmpty = (chunk: DetailChunk) => chunk.commentFragments.length === 0;
   const withFragment = (chunk: DetailChunk, fragment: CommentFragment): DetailChunk => ({
     ...chunk,
@@ -855,15 +872,15 @@ function expandCandidateToChunks(candidate: DetailCandidate): DetailChunk[] {
  * (not a fixed count per slide — sections vary a lot depending on how many
  * subtasks/comments a parent has), so several chunks share a slide whenever
  * they fit within CONTENT_HEIGHT_IN. */
-function buildDetailSlides(candidates: DetailCandidate[]): DetailSlideModel[] {
-  const chunks = candidates.flatMap(expandCandidateToChunks);
+function buildDetailSlides(candidates: DetailCandidate[], people: Person[]): DetailSlideModel[] {
+  const chunks = candidates.flatMap((candidate) => expandCandidateToChunks(candidate, people));
   if (chunks.length === 0) return [];
 
   const withHeight = chunks.map((chunk) => ({
     chunk,
     // Height is independent of the starting Y (the layout math is purely
     // additive), so probing at startY = 0 gives the chunk's own height.
-    heightIn: buildDetailSection(chunk, 0).endY,
+    heightIn: buildDetailSection(chunk, 0, people).endY,
   }));
 
   const groups: DetailChunk[][] = [];
@@ -888,7 +905,7 @@ function buildDetailSlides(candidates: DetailCandidate[]): DetailSlideModel[] {
   return groups.map((group, index) => {
     let y = CONTENT_TOP_IN;
     const sections = group.map((chunk) => {
-      const { section, endY } = buildDetailSection(chunk, y);
+      const { section, endY } = buildDetailSection(chunk, y, people);
       y = endY + PARENT_SECTION_GAP_IN;
       return section;
     });
@@ -937,6 +954,7 @@ export function getExportParentItems(items: TimelineItem[]): TimelineItem[] {
 export function buildExportSlides(
   items: TimelineItem[],
   comments: TaskComment[],
+  people: Person[],
   commentMode: ExportOptions['commentMode'],
   exportTimeframe: ExportTimeframe | null,
   showDependencies: boolean,
@@ -961,7 +979,7 @@ export function buildExportSlides(
 
   const slides: ExportSlideModel[] = [
     ...buildOverviewSlides(overviewPlan, exportTimeframe, exportMode, showDependencies),
-    ...buildDetailSlides(detailCandidates),
+    ...buildDetailSlides(detailCandidates, people),
   ];
 
   slides.push(buildSummarySlide(exportableItems));

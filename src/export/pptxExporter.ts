@@ -1,5 +1,6 @@
 import pptxgen from 'pptxgenjs';
 import type { ExportOptions } from '../store/timelineStore';
+import type { Person } from '../store/peopleStore';
 import type { TaskComment, TimelineItem } from '../types/timeline';
 import { sortItems } from '../utils/sortItems';
 import {
@@ -21,6 +22,8 @@ import { buildSlideLinks, type SlideLinks } from './slideLinks';
 import { orderExportSlides } from './slideOrder';
 import { COLORS, FOOTER_TEXT, PPTX_FONT_FACE } from './theme';
 import {
+  ASSIGNEE_SWATCH_GAP_IN,
+  ASSIGNEE_SWATCH_SIZE_IN,
   BACK_LINK_FONT_SIZE_PT,
   BACK_LINK_HEIGHT_IN,
   BACK_LINK_TEXT,
@@ -500,10 +503,31 @@ function drawDetailSlide(slide: PptxSlide, model: DetailSlideModel, links: Slide
     });
 
     if (section.assigneeText !== undefined && section.assigneeY !== undefined) {
+      // Swatch only when there's an actual person color to show (i.e. not
+      // the "No assignee" placeholder) — text starts right after it instead
+      // of at the row's usual left edge.
+      const textX = section.assigneeColor
+        ? CONTENT_X_IN + ASSIGNEE_SWATCH_SIZE_IN + ASSIGNEE_SWATCH_GAP_IN
+        : CONTENT_X_IN;
+      const textW = section.assigneeColor
+        ? CONTENT_WIDTH_IN - ASSIGNEE_SWATCH_SIZE_IN - ASSIGNEE_SWATCH_GAP_IN
+        : CONTENT_WIDTH_IN;
+
+      if (section.assigneeColor) {
+        slide.addShape('ellipse', {
+          x: CONTENT_X_IN,
+          y: section.assigneeY + (LIST_ROW_HEIGHT_IN - ASSIGNEE_SWATCH_SIZE_IN) / 2,
+          w: ASSIGNEE_SWATCH_SIZE_IN,
+          h: ASSIGNEE_SWATCH_SIZE_IN,
+          fill: { color: section.assigneeColor },
+          line: { color: section.assigneeColor },
+        });
+      }
+
       slide.addText(section.assigneeText, {
-        x: CONTENT_X_IN,
+        x: textX,
         y: section.assigneeY,
-        w: CONTENT_WIDTH_IN,
+        w: textW,
         h: LIST_ROW_HEIGHT_IN,
         fontSize: 12,
         bold: true,
@@ -723,6 +747,7 @@ export async function exportTimelineToPptx(
   items: TimelineItem[],
   exportOptions: ExportOptions,
   comments: TaskComment[],
+  people: Person[],
   fileName: string = 'timeline-export.pptx',
   exportMode: ExportMode = 'compact',
 ): Promise<void> {
@@ -730,6 +755,7 @@ export async function exportTimelineToPptx(
   const slides = buildExportSlides(
     sortedItems,
     comments,
+    people,
     exportOptions.commentMode,
     exportOptions.exportTimeframe,
     exportOptions.showDependencies,

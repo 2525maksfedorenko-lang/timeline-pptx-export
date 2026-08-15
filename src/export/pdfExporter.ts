@@ -2,6 +2,7 @@ import { jsPDF } from 'jspdf';
 import type { TextOptionsLight } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import type { ExportOptions } from '../store/timelineStore';
+import type { Person } from '../store/peopleStore';
 import type { TaskComment, TimelineItem } from '../types/timeline';
 import { sortItems } from '../utils/sortItems';
 import {
@@ -23,6 +24,8 @@ import { buildSlideLinks, type SlideLinks } from './slideLinks';
 import { orderExportSlides } from './slideOrder';
 import { COLORS, FOOTER_TEXT, PDF_FONT_FACE, withHash } from './theme';
 import {
+  ASSIGNEE_SWATCH_GAP_IN,
+  ASSIGNEE_SWATCH_SIZE_IN,
   BACK_LINK_FONT_SIZE_PT,
   BACK_LINK_HEIGHT_IN,
   BACK_LINK_TEXT,
@@ -43,6 +46,7 @@ import {
   FOOTER_HEIGHT_IN,
   GROUP_HEADER_HEIGHT_IN,
   HEADER_HEIGHT_IN,
+  LIST_ROW_HEIGHT_IN,
   PAGE_HEIGHT_IN,
   PAGE_WIDTH_IN,
   SUBTASK_STATUS_FONT_SIZE_PT,
@@ -400,10 +404,27 @@ function drawDetailSlide(doc: jsPDF, model: DetailSlideModel, links: SlideLinks)
     });
 
     if (section.assigneeText !== undefined && section.assigneeY !== undefined) {
+      // Swatch only when there's an actual person color to show (i.e. not
+      // the "No assignee" placeholder) — text starts right after it instead
+      // of at the row's usual left edge.
+      const textX = section.assigneeColor
+        ? CONTENT_X_IN + ASSIGNEE_SWATCH_SIZE_IN + ASSIGNEE_SWATCH_GAP_IN
+        : CONTENT_X_IN;
+
+      if (section.assigneeColor) {
+        doc.setFillColor(withHash(section.assigneeColor));
+        doc.circle(
+          CONTENT_X_IN + ASSIGNEE_SWATCH_SIZE_IN / 2,
+          section.assigneeY + LIST_ROW_HEIGHT_IN / 2,
+          ASSIGNEE_SWATCH_SIZE_IN / 2,
+          'F',
+        );
+      }
+
       doc.setFont(PDF_FONT_FACE, 'bold');
       doc.setFontSize(12);
       doc.setTextColor(withHash(section.assigneeMuted ? COLORS.mutedText : COLORS.navy));
-      drawText(doc, section.assigneeText, CONTENT_X_IN, section.assigneeY, { baseline: 'top' });
+      drawText(doc, section.assigneeText, textX, section.assigneeY, { baseline: 'top' });
     }
 
     if (section.commentsHeadingY !== undefined) {
@@ -583,6 +604,7 @@ export async function exportTimelineToPdf(
   items: TimelineItem[],
   exportOptions: ExportOptions,
   comments: TaskComment[],
+  people: Person[],
   fileName: string = 'timeline-export.pdf',
   exportMode: ExportMode = 'compact',
 ): Promise<void> {
@@ -590,6 +612,7 @@ export async function exportTimelineToPdf(
   const slides = buildExportSlides(
     sortedItems,
     comments,
+    people,
     exportOptions.commentMode,
     exportOptions.exportTimeframe,
     exportOptions.showDependencies,
