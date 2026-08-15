@@ -39,6 +39,12 @@ interface GanttRowProps {
   onTagInputChange: (value: string) => void;
   onToggleTrigger: (initialAssigneeId: string) => void;
   onRequestClosePopup: () => void;
+  // Hover-highlight of a task's structural branch, owned by GanttChart (see
+  // hoveredTaskId there) since it spans rows: true when some *other* row's
+  // branch is hovered and this bar isn't part of it. On-screen only — the
+  // exporters never see it, the same way HierarchyConnectors is screen-only.
+  isDimmed: boolean;
+  onBarHoverChange: (isHovered: boolean) => void;
 }
 
 // One drag state shape for all three bar interactions (move + resize each
@@ -145,6 +151,8 @@ export function GanttRow({
   onTagInputChange,
   onToggleTrigger,
   onRequestClosePopup,
+  isDimmed,
+  onBarHoverChange,
 }: GanttRowProps) {
   const items = useTimelineStore((state) => state.items);
   const updateItem = useTimelineStore((state) => state.updateItem);
@@ -399,10 +407,18 @@ export function GanttRow({
           this row is never drawn across its percentage — matching the
           shapes-then-text order the exporters use for the same reason. */}
       <div className="relative z-10 flex-shrink-0" style={{ width: timelineWidth }}>
+        {/* The dim is a class, not a `style` entry, on purpose: this
+            element's style attribute is written to imperatively during a
+            drag/resize (see beginBarInteraction), so anything React also
+            drives through `style` here risks fighting those writes. */}
         <div
           ref={barRef}
           onMouseDown={handleMouseDown}
-          className="absolute top-1 h-8 cursor-grab select-none active:cursor-grabbing"
+          onMouseEnter={() => onBarHoverChange(true)}
+          onMouseLeave={() => onBarHoverChange(false)}
+          className={`absolute top-1 h-8 cursor-grab select-none transition-opacity active:cursor-grabbing ${
+            isDimmed ? 'opacity-30' : ''
+          }`}
           style={{ left, width: barWidth }}
         >
           <div

@@ -55,6 +55,34 @@ export function buildTaskHierarchy(items: TimelineItem[]): TaskHierarchy {
   return { roots, flat };
 }
 
+/** `id` itself, plus every ancestor up the parentId chain, plus every
+ * descendant down it — the whole structural branch a task sits on.
+ *
+ * Deliberately ignores `dependencies`: those are task *sequencing* ("what
+ * this comes after"), a different relation from the parent/child
+ * *composition* this walks, exactly as HierarchyConnectors is kept separate
+ * from DependencyConnectors. Empty when `id` isn't in `items`, which callers
+ * should treat as "no branch" rather than "an empty branch". */
+export function getRelatedTreeIds(items: TimelineItem[], id: string): Set<string> {
+  const itemById = new Map(items.map((item) => [item.id, item]));
+  if (!itemById.has(id)) return new Set();
+
+  const ids = new Set<string>([id, ...getDescendantIds(items, id)]);
+
+  // Ancestors: walk parentId links upward. The already-seen check doubles as
+  // a cycle guard — malformed data (a's parent is b, b's parent is a) stops
+  // the walk instead of looping forever.
+  let current = itemById.get(id);
+  while (current?.parentId !== undefined) {
+    const parent = itemById.get(current.parentId);
+    if (!parent || ids.has(parent.id)) break;
+    ids.add(parent.id);
+    current = parent;
+  }
+
+  return ids;
+}
+
 /** All descendant ids of `id` (children, grandchildren, ...), not including
  * `id` itself. Empty if `id` isn't in `items` or has no subtasks — the same
  * "has subtasks" check the cascade toggle/delete actions and the Gantt row's

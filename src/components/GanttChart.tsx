@@ -9,6 +9,7 @@ import { ZONE3_WIDTH_PX, computeZone1Width } from './ganttLayout';
 import { ZoomControl } from './ZoomControl';
 import { BASE_PX_PER_DAY, MS_PER_DAY, formatShortDate, getDateRange } from '../export/dateScale';
 import { sortItems } from '../utils/sortItems';
+import { getRelatedTreeIds } from '../utils/taskHierarchy';
 
 /** The one comment/assignee popup that may be open at a time, across every
  * row — lifted up here (instead of living in each GanttRow) so opening one
@@ -37,6 +38,23 @@ export function GanttChart() {
 
   const [popupDraft, setPopupDraft] = useState<PopupDraft | null>(null);
   const popupRef = useRef<HTMLDivElement | null>(null);
+
+  // Which bar the pointer is over, if any. useState rather than the useRef
+  // the bar drags use (see GanttRow): this one *has* to re-render to show
+  // anything, and it changes once per pointer crossing rather than once per
+  // mousemove, so there's no render-churn reason to keep it out of state.
+  const [hoveredTaskId, setHoveredTaskId] = useState<string | null>(null);
+
+  // The hovered task's structural branch (itself + ancestors + descendants);
+  // null whenever nothing should be highlighted, which is what keeps "no
+  // hover" from reading as "an empty branch" and dimming every bar at once.
+  // A hover id that no longer resolves — the task was deleted while hovered
+  // — collapses to that same null for the same reason.
+  const highlightedIds = useMemo(() => {
+    if (hoveredTaskId === null) return null;
+    const related = getRelatedTreeIds(items, hoveredTaskId);
+    return related.size > 0 ? related : null;
+  }, [items, hoveredTaskId]);
 
   // Escape always discards and closes, no matter what's been typed.
   useEffect(() => {
@@ -183,6 +201,16 @@ export function GanttChart() {
                   onTagInputChange={(value) => updatePopupDraft(item.id, { tagInput: value })}
                   onToggleTrigger={(initialAssigneeId) => handleToggleTaskPopup(item.id, initialAssigneeId)}
                   onRequestClosePopup={closeTaskPopup}
+                  isDimmed={highlightedIds !== null && !highlightedIds.has(item.id)}
+                  onBarHoverChange={(isHovered) =>
+                    // Clearing only when this row is still the hovered one:
+                    // moving between two adjacent bars can deliver the new
+                    // bar's mouseenter before the old bar's mouseleave, and
+                    // an unconditional reset would drop the fresh hover.
+                    setHoveredTaskId((current) =>
+                      isHovered ? item.id : current === item.id ? null : current,
+                    )
+                  }
                 />
               );
             })}
