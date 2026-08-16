@@ -27,7 +27,7 @@ function KpiCard({ label, value, accent }: { label: string; value: string; accen
   return (
     <div className={CARD_CLASSES}>
       <div className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</div>
-      <div className="mt-1 text-3xl font-bold" style={{ color: accent ?? '#1E2B38' }}>
+      <div className="mt-1 text-3xl font-bold tracking-tight" style={{ color: accent ?? '#1E2B38' }}>
         {value}
       </div>
     </div>
@@ -82,7 +82,7 @@ function StatusDonut({ segments }: { segments: StatusSegment[] }) {
           </g>
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-2xl font-bold text-[#1E2B38]">{total}</span>
+          <span className="text-2xl font-bold tracking-tight text-[#1E2B38]">{total}</span>
           <span className="text-xs text-slate-500">tasks</span>
         </div>
       </div>
@@ -95,7 +95,14 @@ function StatusDonut({ segments }: { segments: StatusSegment[] }) {
               style={{ backgroundColor: withHash(segment.color) }}
               aria-hidden="true"
             />
-            <span className="text-[#1E2B38]">{segment.label}</span>
+            {/* The status tier: a notch smaller than the row's text-sm,
+                medium weight, tracked out and uppercased — the one place a
+                status is rendered as real text on screen (elsewhere it's a
+                colored dot's tooltip or a native <select> option, neither of
+                which can carry this styling). */}
+            <span className="text-xs font-medium uppercase tracking-[0.06em] text-[#1E2B38]">
+              {segment.label}
+            </span>
             <span className="text-slate-500">
               {segment.count} ({segment.percent}%)
             </span>
@@ -129,8 +136,8 @@ function DelayedTable({ items, today }: { items: TimelineItem[]; today: Date }) 
         <tbody>
           {items.map((item) => (
             <tr key={item.id} className="border-b border-[#E5E5E1] last:border-0">
-              <td className="py-2 pr-3 text-[#1E2B38]">{item.label}</td>
-              <td className="py-2 pr-3 text-slate-500">{formatShortDate(new Date(item.end))}</td>
+              <td className="py-2 pr-3 font-medium text-[#1E2B38]">{item.label}</td>
+              <td className="py-2 pr-3 font-mono text-xs tracking-[0.02em] text-slate-500">{formatShortDate(new Date(item.end))}</td>
               <td className="py-2 pr-3 font-medium text-[#E76E50]">{getDaysOverdue(item, today)}</td>
               <td className="py-2 text-slate-500">{assigneeText(item)}</td>
             </tr>
@@ -159,8 +166,8 @@ function AtRiskTable({ items }: { items: TimelineItem[] }) {
         <tbody>
           {items.map((item) => (
             <tr key={item.id} className="border-b border-[#E5E5E1] last:border-0">
-              <td className="py-2 pr-3 text-[#1E2B38]">{item.label}</td>
-              <td className="py-2 pr-3 text-slate-500">{formatShortDate(new Date(item.end))}</td>
+              <td className="py-2 pr-3 font-medium text-[#1E2B38]">{item.label}</td>
+              <td className="py-2 pr-3 font-mono text-xs tracking-[0.02em] text-slate-500">{formatShortDate(new Date(item.end))}</td>
               <td className="py-2 text-slate-500">{assigneeText(item)}</td>
             </tr>
           ))}
@@ -191,7 +198,7 @@ export function Dashboard({ highlightSection }: DashboardProps) {
 
   return (
     <div>
-      <h2 className="mb-3 text-lg font-semibold text-[#1E2B38]">Dashboard</h2>
+      <h2 className="mb-3 text-lg font-semibold tracking-tight text-[#1E2B38]">Dashboard</h2>
 
       <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
         <KpiCard label="Total tasks" value={`${kpis.total}`} />
@@ -204,7 +211,7 @@ export function Dashboard({ highlightSection }: DashboardProps) {
         ref={statusRef}
         className={`${CARD_CLASSES} mb-6 transition-shadow ${highlightSection === 'status' ? HIGHLIGHT_CLASSES : ''}`}
       >
-        <h3 className="mb-4 text-sm font-semibold text-[#1E2B38]">Status breakdown</h3>
+        <h3 className="mb-4 text-sm font-semibold tracking-tight text-[#1E2B38]">Status breakdown</h3>
         <StatusDonut segments={segments} />
       </div>
 
@@ -213,7 +220,7 @@ export function Dashboard({ highlightSection }: DashboardProps) {
           ref={delayedRef}
           className={`${CARD_CLASSES} transition-shadow ${highlightSection === 'delayed' ? HIGHLIGHT_CLASSES : ''}`}
         >
-          <h3 className="mb-3 text-sm font-semibold text-[#1E2B38]">Delayed tasks</h3>
+          <h3 className="mb-3 text-sm font-semibold tracking-tight text-[#1E2B38]">Delayed tasks</h3>
           <DelayedTable items={delayedTasks} today={today} />
         </div>
 
@@ -221,7 +228,7 @@ export function Dashboard({ highlightSection }: DashboardProps) {
           ref={atRiskRef}
           className={`${CARD_CLASSES} transition-shadow ${highlightSection === 'atrisk' ? HIGHLIGHT_CLASSES : ''}`}
         >
-          <h3 className="mb-3 text-sm font-semibold text-[#1E2B38]">At risk tasks</h3>
+          <h3 className="mb-3 text-sm font-semibold tracking-tight text-[#1E2B38]">At risk tasks</h3>
           <AtRiskTable items={atRiskTasks} />
         </div>
       </div>

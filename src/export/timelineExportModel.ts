@@ -26,7 +26,7 @@ import {
   type DateGridLevel,
   type DateGridMark,
 } from './dateGrid';
-import { measureTextWidthIn } from './textMetrics';
+import { measureLetterSpacingWidthIn, measureMonoTextWidthIn, measureTextWidthIn } from './textMetrics';
 import { COLORS, statusColor } from './theme';
 import {
   BAR_HEIGHT_IN,
@@ -36,6 +36,11 @@ import {
   BAR_PROGRESS_FONT_SIZE_PT,
   BAR_PROGRESS_PADDING_IN,
   BAR_STATUS_FONT_SIZE_PT,
+  STATUS_LETTER_SPACING_EM,
+  DATE_LETTER_SPACING_EM,
+  letterSpacingPt,
+  SUBTASK_DATE_FONT_SIZE_PT,
+  SUBTASK_META_GAP_IN,
   COMMENT_BLOCK_GAP_IN,
   COMMENT_GAP_IN,
   COMMENT_HEADING_ROW_HEIGHT_IN,
@@ -186,9 +191,23 @@ export interface OverviewSlideModel {
   omittedCount: number;
 }
 
+/** One subtask line on a detail slide. The left side used to be a single
+ * pre-joined string ("name  —  2026-08-20 → 2026-08-28  —  45%") drawn in
+ * one call; it's split into separately-positioned pieces now because each
+ * carries its own typographic role — the name is the content, the dates are
+ * monospace, the progress is a figure — and neither engine can vary the
+ * face mid-string at a position the other could reproduce. Same approach as
+ * OverviewBarTagModel: the model resolves x for every piece so a renderer
+ * only has to draw. */
 export interface SubtaskRowModel {
-  text: string;
-  color: string;
+  /** Task name, already truncated to whatever room the rest of the row left. */
+  label: string;
+  labelX: number;
+  /** "Aug 20 – Aug 28", drawn in the monospace face. */
+  dateText: string;
+  dateX: number;
+  progressText: string;
+  progressX: number;
   statusText: string;
   statusColor: string;
   y: number;
@@ -457,7 +476,15 @@ function buildOverviewSlide(
       // overlapping either — which both stay untouched and fully readable
       // either way, same reasoning as truncateToWidth below.
       const statusText = TASK_STATUS_LABELS[status];
-      const statusTextWidth = measureTextWidthIn(statusText, BAR_STATUS_FONT_SIZE_PT);
+      // Tracking included: it's real drawn width that neither engine reports
+      // back through its own metrics, so leaving it out would under-reserve
+      // the status column and let a long label run into it.
+      const statusTextWidth =
+        measureTextWidthIn(statusText, BAR_STATUS_FONT_SIZE_PT) +
+        measureLetterSpacingWidthIn(
+          statusText,
+          letterSpacingPt(BAR_STATUS_FONT_SIZE_PT, STATUS_LETTER_SPACING_EM),
+        );
       const tagTexts = item.tags ?? [];
       const tagPillWidths = tagTexts.map(
         (tag) => measureTextWidthIn(tag, TAG_PILL_FONT_SIZE_PT) + TAG_PILL_PADDING_IN * 2,
@@ -720,23 +747,56 @@ function buildDetailSection(
       // Same collision to guard against as an overview bar's label/status
       // (see truncateToWidth): the row's label is the flexible part, so it's
       // what gets truncated — the trailing dates/progress and the status
-      // both stay intact and fully readable. Dates use formatShortDate (the
+      // all stay intact and fully readable. Dates use formatShortDate (the
       // same "Aug 20" the on-screen day header and overview axis already
       // use) rather than the raw ISO string — no year, short month, so the
       // fixed non-truncatable tail stays as narrow as possible.
-      const meta = `  —  ${formatShortDate(new Date(child.start))} – ${formatShortDate(new Date(child.end))}  —  ${progress}%`;
-      const statusTextWidth = measureTextWidthIn(statusText, SUBTASK_STATUS_FONT_SIZE_PT);
+      //
+      // Each trailing piece is measured in the face and size it's actually
+      // drawn in: the dates monospace (measureMonoTextWidthIn — the
+      // proportional table would under-reserve them by ~16%), the status
+      // proportional *plus* its tracking, which neither engine folds into
+      // its own metrics.
+      const dateText = `${formatShortDate(new Date(child.start))} – ${formatShortDate(new Date(child.end))}`;
+      const progressText = `${progress}%`;
+
+      const dateWidth = measureMonoTextWidthIn(dateText, SUBTASK_DATE_FONT_SIZE_PT);
+      const dateTrackingWidth = measureLetterSpacingWidthIn(
+        dateText,
+        letterSpacingPt(SUBTASK_DATE_FONT_SIZE_PT, DATE_LETTER_SPACING_EM),
+      );
+      const progressWidth = measureTextWidthIn(progressText, SUBTASK_TEXT_FONT_SIZE_PT);
+      const statusTextWidth =
+        measureTextWidthIn(statusText, SUBTASK_STATUS_FONT_SIZE_PT) +
+        measureLetterSpacingWidthIn(
+          statusText,
+          letterSpacingPt(SUBTASK_STATUS_FONT_SIZE_PT, STATUS_LETTER_SPACING_EM),
+        );
+
       const availableWidth =
         CONTENT_WIDTH_IN -
         DETAIL_ROW_INDENT_IN -
         statusTextWidth -
         SUBTASK_META_STATUS_GAP_IN -
-        measureTextWidthIn(meta, SUBTASK_TEXT_FONT_SIZE_PT);
+        (dateWidth + dateTrackingWidth) -
+        progressWidth -
+        SUBTASK_META_GAP_IN * 2;
       const label = truncateToWidth(child.label, SUBTASK_TEXT_FONT_SIZE_PT, Math.max(availableWidth, 0));
 
+      // Each piece follows the previous one's *actual* drawn width, not its
+      // reserved box, so a short task name doesn't leave a gap before its
+      // dates (same reasoning as the overview bar's tag pills).
+      const labelX = CONTENT_X_IN + DETAIL_ROW_INDENT_IN;
+      const dateX = labelX + measureTextWidthIn(label, SUBTASK_TEXT_FONT_SIZE_PT) + SUBTASK_META_GAP_IN;
+      const progressX = dateX + dateWidth + dateTrackingWidth + SUBTASK_META_GAP_IN;
+
       subtasks.push({
-        text: `${label}${meta}`,
-        color: statusColor(progress),
+        label,
+        labelX,
+        dateText,
+        dateX,
+        progressText,
+        progressX,
         statusText,
         statusColor: TASK_STATUS_COLORS[status],
         y,

@@ -56,13 +56,41 @@ export const BAR_PROGRESS_PADDING_IN = 0.05;
 // the label's box instead of the two overlapping (see truncateToWidth in
 // timelineExportModel.ts).
 export const BAR_LABEL_FONT_SIZE_PT = 11;
-export const BAR_STATUS_FONT_SIZE_PT = 9;
+// Status runs a notch smaller than it used to (was 9) and tracked out — see
+// STATUS_LETTER_SPACING_EM. Between the size drop and the tracking it reads
+// as a distinct tier from the bar's own label rather than as more label.
+export const BAR_STATUS_FONT_SIZE_PT = 8;
 // Same purpose, one row down: a detail slide's subtask row packs a label
 // (plus dates/progress) on the left and a status on the right of the same
 // line. Smaller than the overview bar's label, so the dates/progress tail
 // (which never truncates) leaves more of the row for the label itself.
 export const SUBTASK_TEXT_FONT_SIZE_PT = 10;
-export const SUBTASK_STATUS_FONT_SIZE_PT = 10;
+// A notch under the row's own text (was 10, matching it exactly), for the
+// same reason as BAR_STATUS_FONT_SIZE_PT.
+export const SUBTASK_STATUS_FONT_SIZE_PT = 9;
+// Dates on a subtask row, in the monospace face, one point under the row's
+// text so the date tier sits below the task-name tier rather than beside it.
+export const SUBTASK_DATE_FONT_SIZE_PT = 9;
+// Tracking (letter-spacing), as a fraction of the font size, for the two
+// roles that get it. Expressed in em so one value covers every size the role
+// is drawn at; letterSpacingPt() converts. Both engines can apply this —
+// pptxgenjs takes `charSpacing` in points, jsPDF takes setCharSpace in the
+// document unit — but neither folds it into its own text metrics, so
+// anything measured for a collision has to add measureLetterSpacingWidthIn
+// on top (see textMetrics.ts).
+export const STATUS_LETTER_SPACING_EM = 0.06;
+export const DATE_LETTER_SPACING_EM = 0.02;
+// Status names in the summary slide's status-breakdown legend, a notch
+// under the count/percentage they sit next to (10pt) for the same reason as
+// BAR_STATUS_FONT_SIZE_PT.
+export const SUMMARY_LEGEND_STATUS_FONT_SIZE_PT = 9;
+
+/** Tracking in points for `fontSizePt` — the unit pptxgenjs's charSpacing
+ * wants, and 1/72 of what jsPDF's setCharSpace wants in inches. */
+export function letterSpacingPt(fontSizePt: number, em: number): number {
+  return fontSizePt * em;
+}
+
 // Minimum clear gap always kept between a label and the status text sharing
 // its row, even after the label has been reserved room / truncated against
 // the status's own measured width — a small buffer against the font-metric
@@ -73,6 +101,12 @@ export const LABEL_STATUS_GAP_IN = 0.1;
 // smaller than LABEL_STATUS_GAP_IN (rather than reusing it) so tightening
 // this one doesn't also widen the overview bar's label column.
 export const SUBTASK_META_STATUS_GAP_IN = 0.05;
+// Gap between the three pieces of a subtask row's left side — task name,
+// then its dates, then its progress. These used to be one string joined by
+// "  —  " separators; now that each piece is drawn in its own face and size
+// (name / monospace date / progress), whitespace alone separates them and
+// the dashes would just be noise.
+export const SUBTASK_META_GAP_IN = 0.09;
 
 // An overview bar's tag pills (item.tags — see TimelineItem) sit right
 // after its label, before the status text: mini gray pills, small enough

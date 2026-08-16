@@ -20,7 +20,7 @@ import {
 import { getQrCodeDataUrl, getSummaryQrCodes, type QrCodeModel } from './qrCode';
 import { buildSlideLinks, type SlideLinks } from './slideLinks';
 import { orderExportSlides } from './slideOrder';
-import { COLORS, FOOTER_TEXT, PPTX_FONT_FACE } from './theme';
+import { COLORS, FOOTER_TEXT, PPTX_FONT_FACE, PPTX_MONO_FONT_FACE } from './theme';
 import {
   ASSIGNEE_SWATCH_GAP_IN,
   ASSIGNEE_SWATCH_SIZE_IN,
@@ -48,8 +48,13 @@ import {
   PAGE_HEIGHT_IN,
   PAGE_WIDTH_IN,
   ROW_LABEL_HEIGHT_IN,
+  SUBTASK_DATE_FONT_SIZE_PT,
   SUBTASK_STATUS_FONT_SIZE_PT,
   SUBTASK_TEXT_FONT_SIZE_PT,
+  SUMMARY_LEGEND_STATUS_FONT_SIZE_PT,
+  STATUS_LETTER_SPACING_EM,
+  DATE_LETTER_SPACING_EM,
+  letterSpacingPt,
   TAG_PILL_FONT_SIZE_PT,
   TAG_PILL_HEIGHT_IN,
   TAG_PILL_RADIUS_IN,
@@ -259,16 +264,23 @@ function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel, links: S
   });
 
   // Month captions at the axis's normal size, week captions a notch smaller
-  // (the model has already thinned any that would collide).
+  // (the model has already thinned any that would collide). Monospace, like
+  // every other date: sizes stay as they were because these are already the
+  // smallest text on the slide and shrinking them further would cost more
+  // legibility than the extra tier is worth — the face change alone is what
+  // marks them as dates. Still comfortably inside AXIS_LABEL_MIN_PITCH_IN
+  // (0.5in) at the widest: "Aug 01" is 6 glyphs * 0.6em * 8pt = 0.4in.
   model.axisLabels.forEach((label) => {
+    const fontSize = label.level === 'month' ? 8 : 7;
     slide.addText(label.text, {
       x: label.x,
       y: model.dateAxisY,
       w: 1,
       h: GROUP_HEADER_HEIGHT_IN,
-      fontSize: label.level === 'month' ? 8 : 7,
+      fontSize,
+      charSpacing: letterSpacingPt(fontSize, DATE_LETTER_SPACING_EM),
       color: COLORS.footerText,
-      fontFace: PPTX_FONT_FACE,
+      fontFace: PPTX_MONO_FONT_FACE,
       valign: 'middle',
     });
   });
@@ -349,6 +361,7 @@ function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel, links: S
       w: CONTENT_WIDTH_IN,
       h: BAR_HEIGHT_IN,
       fontSize: BAR_STATUS_FONT_SIZE_PT,
+      charSpacing: letterSpacingPt(BAR_STATUS_FONT_SIZE_PT, STATUS_LETTER_SPACING_EM),
       bold: true,
       color: bar.statusColor,
       fontFace: PPTX_FONT_FACE,
@@ -411,7 +424,24 @@ function drawTableBlock(
         text: header,
         options: { bold: true, fill: { color: COLORS.border }, color: COLORS.navy },
       })),
-      ...table.rows.map((row) => row.map((cell) => ({ text: cell }))),
+      // Per-cell faces: the date column monospace, the first column (the
+      // task name in both dashboard tables) medium-weight as the row's
+      // content anchor. Everything else inherits the table's own options.
+      ...table.rows.map((row) =>
+        row.map((cell, columnIndex) =>
+          columnIndex === table.dateColumnIndex
+            ? {
+                text: cell,
+                options: {
+                  fontFace: PPTX_MONO_FONT_FACE,
+                  fontSize: fontSize - 1,
+                  charSpacing: letterSpacingPt(fontSize - 1, DATE_LETTER_SPACING_EM),
+                  color: COLORS.footerText,
+                },
+              }
+            : { text: cell, options: columnIndex === 0 ? { bold: true } : {} },
+        ),
+      ),
     ],
     {
       x,
@@ -507,11 +537,37 @@ function drawDetailSlide(slide: PptxSlide, model: DetailSlideModel, links: Slide
     }
 
     section.subtasks.forEach((row) => {
-      // The model has already truncated the label portion of row.text (with
-      // an ellipsis) to leave room for the status text on the same line —
-      // `wrap: false` for the same reason as the overview bar's label.
-      slide.addText(row.text, {
-        x: CONTENT_X_IN + DETAIL_ROW_INDENT_IN,
+      // Four typographic tiers on one line, each its own textbox at an x the
+      // model resolved: bold task name, monospace dates, plain progress,
+      // tracked-out status. `wrap: false` throughout for the same reason as
+      // the overview bar's label — the model measured each piece against one
+      // line, so PowerPoint must not re-flow any of them onto a second.
+      slide.addText(row.label, {
+        x: row.labelX,
+        y: row.y,
+        w: CONTENT_WIDTH_IN - DETAIL_ROW_INDENT_IN,
+        h: LIST_ROW_HEIGHT_IN,
+        fontSize: SUBTASK_TEXT_FONT_SIZE_PT,
+        bold: true,
+        color: COLORS.navy,
+        fontFace: PPTX_FONT_FACE,
+        wrap: false,
+      });
+
+      slide.addText(row.dateText, {
+        x: row.dateX,
+        y: row.y,
+        w: CONTENT_WIDTH_IN - DETAIL_ROW_INDENT_IN,
+        h: LIST_ROW_HEIGHT_IN,
+        fontSize: SUBTASK_DATE_FONT_SIZE_PT,
+        charSpacing: letterSpacingPt(SUBTASK_DATE_FONT_SIZE_PT, DATE_LETTER_SPACING_EM),
+        color: COLORS.footerText,
+        fontFace: PPTX_MONO_FONT_FACE,
+        wrap: false,
+      });
+
+      slide.addText(row.progressText, {
+        x: row.progressX,
         y: row.y,
         w: CONTENT_WIDTH_IN - DETAIL_ROW_INDENT_IN,
         h: LIST_ROW_HEIGHT_IN,
@@ -527,6 +583,7 @@ function drawDetailSlide(slide: PptxSlide, model: DetailSlideModel, links: Slide
         w: CONTENT_WIDTH_IN,
         h: LIST_ROW_HEIGHT_IN,
         fontSize: SUBTASK_STATUS_FONT_SIZE_PT,
+        charSpacing: letterSpacingPt(SUBTASK_STATUS_FONT_SIZE_PT, STATUS_LETTER_SPACING_EM),
         bold: true,
         color: row.statusColor,
         fontFace: PPTX_FONT_FACE,
@@ -583,15 +640,18 @@ function drawDetailSlide(slide: PptxSlide, model: DetailSlideModel, links: Slide
 
     section.comments.forEach((comment) => {
       if (comment.meta) {
+        // A comment's meta line is its date (optionally pin-prefixed), so it
+        // takes the date face. Italic drops off with the switch — the
+        // monospace face is now what sets it apart from the body text.
         slide.addText(comment.meta.text, {
           x: COMMENT_BODY_X_IN,
           y: comment.meta.y,
           w: COMMENT_BODY_WIDTH_IN,
           h: COMMENT_META_ROW_HEIGHT_IN,
-          fontSize: 9,
-          italic: true,
+          fontSize: 8,
+          charSpacing: letterSpacingPt(8, DATE_LETTER_SPACING_EM),
+          fontFace: PPTX_MONO_FONT_FACE,
           color: COLORS.footerText,
-          fontFace: PPTX_FONT_FACE,
           valign: 'top',
         });
       }
@@ -635,7 +695,11 @@ function drawStatusDonutChart(
       legendPos: 'b',
       legendColor: COLORS.navy,
       legendFontFace: PPTX_FONT_FACE,
-      legendFontSize: 10,
+      // The legend items are status names, so they take the status tier's
+      // smaller size. Only the size: this is pptxgenjs's native chart
+      // legend, which exposes no per-item weight or charSpacing, so the
+      // tracking the other status renderings get can't be applied here.
+      legendFontSize: SUMMARY_LEGEND_STATUS_FONT_SIZE_PT,
       showPercent: true,
       showValue: false,
       showLabel: false,

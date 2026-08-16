@@ -56,7 +56,7 @@ export function ExportOverflowModal({ totalTasks, capacity, onSelect, onCancel }
         onClick={(event) => event.stopPropagation()}
         className="w-full max-w-md rounded-lg border border-[#E5E5E1] bg-white p-6 shadow-xl"
       >
-        <h2 id="export-overflow-title" className="text-base font-semibold text-[#1E2B38]">
+        <h2 id="export-overflow-title" className="text-base font-semibold tracking-tight text-[#1E2B38]">
           More tasks than fit on one slide
         </h2>
         <p className="mt-1.5 text-sm text-slate-500">

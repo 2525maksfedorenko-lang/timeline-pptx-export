@@ -49,4 +49,13 @@ export function statusColor(progress: number): string {
 export const PPTX_FONT_FACE = 'Arial';
 export const PDF_FONT_FACE = 'helvetica';
 
+// Monospace face for dates, so a date is recognizable as a date at a glance
+// rather than blending into the prose around it. 'courier' is one of jsPDF's
+// built-in standard-14 fonts (confirmed via doc.getFontList(): normal +
+// bold), and 'Courier New' is its metric-compatible Office counterpart —
+// both advance a flat 600/1000 em per glyph, which is what
+// measureMonoTextWidthIn in textMetrics.ts relies on.
+export const PPTX_MONO_FONT_FACE = 'Courier New';
+export const PDF_MONO_FONT_FACE = 'courier';
+
 export const FOOTER_TEXT = 'Exported from aicoo';

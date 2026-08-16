@@ -6,6 +6,12 @@ import { dashboardDeepLink } from './qrCode';
 export interface DashboardTable {
   headers: string[];
   rows: string[][];
+  /** Index of the column holding dates, so a renderer can give that column
+   * the monospace date face. Set here, by the code that actually places the
+   * dates into `rows`, rather than sniffed from header text downstream.
+   * Undefined for tables with no date column — e.g. the markdown tables in
+   * a comment body, which share this renderer. */
+  dateColumnIndex?: number;
 }
 
 export interface DashboardTableSlideModel {
@@ -53,6 +59,7 @@ export function buildDashboardSlides(items: TimelineItem[], today: Date): Dashbo
               `${getDaysOverdue(item, today)}`,
               assigneeText(item),
             ]),
+            dateColumnIndex: 1,
           }
         : null,
     emptyMessage: 'No delayed tasks.',
@@ -70,6 +77,7 @@ export function buildDashboardSlides(items: TimelineItem[], today: Date): Dashbo
         ? {
             headers: ['Task', 'End date', 'Assignee'],
             rows: atRiskTasks.map((item) => [item.label, formatShortDate(new Date(item.end)), assigneeText(item)]),
+            dateColumnIndex: 1,
           }
         : null,
     emptyMessage: 'No at-risk tasks.',

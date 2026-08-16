@@ -59,3 +59,32 @@ export function measureTextWidthIn(text: string, fontSizePt: number): number {
 
   return (widthPerEm * fontSizePt) / 72;
 }
+
+// Courier / Courier New advance exactly this per glyph, whatever the glyph
+// and whichever weight — verified against jsPDF's own getTextWidth (which
+// reads the real embedded metrics) for digits, letters, spaces and the en
+// dash, in both normal and bold. That flatness is the whole point of a
+// monospace face, and it's why dates need their own measurement rather than
+// the proportional table above: "Aug 20 – Aug 28" measures 517/glyph in
+// Helvetica-Bold but 600 here, so reusing the wrong one would under-reserve
+// its box by ~16% and let the next thing along the row overlap it.
+const MONO_GLYPH_WIDTH_PER_1000_EM = 600;
+
+/** Width in inches of `text` rendered at `fontSizePt` in the monospace face
+ * (theme.ts's PPTX_MONO_FONT_FACE / PDF_MONO_FONT_FACE). */
+export function measureMonoTextWidthIn(text: string, fontSizePt: number): number {
+  return ([...text].length * MONO_GLYPH_WIDTH_PER_1000_EM * fontSizePt) / 1000 / 72;
+}
+
+/** Extra width in inches that `letterSpacingPt` of tracking adds to `text`.
+ *
+ * Counts every glyph rather than the gaps between them: PDF's `Tc` operator
+ * (jsPDF's setCharSpace) adds the spacing to each glyph's advance including
+ * the last, and over-estimating by one glyph is the safe direction anyway —
+ * the same bias the fallback width above takes. Callers add this on top of a
+ * measureTextWidthIn/measureMonoTextWidthIn result, since neither engine
+ * folds tracking into its own metrics (jsPDF's getTextWidth ignores
+ * setCharSpace entirely). */
+export function measureLetterSpacingWidthIn(text: string, letterSpacingPt: number): number {
+  return ([...text].length * letterSpacingPt) / 72;
+}

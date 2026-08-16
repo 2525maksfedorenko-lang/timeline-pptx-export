@@ -97,7 +97,7 @@ export function ExportSettingsPanel() {
           onClick={() => setIsOpen((open) => !open)}
           className="flex items-center gap-2 text-left"
         >
-          <span className="text-sm font-semibold text-[#1E2B38]">Export settings</span>
+          <span className="text-sm font-semibold tracking-tight text-[#1E2B38]">Export settings</span>
           <span className="text-[#1E2B38]">{isOpen ? '▲' : '▼'}</span>
         </button>
 
@@ -150,7 +150,7 @@ export function ExportSettingsPanel() {
                   }
                   className="h-4 w-4 rounded border-[#E5E5E1] text-[#2A9D90] focus:ring-[#2A9D90]"
                 />
-                <span className="flex-1 truncate text-sm text-[#1E2B38]">{item.label}</span>
+                <span className="flex-1 truncate text-sm font-medium text-[#1E2B38]">{item.label}</span>
                 <select
                   value={getTaskStatus(item)}
                   onChange={(event) =>
@@ -295,7 +295,7 @@ export function ExportSettingsPanel() {
                         <span className="font-medium text-[#1E2B38]">
                           {task?.label ?? 'Unknown task'}
                         </span>
-                        <span>
+                        <span className="font-mono text-[11px] tracking-[0.02em]">
                           {comment.isPinned ? '📌 ' : ''}
                           {new Date(comment.createdAt).toLocaleDateString()}
                         </span>
