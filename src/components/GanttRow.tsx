@@ -2,7 +2,7 @@ import { useMemo, useRef } from 'react';
 import { getTaskStatus, TASK_STATUS_COLORS, TASK_STATUS_LABELS, type TimelineItem } from '../types/timeline';
 import { useTimelineStore } from '../store/timelineStore';
 import { usePeopleStore } from '../store/peopleStore';
-import { AssigneeSelect } from './AssigneeSelect';
+import { TaskDetailsModal } from './TaskDetailsModal';
 import { resolveAssignee } from './assigneeSelection';
 import { ZONE3_WIDTH_PX } from './ganttLayout';
 import { daysBetween, getItemBar, shiftIsoDate } from '../export/dateScale';
@@ -374,9 +374,16 @@ export function GanttRow({
           ROW_HEIGHT_PX in ganttLayout.ts, which every other overlay's
           position math assumes is constant across rows), not from content,
           so tags that don't fit even wrapped are clipped rather than
-          growing the row. */}
+          growing the row.
+
+          z-20 — above zone 2 (z-10), not merely equal to it: this column is
+          `sticky left-0`, so on a horizontally scrolled chart the bars slide
+          underneath it, and with both zones at the same z-index the tie
+          would break on DOM order and paint the bars *over* the labels. The
+          opaque bg-white is the other half of that: sticky only reserves the
+          space, it doesn't hide what scrolls beneath it. */}
       <div
-        className="sticky left-0 z-10 flex flex-shrink-0 items-center gap-1.5 overflow-hidden border-r border-slate-100 bg-white px-2"
+        className="sticky left-0 z-20 flex flex-shrink-0 items-center gap-1.5 overflow-hidden border-r border-slate-100 bg-white px-2"
         style={{ width: zone1Width }}
       >
         <span
@@ -405,7 +412,8 @@ export function GanttRow({
           separately. z-10 puts the whole zone over the date grid (z-0) and
           the dependency/hierarchy connectors (z-1), so a bracket crossing
           this row is never drawn across its percentage — matching the
-          shapes-then-text order the exporters use for the same reason. */}
+          shapes-then-text order the exporters use for the same reason — and
+          under the two sticky columns (z-20) either side of it. */}
       <div className="relative z-10 flex-shrink-0" style={{ width: timelineWidth }}>
         {/* The dim is a class, not a `style` entry, on purpose: this
             element's style attribute is written to imperatively during a
@@ -459,9 +467,10 @@ export function GanttRow({
       {/* Zone 3: assignee, comment, eye, trash. Fixed width and fixed set of
           slots (trash reserves its slot even when hidden) so every row's
           zone 3 is pixel-identical, never overlapping the row above or below
-          it. */}
+          it. Sticky and z-20 for the same reason as zone 1, mirrored: bars
+          scroll under it, never across it. */}
       <div
-        className="sticky right-0 z-10 flex flex-shrink-0 items-center gap-1.5 border-l border-slate-100 bg-white px-2"
+        className="sticky right-0 z-20 flex flex-shrink-0 items-center gap-1.5 border-l border-slate-100 bg-white px-2"
         style={{ width: ZONE3_WIDTH_PX }}
       >
         <button
@@ -525,93 +534,23 @@ export function GanttRow({
         )}
 
         {isPopupOpen && (
-          <div
-            ref={popupRef}
-            className="absolute right-0 top-full z-20 mt-1 w-64 rounded-md border border-[#E5E5E1] bg-white p-3 text-left shadow-lg"
-            onMouseDown={(event) => event.stopPropagation()}
-          >
-            <div className="flex flex-col gap-1">
-              <label htmlFor={`comment-${item.id}`} className="text-xs font-medium text-slate-500">
-                Comment *
-              </label>
-              <textarea
-                id={`comment-${item.id}`}
-                autoFocus
-                rows={3}
-                value={commentText}
-                onChange={(event) => onCommentTextChange(event.target.value)}
-                placeholder="Add a note about this task…"
-                className="resize-none rounded-md border border-[#E5E5E1] px-2 py-1 text-sm text-[#1E2B38] focus:border-[#2A9D90] focus:outline-none"
-              />
-            </div>
-
-            <div className="mt-2 flex flex-col gap-1">
-              <label htmlFor={`row-${item.id}-assignee`} className="text-xs font-medium text-slate-500">
-                Assignee
-              </label>
-              <AssigneeSelect
-                idPrefix={`row-${item.id}`}
-                value={selectedAssigneeId}
-                onChange={onSelectedAssigneeIdChange}
-                newPersonName={newPersonName}
-                onNewPersonNameChange={onNewPersonNameChange}
-                placeholderLabel={item.assignee ? `Keep: ${item.assignee.name}` : 'Select assignee…'}
-              />
-            </div>
-
-            <div className="mt-2 flex flex-col gap-1">
-              <label htmlFor={`tag-${item.id}`} className="text-xs font-medium text-slate-500">
-                Tags
-              </label>
-              {item.tags && item.tags.length > 0 && (
-                <div className="flex flex-wrap gap-1">
-                  {item.tags.map((tag) => (
-                    <span
-                      key={tag}
-                      className="inline-flex items-center gap-1 rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-700"
-                    >
-                      {tag}
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveTag(tag)}
-                        className="leading-none text-slate-400 hover:text-slate-600"
-                        aria-label={`Remove tag ${tag}`}
-                      >
-                        ×
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
-              <input
-                id={`tag-${item.id}`}
-                type="text"
-                value={tagInput}
-                onChange={(event) => onTagInputChange(event.target.value)}
-                onKeyDown={handleTagInputKeyDown}
-                placeholder="Add a tag, press Enter…"
-                className="rounded-md border border-[#E5E5E1] px-2 py-1 text-sm text-[#1E2B38] focus:border-[#2A9D90] focus:outline-none"
-              />
-            </div>
-
-            <div className="mt-3 flex gap-1.5">
-              <button
-                type="button"
-                onClick={() => void handleSaveNote()}
-                disabled={!canSaveNote}
-                className="rounded-md bg-[#2A9D90] px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[#238277] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-[#2A9D90]"
-              >
-                Save
-              </button>
-              <button
-                type="button"
-                onClick={onRequestClosePopup}
-                className="rounded-md px-3 py-1.5 text-sm font-medium text-slate-500 hover:bg-slate-100"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
+          <TaskDetailsModal
+            item={item}
+            panelRef={popupRef}
+            commentText={commentText}
+            onCommentTextChange={onCommentTextChange}
+            selectedAssigneeId={selectedAssigneeId}
+            onSelectedAssigneeIdChange={onSelectedAssigneeIdChange}
+            newPersonName={newPersonName}
+            onNewPersonNameChange={onNewPersonNameChange}
+            tagInput={tagInput}
+            onTagInputChange={onTagInputChange}
+            onTagInputKeyDown={handleTagInputKeyDown}
+            onRemoveTag={handleRemoveTag}
+            canSave={canSaveNote}
+            onSave={() => void handleSaveNote()}
+            onClose={onRequestClosePopup}
+          />
         )}
       </div>
     </div>

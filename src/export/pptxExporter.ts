@@ -34,6 +34,7 @@ import {
   BAR_PROGRESS_FONT_SIZE_PT,
   BAR_RADIUS_IN,
   BAR_STATUS_FONT_SIZE_PT,
+  COMMENT_BODY_FONT_SIZE_PT,
   COMMENT_META_ROW_HEIGHT_IN,
   CONTENT_BOTTOM_IN,
   CONTENT_TOP_IN,
@@ -66,7 +67,6 @@ import { DATE_GRID_STYLES } from './dateGrid';
 const COMMENT_BODY_X_IN = CONTENT_X_IN + 0.2;
 const COMMENT_BODY_WIDTH_IN = CONTENT_WIDTH_IN - 0.2;
 const COMMENT_HEADING_FONT_SIZE: Record<1 | 2 | 3, number> = { 1: 16, 2: 14, 3: 12 };
-const COMMENT_BODY_FONT_SIZE = 11;
 const COMMENT_TABLE_FONT_SIZE = 10;
 
 const CHEVRON_WIDTH_IN = 0.14;
@@ -173,14 +173,18 @@ function drawBackToOverviewLink(slide: PptxSlide, overviewSlideNumber: number | 
 /** Painted strictly back to front, because pptxgenjs has no z-index — shape
  * order *is* z-order:
  *   1. the three date-grid densities (palest first)
- *   2. the bar tracks and fills
- *   3. the dependency connectors, over the bars so a bracket stub landing on
- *      a bar's edge isn't undercut by it
- *   4. every piece of text, over the connectors so a bracket crossing a row
- *      can never cut through a label, percentage or status
+ *   2. the dependency connectors
+ *   3. the bar tracks and fills, over the connectors — the same order the
+ *      on-screen chart uses (connectors z-1, bars z-10; see GanttChart), so
+ *      a line passing a row it has no business in disappears behind that
+ *      row's bar instead of being drawn across it. The connectors are
+ *      anchored on bar edges besides (see buildDependencyConnectors), so
+ *      what this hides is incidental crossings, not their own endpoints.
+ *   4. every piece of text, over both, so nothing can cut through a label,
+ *      percentage or status
  * Splitting the bars into a shapes pass and a text pass is what buys step 4;
  * drawing each bar's shapes and text together would put the first bars' text
- * under the connectors again. */
+ * under the later bars again. */
 function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel, links: SlideLinks) {
   // A bar is clickable exactly when its task has an appendix slide to open.
   // The link goes on the track, the fill *and* the label because those are
@@ -221,6 +225,18 @@ function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel, links: S
     });
   }
 
+  model.dependencyConnectors.forEach((connector) => {
+    connector.segments.forEach((segment) => {
+      slide.addShape('line', {
+        x: Math.min(segment.x1, segment.x2),
+        y: Math.min(segment.y1, segment.y2),
+        w: Math.abs(segment.x2 - segment.x1),
+        h: Math.abs(segment.y2 - segment.y1),
+        line: { color: COLORS.dependencyLine, width: DEPENDENCY_LINE_WIDTH_PT },
+      });
+    });
+  });
+
   model.bars.forEach((bar) => {
     // barJump() is called per object rather than shared between the two
     // shapes: pptxgenjs stamps its own `_rId` onto whatever hyperlink object
@@ -249,18 +265,6 @@ function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel, links: S
         ...barJump(bar),
       });
     }
-  });
-
-  model.dependencyConnectors.forEach((connector) => {
-    connector.segments.forEach((segment) => {
-      slide.addShape('line', {
-        x: Math.min(segment.x1, segment.x2),
-        y: Math.min(segment.y1, segment.y2),
-        w: Math.abs(segment.x2 - segment.x1),
-        h: Math.abs(segment.y2 - segment.y1),
-        line: { color: COLORS.dependencyLine, width: DEPENDENCY_LINE_WIDTH_PT },
-      });
-    });
   });
 
   // Month captions at the axis's normal size, week captions a notch smaller
@@ -480,7 +484,7 @@ function drawCommentBlock(slide: PptxSlide, block: CommentBlockRowModel) {
       y: block.y,
       w: COMMENT_BODY_WIDTH_IN,
       h: block.height,
-      fontSize: COMMENT_BODY_FONT_SIZE,
+      fontSize: COMMENT_BODY_FONT_SIZE_PT,
       color: COLORS.navy,
       fontFace: PPTX_FONT_FACE,
       valign: 'top',
@@ -496,7 +500,7 @@ function drawCommentBlock(slide: PptxSlide, block: CommentBlockRowModel) {
         y: block.y,
         w: COMMENT_BODY_WIDTH_IN,
         h: block.height,
-        fontSize: COMMENT_BODY_FONT_SIZE,
+        fontSize: COMMENT_BODY_FONT_SIZE_PT,
         color: COLORS.navy,
         fontFace: PPTX_FONT_FACE,
         valign: 'top',
@@ -511,55 +515,67 @@ function drawDetailSlide(slide: PptxSlide, model: DetailSlideModel, links: Slide
   drawChrome(slide, model.title);
   drawBackToOverviewLink(slide, links.overviewSlideNumber);
 
+  // Every single-line row on this slide is centered in a box of its own row
+  // height (see rowCenterY in slideLayout.ts) rather than hung from the box's
+  // top, and drawn with no inset so its x is exactly the one the model
+  // resolved. `margin: 0` matters as much as `valign` here: pptxgenjs's
+  // default 0.05in inset would otherwise shift each piece of a row right by
+  // an amount the model never measured.
+  const rowText = (fontSizePt: number, heightIn: number) => ({
+    h: heightIn,
+    fontSize: fontSizePt,
+    fontFace: PPTX_FONT_FACE,
+    valign: 'middle' as const,
+    margin: 0,
+  });
+
   model.sections.forEach((section) => {
     slide.addText(section.parentTitle, {
+      ...rowText(16, ROW_LABEL_HEIGHT_IN),
       x: CONTENT_X_IN,
       y: section.parentTitleY,
       w: CONTENT_WIDTH_IN,
-      h: ROW_LABEL_HEIGHT_IN,
-      fontSize: 16,
       bold: true,
       color: COLORS.navy,
-      fontFace: PPTX_FONT_FACE,
     });
 
     if (section.subtasksHeadingY !== undefined) {
       slide.addText('Subtasks', {
+        ...rowText(14, ROW_LABEL_HEIGHT_IN),
         x: CONTENT_X_IN,
         y: section.subtasksHeadingY,
         w: CONTENT_WIDTH_IN,
-        h: ROW_LABEL_HEIGHT_IN,
-        fontSize: 14,
         bold: true,
         color: COLORS.navy,
-        fontFace: PPTX_FONT_FACE,
       });
     }
 
     section.subtasks.forEach((row) => {
       // Four typographic tiers on one line, each its own textbox at an x the
       // model resolved: bold task name, monospace dates, plain progress,
-      // tracked-out status. `wrap: false` throughout for the same reason as
-      // the overview bar's label — the model measured each piece against one
-      // line, so PowerPoint must not re-flow any of them onto a second.
+      // tracked-out status. Four *sizes* on one line is exactly why they're
+      // vertically centered rather than top-aligned — a shared top edge puts
+      // the four baselines at four different heights, which is what made
+      // this row look broken after the sizes stopped matching.
+      //
+      // `wrap: false` throughout for the same reason as the overview bar's
+      // label — the model measured each piece against one line, so
+      // PowerPoint must not re-flow any of them onto a second.
       slide.addText(row.label, {
+        ...rowText(SUBTASK_TEXT_FONT_SIZE_PT, LIST_ROW_HEIGHT_IN),
         x: row.labelX,
         y: row.y,
         w: CONTENT_WIDTH_IN - DETAIL_ROW_INDENT_IN,
-        h: LIST_ROW_HEIGHT_IN,
-        fontSize: SUBTASK_TEXT_FONT_SIZE_PT,
         bold: true,
         color: COLORS.navy,
-        fontFace: PPTX_FONT_FACE,
         wrap: false,
       });
 
       slide.addText(row.dateText, {
+        ...rowText(SUBTASK_DATE_FONT_SIZE_PT, LIST_ROW_HEIGHT_IN),
         x: row.dateX,
         y: row.y,
         w: CONTENT_WIDTH_IN - DETAIL_ROW_INDENT_IN,
-        h: LIST_ROW_HEIGHT_IN,
-        fontSize: SUBTASK_DATE_FONT_SIZE_PT,
         charSpacing: letterSpacingPt(SUBTASK_DATE_FONT_SIZE_PT, DATE_LETTER_SPACING_EM),
         color: COLORS.footerText,
         fontFace: PPTX_MONO_FONT_FACE,
@@ -567,26 +583,22 @@ function drawDetailSlide(slide: PptxSlide, model: DetailSlideModel, links: Slide
       });
 
       slide.addText(row.progressText, {
+        ...rowText(SUBTASK_TEXT_FONT_SIZE_PT, LIST_ROW_HEIGHT_IN),
         x: row.progressX,
         y: row.y,
         w: CONTENT_WIDTH_IN - DETAIL_ROW_INDENT_IN,
-        h: LIST_ROW_HEIGHT_IN,
-        fontSize: SUBTASK_TEXT_FONT_SIZE_PT,
         color: COLORS.navy,
-        fontFace: PPTX_FONT_FACE,
         wrap: false,
       });
 
       slide.addText(row.statusText, {
+        ...rowText(SUBTASK_STATUS_FONT_SIZE_PT, LIST_ROW_HEIGHT_IN),
         x: CONTENT_X_IN,
         y: row.y,
         w: CONTENT_WIDTH_IN,
-        h: LIST_ROW_HEIGHT_IN,
-        fontSize: SUBTASK_STATUS_FONT_SIZE_PT,
         charSpacing: letterSpacingPt(SUBTASK_STATUS_FONT_SIZE_PT, STATUS_LETTER_SPACING_EM),
         bold: true,
         color: row.statusColor,
-        fontFace: PPTX_FONT_FACE,
         align: 'right',
       });
     });
@@ -613,28 +625,26 @@ function drawDetailSlide(slide: PptxSlide, model: DetailSlideModel, links: Slide
         });
       }
 
+      // Centered in the same row box the swatch above is centered in — that
+      // pairing is the whole reason this line can't be top-aligned.
       slide.addText(section.assigneeText, {
+        ...rowText(12, LIST_ROW_HEIGHT_IN),
         x: textX,
         y: section.assigneeY,
         w: textW,
-        h: LIST_ROW_HEIGHT_IN,
-        fontSize: 12,
         bold: true,
         color: section.assigneeMuted ? COLORS.mutedText : COLORS.navy,
-        fontFace: PPTX_FONT_FACE,
       });
     }
 
     if (section.commentsHeadingY !== undefined) {
       slide.addText(section.commentsHeadingText ?? 'Comments', {
+        ...rowText(14, ROW_LABEL_HEIGHT_IN),
         x: CONTENT_X_IN,
         y: section.commentsHeadingY,
         w: CONTENT_WIDTH_IN,
-        h: ROW_LABEL_HEIGHT_IN,
-        fontSize: 14,
         bold: true,
         color: COLORS.navy,
-        fontFace: PPTX_FONT_FACE,
       });
     }
 

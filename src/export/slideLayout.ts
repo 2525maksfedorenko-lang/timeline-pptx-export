@@ -64,13 +64,16 @@ export const BAR_STATUS_FONT_SIZE_PT = 8;
 // (plus dates/progress) on the left and a status on the right of the same
 // line. Smaller than the overview bar's label, so the dates/progress tail
 // (which never truncates) leaves more of the row for the label itself.
-export const SUBTASK_TEXT_FONT_SIZE_PT = 10;
-// A notch under the row's own text (was 10, matching it exactly), for the
-// same reason as BAR_STATUS_FONT_SIZE_PT.
-export const SUBTASK_STATUS_FONT_SIZE_PT = 9;
+// The whole appendix tier runs a point larger than it first did (10/9/9):
+// these rows are read close-up in a deck's appendix rather than glanced at
+// like an overview bar, and the row pitch (LIST_ROW_HEIGHT_IN) had the room.
+export const SUBTASK_TEXT_FONT_SIZE_PT = 11;
+// A notch under the row's own text, for the same reason as
+// BAR_STATUS_FONT_SIZE_PT.
+export const SUBTASK_STATUS_FONT_SIZE_PT = 10;
 // Dates on a subtask row, in the monospace face, one point under the row's
 // text so the date tier sits below the task-name tier rather than beside it.
-export const SUBTASK_DATE_FONT_SIZE_PT = 9;
+export const SUBTASK_DATE_FONT_SIZE_PT = 10;
 // Tracking (letter-spacing), as a fraction of the font size, for the two
 // roles that get it. Expressed in em so one value covers every size the role
 // is drawn at; letterSpacingPt() converts. Both engines can apply this —
@@ -144,8 +147,12 @@ export const ROW_HEIGHT_IN = BAR_HEIGHT_IN + ROW_GAP_IN;
 // dateGrid.ts.
 
 // Dependency connector: a bracket line ("┐" + "└", no arrowhead) from a
-// predecessor bar's right edge to a successor bar's left edge — right a
-// short stub, down/up, right again into the bar.
+// predecessor bar's right edge to the nearest reachable edge of the
+// successor's bar — a short stub out, down/up, then back in to that edge,
+// stopping at it rather than continuing into the bar. Drawn under the bars
+// in both exporters, as on screen. DEPENDENCY_JOG_IN is how far clear of a
+// bar's edge the vertical leg runs; see buildDependencyConnectors for which
+// edge each end lands on.
 export const DEPENDENCY_LINE_WIDTH_PT = 0.75;
 export const DEPENDENCY_JOG_IN = 0.06;
 
@@ -172,6 +179,28 @@ export const PARENT_SECTION_GAP_IN = 0.3;
 // assigneeColor in timelineExportModel.ts.
 export const ASSIGNEE_SWATCH_SIZE_IN = 0.1;
 export const ASSIGNEE_SWATCH_GAP_IN = 0.08;
+
+// Body text of a comment's paragraphs and list items. Lives here rather
+// than in each exporter because the model measures wrapped line counts
+// against it (estimateBlockHeight) at exactly the size both engines then
+// draw it at — three private copies of the number is how the three quietly
+// drift apart.
+export const COMMENT_BODY_FONT_SIZE_PT = 12;
+
+// Every single-line row on a detail slide (subtask rows, the assignee line,
+// the section headings) is drawn vertically centered in its own row box
+// rather than hung from the box's top: the pieces sharing one line are drawn
+// at four different sizes, and a shared top edge puts four different
+// baselines on what should read as one line. Centering is also what keeps a
+// row's text aligned with the graphics beside it — the assignee swatch is
+// centered in the same box.
+//
+// In pptxgenjs that's `valign: 'middle'` on a box of the row's height; in
+// jsPDF, `baseline: 'middle'` at the row's center Y, which this helper
+// resolves so the two engines can't drift apart.
+export function rowCenterY(rowY: number, rowHeightIn: number): number {
+  return rowY + rowHeightIn / 2;
+}
 
 // Comment bodies are parsed markdown (see src/utils/renderMarkdown.ts) and
 // rendered as real headings/paragraphs/lists/tables. Heights below reuse the

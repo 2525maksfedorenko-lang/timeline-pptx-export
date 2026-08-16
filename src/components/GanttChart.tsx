@@ -69,8 +69,13 @@ export function GanttChart() {
 
   // Backdrop click: closes without saving, but only when there's nothing to
   // lose (fields empty or untouched since the popup opened) — otherwise a
-  // stray click elsewhere on the page would silently drop a half-written
-  // comment. Runs in the capture phase, ahead of the row buttons' own
+  // stray click outside the dialog would silently drop a half-written
+  // comment. This is why the modal itself has no plain `onClick={onClose}`
+  // backdrop the way ExportOverflowModal does: the decision isn't
+  // unconditional. `popupRef` points at the dialog panel, so the backdrop
+  // around it counts as "outside" and closes.
+  //
+  // Runs in the capture phase, ahead of the row buttons' own
   // stopPropagation()-ing mousedown handlers, and explicitly ignores clicks
   // on any [data-popup-trigger] icon so switching to a different bar's popup
   // (which those buttons' own onClick already does unconditionally) never
@@ -174,12 +179,13 @@ export function GanttChart() {
               style={{ width: ZONE3_WIDTH_PX }}
             />
           </div>
-          {/* Explicit z-stack, back to front: date grid, then the connector
-              overlays, then the rows — whose bars and on-bar text carry z-10
-              (see GanttRow) so a connector crossing a row can never be drawn
-              over its percentage. Without the classes this would fall back to
-              DOM order among positioned siblings, which is far too easy to
-              break by reordering a line here. */}
+          {/* Explicit z-stack, back to front: date grid (z-0), the connector
+              overlays (z-1), the rows' bars and on-bar text (z-10 — so a
+              connector crossing a row can never be drawn over its
+              percentage), and finally the rows' two sticky columns (z-20),
+              which the bars scroll underneath. Without the classes this
+              would fall back to DOM order among positioned siblings, which
+              is far too easy to break by reordering a line here. */}
           <div className="relative">
             <DateGridLines minDate={minDate} totalDays={days.length} pxPerDay={pxPerDay} zone1Width={zone1Width} />
             <HierarchyConnectors items={sortedItems} minDate={minDate} pxPerDay={pxPerDay} zone1Width={zone1Width} />

@@ -37,6 +37,7 @@ import {
   BAR_PROGRESS_FONT_SIZE_PT,
   BAR_RADIUS_IN,
   BAR_STATUS_FONT_SIZE_PT,
+  COMMENT_BODY_FONT_SIZE_PT,
   COMMENT_LINE_HEIGHT_IN,
   CONTENT_BOTTOM_IN,
   CONTENT_TOP_IN,
@@ -49,6 +50,8 @@ import {
   LIST_ROW_HEIGHT_IN,
   PAGE_HEIGHT_IN,
   PAGE_WIDTH_IN,
+  ROW_LABEL_HEIGHT_IN,
+  rowCenterY,
   SUBTASK_DATE_FONT_SIZE_PT,
   SUBTASK_STATUS_FONT_SIZE_PT,
   SUMMARY_LEGEND_STATUS_FONT_SIZE_PT,
@@ -70,7 +73,6 @@ const CHEVRON_WIDTH_IN = 0.14;
 const COMMENT_BODY_X_IN = CONTENT_X_IN + 0.2;
 const COMMENT_BODY_WIDTH_IN = CONTENT_WIDTH_IN - 0.2;
 const COMMENT_HEADING_FONT_SIZE: Record<1 | 2 | 3, number> = { 1: 16, 2: 14, 3: 12 };
-const COMMENT_BODY_FONT_SIZE = 11;
 const COMMENT_TABLE_FONT_SIZE = 9;
 const COMMENT_LIST_BULLET_INDENT_IN = 0.2;
 
@@ -190,14 +192,18 @@ function drawOmittedTasksWarning(doc: jsPDF, omittedCount: number) {
 /** Painted strictly back to front, because jsPDF has no z-index — draw order
  * *is* z-order:
  *   1. the three date-grid densities (palest first)
- *   2. the bar tracks and fills
- *   3. the dependency connectors, over the bars so a bracket stub landing on
- *      a bar's edge isn't undercut by it
- *   4. every piece of text, over the connectors so a bracket crossing a row
- *      can never cut through a label, percentage or status
+ *   2. the dependency connectors
+ *   3. the bar tracks and fills, over the connectors — the same order the
+ *      on-screen chart uses (connectors z-1, bars z-10; see GanttChart), so
+ *      a line passing a row it has no business in disappears behind that
+ *      row's bar instead of being drawn across it. The connectors are
+ *      anchored on bar edges besides (see buildDependencyConnectors), so
+ *      what this hides is incidental crossings, not their own endpoints.
+ *   4. every piece of text, over both, so nothing can cut through a label,
+ *      percentage or status
  * Splitting the bars into a shapes pass and a text pass is what buys step 4;
  * drawing each bar's shapes and text together would put the first bars' text
- * under the connectors again. Mirrors pptxExporter.ts's identical ordering. */
+ * under the later bars again. Mirrors pptxExporter.ts's identical ordering. */
 function drawOverviewSlide(doc: jsPDF, model: OverviewSlideModel, links: SlideLinks) {
   drawChrome(doc, model.title);
   drawOmittedTasksWarning(doc, model.omittedCount);
@@ -225,16 +231,6 @@ function drawOverviewSlide(doc: jsPDF, model: OverviewSlideModel, links: SlideLi
     });
   }
 
-  model.bars.forEach((bar) => {
-    doc.setFillColor(withHash(COLORS.border));
-    doc.roundedRect(bar.barX, bar.y, bar.trackWidth, BAR_HEIGHT_IN, BAR_RADIUS_IN, BAR_RADIUS_IN, 'F');
-
-    if (bar.fillWidth > 0) {
-      doc.setFillColor(withHash(bar.color));
-      doc.roundedRect(bar.barX, bar.y, bar.fillWidth, BAR_HEIGHT_IN, BAR_RADIUS_IN, BAR_RADIUS_IN, 'F');
-    }
-  });
-
   if (model.dependencyConnectors.length > 0) {
     doc.setDrawColor(withHash(COLORS.dependencyLine));
     doc.setLineWidth(DEPENDENCY_LINE_WIDTH_PT * PT_TO_IN);
@@ -245,6 +241,16 @@ function drawOverviewSlide(doc: jsPDF, model: OverviewSlideModel, links: SlideLi
       });
     });
   }
+
+  model.bars.forEach((bar) => {
+    doc.setFillColor(withHash(COLORS.border));
+    doc.roundedRect(bar.barX, bar.y, bar.trackWidth, BAR_HEIGHT_IN, BAR_RADIUS_IN, BAR_RADIUS_IN, 'F');
+
+    if (bar.fillWidth > 0) {
+      doc.setFillColor(withHash(bar.color));
+      doc.roundedRect(bar.barX, bar.y, bar.fillWidth, BAR_HEIGHT_IN, BAR_RADIUS_IN, BAR_RADIUS_IN, 'F');
+    }
+  });
 
   // Month captions at the axis's normal size, week captions a notch smaller
   // (the model has already thinned any that would collide). Monospace, like
@@ -422,7 +428,7 @@ function drawCommentBlock(doc: jsPDF, block: CommentBlockRowModel) {
 
   if (block.type === 'paragraph') {
     doc.setFont(PDF_FONT_FACE, 'normal');
-    doc.setFontSize(COMMENT_BODY_FONT_SIZE);
+    doc.setFontSize(COMMENT_BODY_FONT_SIZE_PT);
     doc.setTextColor(withHash(COLORS.navy));
     drawText(doc, block.text, COMMENT_BODY_X_IN, block.y, { baseline: 'top', maxWidth: COMMENT_BODY_WIDTH_IN });
     return;
@@ -430,7 +436,7 @@ function drawCommentBlock(doc: jsPDF, block: CommentBlockRowModel) {
 
   if (block.type === 'list') {
     doc.setFont(PDF_FONT_FACE, 'normal');
-    doc.setFontSize(COMMENT_BODY_FONT_SIZE);
+    doc.setFontSize(COMMENT_BODY_FONT_SIZE_PT);
     doc.setTextColor(withHash(COLORS.navy));
 
     let itemY = block.y;
@@ -458,26 +464,36 @@ function drawDetailSlide(doc: jsPDF, model: DetailSlideModel, links: SlideLinks)
   drawBackToOverviewLink(doc, links.overviewSlideNumber);
 
   model.sections.forEach((section) => {
+    // Single-line rows are drawn on their row box's center line (see
+    // rowCenterY in slideLayout.ts), which is what `valign: 'middle'` means
+    // on the PPTX side — top-aligning text of four different sizes puts four
+    // different baselines on what should read as one line.
     doc.setFont(PDF_FONT_FACE, 'bold');
     doc.setFontSize(16);
     doc.setTextColor(withHash(COLORS.navy));
-    drawText(doc, section.parentTitle, CONTENT_X_IN, section.parentTitleY, { baseline: 'top' });
+    drawText(doc, section.parentTitle, CONTENT_X_IN, rowCenterY(section.parentTitleY, ROW_LABEL_HEIGHT_IN), {
+      baseline: 'middle',
+    });
 
     if (section.subtasksHeadingY !== undefined) {
       doc.setFont(PDF_FONT_FACE, 'bold');
       doc.setFontSize(14);
       doc.setTextColor(withHash(COLORS.navy));
-      drawText(doc, 'Subtasks', CONTENT_X_IN, section.subtasksHeadingY, { baseline: 'top' });
+      drawText(doc, 'Subtasks', CONTENT_X_IN, rowCenterY(section.subtasksHeadingY, ROW_LABEL_HEIGHT_IN), {
+        baseline: 'middle',
+      });
     }
 
     section.subtasks.forEach((row) => {
       // Four typographic tiers on one line, each drawn at an x the model
       // resolved against the face and size used here (see SubtaskRowModel):
       // bold task name, monospace dates, plain progress, tracked-out status.
+      const centerY = rowCenterY(row.y, LIST_ROW_HEIGHT_IN);
+
       doc.setFont(PDF_FONT_FACE, 'bold');
       doc.setFontSize(SUBTASK_TEXT_FONT_SIZE_PT);
       doc.setTextColor(withHash(COLORS.navy));
-      drawText(doc, row.label, row.labelX, row.y, { baseline: 'top' });
+      drawText(doc, row.label, row.labelX, centerY, { baseline: 'middle' });
 
       doc.setFont(PDF_MONO_FONT_FACE, 'normal');
       doc.setFontSize(SUBTASK_DATE_FONT_SIZE_PT);
@@ -486,15 +502,15 @@ function drawDetailSlide(doc: jsPDF, model: DetailSlideModel, links: SlideLinks)
         doc,
         row.dateText,
         row.dateX,
-        row.y,
+        centerY,
         letterSpacingPt(SUBTASK_DATE_FONT_SIZE_PT, DATE_LETTER_SPACING_EM),
-        { baseline: 'top' },
+        { baseline: 'middle' },
       );
 
       doc.setFont(PDF_FONT_FACE, 'normal');
       doc.setFontSize(SUBTASK_TEXT_FONT_SIZE_PT);
       doc.setTextColor(withHash(COLORS.navy));
-      drawText(doc, row.progressText, row.progressX, row.y, { baseline: 'top' });
+      drawText(doc, row.progressText, row.progressX, centerY, { baseline: 'middle' });
 
       doc.setFont(PDF_FONT_FACE, 'bold');
       doc.setFontSize(SUBTASK_STATUS_FONT_SIZE_PT);
@@ -503,9 +519,9 @@ function drawDetailSlide(doc: jsPDF, model: DetailSlideModel, links: SlideLinks)
         doc,
         row.statusText,
         CONTENT_X_IN + CONTENT_WIDTH_IN,
-        row.y,
+        centerY,
         letterSpacingPt(SUBTASK_STATUS_FONT_SIZE_PT, STATUS_LETTER_SPACING_EM),
-        { baseline: 'top', align: 'right' },
+        { baseline: 'middle', align: 'right' },
       );
     });
 
@@ -527,19 +543,27 @@ function drawDetailSlide(doc: jsPDF, model: DetailSlideModel, links: SlideLinks)
         );
       }
 
+      // Centered on the same line the swatch above is centered on — that
+      // pairing is the whole reason this line can't be top-aligned.
       doc.setFont(PDF_FONT_FACE, 'bold');
       doc.setFontSize(12);
       doc.setTextColor(withHash(section.assigneeMuted ? COLORS.mutedText : COLORS.navy));
-      drawText(doc, section.assigneeText, textX, section.assigneeY, { baseline: 'top' });
+      drawText(doc, section.assigneeText, textX, rowCenterY(section.assigneeY, LIST_ROW_HEIGHT_IN), {
+        baseline: 'middle',
+      });
     }
 
     if (section.commentsHeadingY !== undefined) {
       doc.setFont(PDF_FONT_FACE, 'bold');
       doc.setFontSize(14);
       doc.setTextColor(withHash(COLORS.navy));
-      drawText(doc, section.commentsHeadingText ?? 'Comments', CONTENT_X_IN, section.commentsHeadingY, {
-        baseline: 'top',
-      });
+      drawText(
+        doc,
+        section.commentsHeadingText ?? 'Comments',
+        CONTENT_X_IN,
+        rowCenterY(section.commentsHeadingY, ROW_LABEL_HEIGHT_IN),
+        { baseline: 'middle' },
+      );
     }
 
     section.comments.forEach((comment) => {

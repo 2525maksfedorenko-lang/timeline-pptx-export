@@ -42,6 +42,7 @@ import {
   SUBTASK_DATE_FONT_SIZE_PT,
   SUBTASK_META_GAP_IN,
   COMMENT_BLOCK_GAP_IN,
+  COMMENT_BODY_FONT_SIZE_PT,
   COMMENT_GAP_IN,
   COMMENT_HEADING_ROW_HEIGHT_IN,
   COMMENT_LINE_HEIGHT_IN,
@@ -163,8 +164,10 @@ export interface DependencyConnectorSegment {
 
 export interface OverviewConnectorModel {
   id: string;
-  // 1 segment for a same-row (straight) connector, 3 for the bracket-shaped
-  // right/down-or-up/right elbow ("┐" + "└") otherwise.
+  // A polyline from one bar's edge to another's, as its individual legs:
+  // 1 segment for a same-row (straight) connector, otherwise up to 5 for the
+  // stub/gutter/approach route (see buildDependencyConnectors), with any
+  // zero-length leg already dropped.
   segments: DependencyConnectorSegment[];
 }
 
@@ -587,7 +590,33 @@ function buildOverviewSlides(
  * predecessor/successor missing from `barById` means it isn't on this slide
  * (excluded from export, outside the timeframe window, cut by compact-mode
  * truncation, or sitting on another page in 'full' mode), so that connector
- * is dropped rather than drawn to nowhere. */
+ * is dropped rather than drawn to nowhere.
+ *
+ * Both ends land on a bar's vertical *edge*, and the path is routed to stay
+ * off the bars in between — the exporters draw connectors under the bars
+ * (matching the on-screen z-stack), but "hidden behind the bar" is a weaker
+ * guarantee than "never there in the first place": a line emerging from the
+ * middle of a bar still reads as crossing it.
+ *
+ * The path is a polyline through five points, degenerate legs dropped:
+ *   1. out of the predecessor's right edge by one jog — the width of
+ *      BAR_LABEL_PADDING_IN, so the stub sits in the gap before the label;
+ *   2. off that row entirely, into the gutter between it and the next
+ *      (ROW_GAP_IN), which is the one horizontal band with no bar, label,
+ *      tag pill or status text in it;
+ *   3. along that gutter to the successor's approach column;
+ *   4. down/up that column to the successor's row;
+ *   5. one jog back into the successor's edge.
+ * Travelling along a row's own center line instead — the obvious elbow, and
+ * what this used to do — draws a strikethrough right across whichever
+ * label shares that row.
+ *
+ * Which edge of the successor the line arrives at depends on where that bar
+ * sits, since a successor's bar is very often *not* to the right of its
+ * predecessor's (overlapping date spans are normal, and any bar can be
+ * clipped to the timeframe window or held back by BAR_LABEL_ZONE_MIN_IN):
+ * approach the left edge when there's room to drop in front of it, and the
+ * right edge otherwise — never a point in between. */
 function buildDependencyConnectors(items: TimelineItem[], bars: OverviewBarModel[]): OverviewConnectorModel[] {
   const barById = new Map(bars.map((bar) => [bar.id, bar]));
 
@@ -601,17 +630,42 @@ function buildDependencyConnectors(items: TimelineItem[], bars: OverviewBarModel
 
       const x1 = predecessorBar.barX + predecessorBar.trackWidth;
       const y1 = predecessorBar.y + BAR_HEIGHT_IN / 2;
-      const x2 = successorBar.barX;
       const y2 = successorBar.y + BAR_HEIGHT_IN / 2;
 
-      const segments: DependencyConnectorSegment[] =
-        y1 === y2
-          ? [{ x1, y1, x2, y2 }]
-          : [
-              { x1, y1, x2: x1 + DEPENDENCY_JOG_IN, y2: y1 },
-              { x1: x1 + DEPENDENCY_JOG_IN, y1, x2: x1 + DEPENDENCY_JOG_IN, y2 },
-              { x1: x1 + DEPENDENCY_JOG_IN, y1: y2, x2, y2 },
-            ];
+      const successorLeft = successorBar.barX;
+      const successorRight = successorBar.barX + successorBar.trackWidth;
+      // Room to drop in front of the successor means room for the approach
+      // column too, i.e. a full jog either side of the predecessor's stub.
+      const approachFromLeft = successorLeft - DEPENDENCY_JOG_IN >= x1 + DEPENDENCY_JOG_IN;
+
+      const x2 = approachFromLeft ? successorLeft : successorRight;
+      const stubX = x1 + DEPENDENCY_JOG_IN;
+      const approachX = approachFromLeft
+        ? successorLeft - DEPENDENCY_JOG_IN
+        : Math.max(stubX, successorRight + DEPENDENCY_JOG_IN);
+
+      if (y1 === y2) return [{ id: `${depId}->${item.id}`, segments: [{ x1, y1, x2, y2 }] }];
+
+      const gutterY =
+        y2 > y1
+          ? predecessorBar.y + BAR_HEIGHT_IN + ROW_GAP_IN / 2
+          : predecessorBar.y - ROW_GAP_IN / 2;
+
+      const points: [number, number][] = [
+        [x1, y1],
+        [stubX, y1],
+        [stubX, gutterY],
+        [approachX, gutterY],
+        [approachX, y2],
+        [x2, y2],
+      ];
+
+      const segments: DependencyConnectorSegment[] = points
+        .slice(1)
+        .map(([x, y], index) => ({ x1: points[index][0], y1: points[index][1], x2: x, y2: y }))
+        // A zero-length leg (the two columns coinciding, say) is nothing to
+        // draw, and pptxgenjs would still emit a shape for it.
+        .filter((segment) => segment.x1 !== segment.x2 || segment.y1 !== segment.y2);
 
       return [{ id: `${depId}->${item.id}`, segments }];
     });
@@ -674,7 +728,6 @@ function estimateWrappedLines(text: string, fontSizePt: number, widthIn: number)
 const COMMENT_BODY_X_INDENT_IN = 0.2;
 const COMMENT_BODY_WIDTH_IN = CONTENT_WIDTH_IN - COMMENT_BODY_X_INDENT_IN;
 const COMMENT_LIST_BULLET_INDENT_IN = 0.2;
-const COMMENT_BODY_FONT_SIZE = 11;
 
 /** Estimates one markdown block's rendered height. Used both to lay out a
  * comment's blocks (layoutMarkdownBlocks) and, at the same per-block
@@ -684,13 +737,13 @@ function estimateBlockHeight(block: MarkdownBlock): number {
   if (block.type === 'heading') return COMMENT_HEADING_ROW_HEIGHT_IN;
 
   if (block.type === 'paragraph') {
-    return estimateWrappedLines(block.text, COMMENT_BODY_FONT_SIZE, COMMENT_BODY_WIDTH_IN) * COMMENT_LINE_HEIGHT_IN;
+    return estimateWrappedLines(block.text, COMMENT_BODY_FONT_SIZE_PT, COMMENT_BODY_WIDTH_IN) * COMMENT_LINE_HEIGHT_IN;
   }
 
   if (block.type === 'list') {
     const totalLines = block.items.reduce(
       (sum, item) =>
-        sum + estimateWrappedLines(item, COMMENT_BODY_FONT_SIZE, COMMENT_BODY_WIDTH_IN - COMMENT_LIST_BULLET_INDENT_IN),
+        sum + estimateWrappedLines(item, COMMENT_BODY_FONT_SIZE_PT, COMMENT_BODY_WIDTH_IN - COMMENT_LIST_BULLET_INDENT_IN),
       0,
     );
     return Math.max(totalLines, 1) * COMMENT_LINE_HEIGHT_IN;
