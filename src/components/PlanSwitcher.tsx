@@ -1,8 +1,7 @@
 import { useRef, useState } from 'react';
 import { useTimelineStore } from '../store/timelineStore';
-import { savePlan as savePlanToDb } from '../store/planStorage';
-import { exportPlanToJsonFile, parsePlanJson } from '../import/planJson';
-import { parseExcelFile } from '../import/excelImport';
+import { exportPlanToJsonFile } from '../import/planJson';
+import { useFileImport } from '../import/useFileImport';
 
 export function PlanSwitcher() {
   const savedPlans = useTimelineStore((state) => state.savedPlans);
@@ -10,9 +9,7 @@ export function PlanSwitcher() {
   const switchToPlan = useTimelineStore((state) => state.switchToPlan);
   const saveCurrentAsPlan = useTimelineStore((state) => state.saveCurrentAsPlan);
   const deletePlan = useTimelineStore((state) => state.deletePlan);
-  const loadPlans = useTimelineStore((state) => state.loadPlans);
-  const items = useTimelineStore((state) => state.items);
-  const addItem = useTimelineStore((state) => state.addItem);
+  const importFile = useFileImport();
 
   const [isCreating, setIsCreating] = useState(false);
   const [newPlanName, setNewPlanName] = useState('');
@@ -47,47 +44,12 @@ export function PlanSwitcher() {
     sheetFileInputRef.current?.click();
   };
 
-  // Tasks from a spreadsheet join the plan that's open, unlike a JSON plan
-  // file, which replaces it. Rows are independent, so this reports what came
-  // in and what didn't rather than refusing the file over one bad row.
-  const handleSheetFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  // Both inputs hand the file to the same importer a drop does (see
+  // useFileImport), so picking a file and dropping one can't diverge.
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = '';
-    if (!file) return;
-
-    try {
-      const { items: importedItems, errors } = await parseExcelFile(file, items);
-      importedItems.forEach((item) => addItem(item));
-
-      const summary = `Imported ${importedItems.length} task${importedItems.length === 1 ? '' : 's'}.`;
-      if (errors.length > 0) {
-        alert(`${summary}\n\n${errors.length} row${errors.length === 1 ? '' : 's'} skipped:\n${errors.join('\n')}`);
-      }
-    } catch (error) {
-      alert(error instanceof Error ? error.message : 'Failed to import the spreadsheet.');
-    }
-  };
-
-  const handleJsonFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = async () => {
-      try {
-        const plan = parsePlanJson(reader.result as string);
-        await savePlanToDb(plan);
-        await loadPlans();
-        await switchToPlan(plan.id);
-      } catch (error) {
-        alert(error instanceof Error ? error.message : 'Failed to load plan.');
-      }
-    };
-    reader.onerror = () => {
-      alert('Failed to read the file.');
-    };
-    reader.readAsText(file);
+    if (file) void importFile(file);
   };
 
   return (
@@ -170,7 +132,7 @@ export function PlanSwitcher() {
           ref={jsonFileInputRef}
           type="file"
           accept=".json"
-          onChange={handleJsonFileChange}
+          onChange={handleFileChange}
           className="hidden"
         />
         <button
@@ -195,7 +157,7 @@ export function PlanSwitcher() {
           ref={sheetFileInputRef}
           type="file"
           accept=".xlsx,.csv"
-          onChange={(event) => void handleSheetFileChange(event)}
+          onChange={handleFileChange}
           className="hidden"
         />
         <button

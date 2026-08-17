@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { GanttChart } from './components/GanttChart'
 import { Dashboard, type DashboardSection } from './components/Dashboard'
+import { FileDropZone } from './components/FileDropZone'
 import { SettingsFlyout } from './components/SettingsFlyout'
 import { ExportOverflowModal } from './components/ExportOverflowModal'
 import { PlanSwitcher } from './components/PlanSwitcher'
@@ -77,7 +78,8 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 p-8 max-md:p-4">
+    <FileDropZone>
+      <div className="min-h-screen bg-slate-50 p-8 max-md:p-4">
       {/* Title and the two export buttons share a line until there isn't
           one to share: on a phone the buttons take their own row and split
           it evenly, which also gets them to a thumb-sized height. */}
@@ -141,7 +143,8 @@ function App() {
           onCancel={() => setOverflow(null)}
         />
       )}
-    </div>
+      </div>
+    </FileDropZone>
   )
 }
 
