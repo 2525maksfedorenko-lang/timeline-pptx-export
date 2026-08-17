@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { StatusSelect } from './StatusSelect';
 import { useIsMobile } from '../utils/useIsMobile';
 import { useTimelineStore, type ExportOptions } from '../store/timelineStore';
 import { getTaskStatus, TASK_STATUS_LABELS, type SortMode, type TaskStatus } from '../types/timeline';
@@ -70,9 +71,6 @@ function SectionToggle({ isOpen, label, onToggle }: { isOpen: boolean; label: st
 
 export function ExportSettingsPanel() {
   const isMobile = useIsMobile();
-  // Open by default on a desktop, where it's a sidebar; closed on a phone,
-  // where it would otherwise bury the chart under a screenful of settings.
-  const [isOpen, setIsOpen] = useState(!isMobile);
   const [openSections, setOpenSections] = useState(MOBILE_SECTION_DEFAULTS);
 
   // Sections only collapse below the breakpoint: on a desktop this is always
@@ -97,6 +95,19 @@ export function ExportSettingsPanel() {
   const handleToggleAll = () => {
     const nextValue = !allIncluded;
     items.forEach((item) => updateItem(item.id, { includeInExport: nextValue }));
+  };
+
+  // Bulk status: the checkboxes beside each task are the selection, so
+  // "apply" means "to every task currently checked for export" — the button
+  // says how many that is rather than leaving it to be guessed. Empty until
+  // a status is picked, which is also what keeps the button inert.
+  const [bulkStatus, setBulkStatus] = useState<TaskStatus | ''>('');
+  const includedItems = items.filter((item) => item.includeInExport !== false);
+
+  const applyBulkStatus = () => {
+    if (bulkStatus === '') return;
+    includedItems.forEach((item) => updateItem(item.id, { status: bulkStatus }));
+    setBulkStatus('');
   };
 
   // Month/year pickers default to the plan's own date range when no
@@ -135,19 +146,9 @@ export function ExportSettingsPanel() {
   };
 
   return (
-    <div className="mb-6 rounded-lg border border-[#E5E5E1] bg-white">
-      <div className="flex items-center justify-between px-4 py-3 max-md:flex-col max-md:items-stretch max-md:gap-3">
-        <button
-          type="button"
-          onClick={() => setIsOpen((open) => !open)}
-          className="flex items-center gap-2 text-left max-md:min-h-11 max-md:justify-between"
-        >
-          <span className="text-sm font-semibold tracking-tight text-[#1E2B38]">Export settings</span>
-          <span className="text-[#1E2B38]">{isOpen ? '▲' : '▼'}</span>
-        </button>
-
-        <div className="flex items-center gap-2 max-md:justify-between">
-          <label htmlFor="sort-mode-select" className="text-xs font-medium text-slate-500">
+    <div>
+      <div className="mb-4 flex items-center justify-between gap-2">
+          <label htmlFor="sort-mode-select" className="text-xs font-medium uppercase tracking-wide text-slate-500">
             Sort by
           </label>
           <select
@@ -162,11 +163,9 @@ export function ExportSettingsPanel() {
               </option>
             ))}
           </select>
-        </div>
       </div>
 
-      {isOpen && (
-        <div className="border-t border-[#E5E5E1] px-4 py-4">
+      <div>
           <div className="mb-3 flex items-center justify-between">
             <span className="flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-slate-500">
               Tasks included in export
@@ -188,6 +187,33 @@ export function ExportSettingsPanel() {
           </div>
 
           {isSectionOpen('tasks') && (
+            <div className="mb-3 flex items-center gap-2">
+              <select
+                aria-label="Set status for checked tasks"
+                value={bulkStatus}
+                onChange={(event) => setBulkStatus(event.target.value as TaskStatus | '')}
+                className="min-w-0 flex-1 rounded-md border border-[#E5E5E1] px-2 py-1.5 text-sm text-[#1E2B38] focus:border-[#2A9D90] focus:outline-none max-md:min-h-11"
+              >
+                <option value="">Set status to…</option>
+                {TASK_STATUS_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={applyBulkStatus}
+                disabled={bulkStatus === '' || includedItems.length === 0}
+                title="Applies to every task checked below"
+                className="flex-shrink-0 rounded-md bg-[#2A9D90] px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[#238277] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-[#2A9D90] max-md:min-h-11"
+              >
+                Apply to {includedItems.length}
+              </button>
+            </div>
+          )}
+
+          {isSectionOpen('tasks') && (
             <ul className="mb-4 max-h-64 space-y-1 overflow-y-auto">
               {rows.map(({ item, depth }) => (
                 <li
@@ -204,19 +230,15 @@ export function ExportSettingsPanel() {
                     className="h-4 w-4 rounded border-[#E5E5E1] text-[#2A9D90] focus:ring-[#2A9D90] max-md:h-5 max-md:w-5"
                   />
                   <span className="flex-1 truncate text-sm font-medium text-[#1E2B38]">{item.label}</span>
-                  <select
-                    value={getTaskStatus(item)}
-                    onChange={(event) =>
-                      updateItem(item.id, { status: event.target.value as TaskStatus })
-                    }
-                    className="rounded border border-[#E5E5E1] px-1.5 py-0.5 text-xs text-[#1E2B38] focus:border-[#2A9D90] focus:outline-none max-md:py-1.5 max-md:text-sm"
-                  >
-                    {TASK_STATUS_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                  {/* The same chip as the chart's status column, not a
+                      second control that means the same thing. */}
+                  <div className="w-[104px] flex-shrink-0">
+                    <StatusSelect
+                      status={getTaskStatus(item)}
+                      onChange={(next) => updateItem(item.id, { status: next })}
+                      label={item.label}
+                    />
+                  </div>
                 </li>
               ))}
             </ul>
@@ -385,8 +407,7 @@ export function ExportSettingsPanel() {
               )}
             </div>
           )}
-        </div>
-      )}
+      </div>
     </div>
   );
 }

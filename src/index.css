@@ -1,1 +1,13 @@
 @import "tailwindcss";
+
+/* The settings flyout's entrance (see SettingsFlyout). Defined here rather
+   than animated through React state because a keyframe needs no re-render
+   to run: the panel mounts already sliding. */
+@keyframes flyout-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}

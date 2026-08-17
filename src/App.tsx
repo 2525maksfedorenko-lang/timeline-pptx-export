@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { GanttChart } from './components/GanttChart'
 import { Dashboard, type DashboardSection } from './components/Dashboard'
-import { ExportSettingsPanel } from './components/ExportSettingsPanel'
+import { SettingsFlyout } from './components/SettingsFlyout'
 import { ExportOverflowModal } from './components/ExportOverflowModal'
 import { PlanSwitcher } from './components/PlanSwitcher'
 import { exportTimelineToPptx } from './export/pptxExporter'
@@ -44,6 +44,7 @@ function App() {
   const [highlightSection] = useState<DashboardSection | null>(readDashboardViewParam)
   const [activeTab, setActiveTab] = useState<Tab>(highlightSection ? 'dashboard' : 'timeline')
   const [overflow, setOverflow] = useState<PendingOverflowExport | null>(null)
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
 
   useEffect(() => {
     void loadPlans()
@@ -87,6 +88,13 @@ function App() {
         <div className="flex gap-3">
           <button
             type="button"
+            onClick={() => setIsSettingsOpen(true)}
+            className="rounded-md border border-[#E5E5E1] bg-white px-4 py-2 text-sm font-medium text-[#1E2B38] shadow-sm transition-colors hover:border-[#2A9D90] hover:text-[#2A9D90] max-md:min-h-11 max-md:flex-1"
+          >
+            ⚙ Settings
+          </button>
+          <button
+            type="button"
             onClick={() => handleExport('pptx')}
             className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700 max-md:min-h-11 max-md:flex-1"
           >
@@ -120,9 +128,7 @@ function App() {
 
       {activeTab === 'timeline' ? <GanttChart /> : <Dashboard highlightSection={highlightSection} />}
 
-      <div className="mt-6 max-w-[50%] max-md:max-w-none">
-        <ExportSettingsPanel />
-      </div>
+      {isSettingsOpen && <SettingsFlyout onClose={() => setIsSettingsOpen(false)} />}
 
       {overflow && (
         <ExportOverflowModal

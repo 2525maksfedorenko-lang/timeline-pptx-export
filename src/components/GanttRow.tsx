@@ -1,14 +1,8 @@
 import { useMemo, useRef } from 'react';
-import {
-  getTaskStatus,
-  TASK_STATUS_COLORS,
-  TASK_STATUS_LABELS,
-  TASK_STATUS_VALUES,
-  type TaskStatus,
-  type TimelineItem,
-} from '../types/timeline';
+import { getTaskStatus, TASK_STATUS_COLORS, TASK_STATUS_LABELS, type TimelineItem } from '../types/timeline';
 import { useTimelineStore } from '../store/timelineStore';
 import { usePeopleStore } from '../store/peopleStore';
+import { StatusSelect } from './StatusSelect';
 import { TaskDetailsModal } from './TaskDetailsModal';
 import { resolveAssignee } from './assigneeSelection';
 import { daysBetween, getItemBar, shiftIsoDate } from '../export/dateScale';
@@ -228,12 +222,6 @@ export function GanttRow({
   const progress = clampProgress(item.progress ?? 0);
   const status = getTaskStatus(item);
   const included = item.includeInExport !== false;
-
-  // The status chip is filled with the status's own color, with its text
-  // flipped to whichever of dark/light stays readable on it — the same
-  // contrast rule the progress percentage on a bar uses.
-  const statusColor = `#${TASK_STATUS_COLORS[status]}`;
-  const statusTextColor = needsDarkText(statusColor) ? '#1E2B38' : '#FFFFFF';
 
   // Matched by name, not id — a task only ever remembers its assignee's
   // name (see Person.color's doc comment in peopleStore.ts), so two people
@@ -480,30 +468,12 @@ export function GanttRow({
         )}`}
         style={{ width: statusZoneWidth }}
       >
-        <div className={`relative w-full ${isDimmed ? ROW_DIM_CLASS : ''}`}>
-          <select
-            value={status}
-            onChange={(event) => updateItem(item.id, { status: event.target.value as TaskStatus })}
-            className="w-full cursor-pointer appearance-none rounded-full py-1 pl-2 pr-4 text-left text-[11px] font-semibold focus:outline-none focus:ring-2 focus:ring-[#2A9D90]/40"
-            style={{ backgroundColor: statusColor, color: statusTextColor }}
-            aria-label={`Status: ${TASK_STATUS_LABELS[status]}`}
-          >
-            {TASK_STATUS_VALUES.map((value) => (
-              // Options are painted by the OS menu, which inherits the
-              // select's own colors — a chip-colored dropdown would leave
-              // three of the four unreadable, so each option resets them.
-              <option key={value} value={value} style={{ backgroundColor: '#FFFFFF', color: '#1E2B38' }}>
-                {TASK_STATUS_LABELS[value]}
-              </option>
-            ))}
-          </select>
-          <span
-            className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px]"
-            style={{ color: statusTextColor }}
-            aria-hidden="true"
-          >
-            ▾
-          </span>
+        <div className={isDimmed ? ROW_DIM_CLASS : ''}>
+          <StatusSelect
+            status={status}
+            onChange={(next) => updateItem(item.id, { status: next })}
+            label={item.label}
+          />
         </div>
       </div>
 
