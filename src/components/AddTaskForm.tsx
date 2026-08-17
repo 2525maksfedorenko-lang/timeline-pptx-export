@@ -64,7 +64,7 @@ export function AddTaskForm() {
       <button
         type="button"
         onClick={() => setIsOpen(true)}
-        className="rounded-md border border-dashed border-[#E5E5E1] px-3 py-1.5 text-sm text-slate-500 transition-colors hover:border-[#2A9D90] hover:text-[#2A9D90]"
+        className="rounded-md border border-dashed border-[#E5E5E1] px-3 py-1.5 text-sm text-slate-500 transition-colors hover:border-[#2A9D90] hover:text-[#2A9D90] max-md:min-h-11 max-md:px-4"
       >
         + Add task
       </button>
@@ -72,7 +72,7 @@ export function AddTaskForm() {
   }
 
   return (
-    <div className="flex flex-wrap items-end gap-3 rounded-md border border-[#E5E5E1] bg-white p-3">
+    <div className="flex flex-wrap items-end gap-3 rounded-md border border-[#E5E5E1] bg-white p-3 max-md:w-full max-md:flex-col max-md:items-stretch">
       <div className="flex flex-col gap-1">
         <label htmlFor="add-task-label" className="text-xs font-medium text-slate-500">
           Label *

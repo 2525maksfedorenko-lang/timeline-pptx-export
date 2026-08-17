@@ -19,12 +19,16 @@ export function ZoomControl() {
   const setZoomLevel = useTimelineStore((state) => state.setZoomLevel);
 
   return (
-    <div className="flex items-center gap-0.5 rounded-md border border-slate-200 bg-white p-0.5">
+    // The two steppers grow from a 24px mouse target to a 44px touch one
+    // below the breakpoint, and the readout between them grows to match —
+    // the control is the only way to change the scale on a phone, where
+    // there's no scroll wheel or trackpad pinch to fall back on.
+    <div className="flex items-center gap-0.5 rounded-md border border-slate-200 bg-white p-0.5 max-md:gap-1 max-md:p-1">
       <button
         type="button"
         onClick={() => setZoomLevel(clampZoom(zoomLevel - ZOOM_STEP))}
         disabled={zoomLevel <= MIN_ZOOM}
-        className="flex h-6 w-6 items-center justify-center rounded text-sm text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+        className="flex h-6 w-6 items-center justify-center rounded text-sm text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 max-md:h-11 max-md:w-11 max-md:text-lg"
         title="Zoom out"
         aria-label="Zoom out"
       >
@@ -33,7 +37,7 @@ export function ZoomControl() {
       <button
         type="button"
         onClick={() => setZoomLevel(1)}
-        className="min-w-[3rem] rounded px-1.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
+        className="min-w-[3rem] rounded px-1.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 max-md:min-h-11 max-md:px-3 max-md:text-sm"
         title="Reset zoom to 100%"
         aria-label="Reset zoom to 100%"
       >
@@ -43,7 +47,7 @@ export function ZoomControl() {
         type="button"
         onClick={() => setZoomLevel(clampZoom(zoomLevel + ZOOM_STEP))}
         disabled={zoomLevel >= MAX_ZOOM}
-        className="flex h-6 w-6 items-center justify-center rounded text-sm text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+        className="flex h-6 w-6 items-center justify-center rounded text-sm text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 max-md:h-11 max-md:w-11 max-md:text-lg"
         title="Zoom in"
         aria-label="Zoom in"
       >

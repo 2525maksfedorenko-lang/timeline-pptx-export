@@ -5,11 +5,17 @@ import { AddTaskForm } from './AddTaskForm';
 import { DateGridLines } from './DateGridLines';
 import { DependencyConnectors } from './DependencyConnectors';
 import { HierarchyConnectors } from './HierarchyConnectors';
-import { ZONE3_WIDTH_PX, computeZone1Width } from './ganttLayout';
+import {
+  MOBILE_ZONE1_MAX_WIDTH_PX,
+  MOBILE_ZONE3_WIDTH_PX,
+  ZONE3_WIDTH_PX,
+  computeZone1Width,
+} from './ganttLayout';
 import { ZoomControl } from './ZoomControl';
 import { BASE_PX_PER_DAY, MS_PER_DAY, formatShortDate, getDateRange } from '../export/dateScale';
 import { sortItems } from '../utils/sortItems';
 import { getRelatedTreeIds } from '../utils/taskHierarchy';
+import { useIsMobile } from '../utils/useIsMobile';
 
 /** The one comment/assignee popup that may be open at a time, across every
  * row — lifted up here (instead of living in each GanttRow) so opening one
@@ -120,8 +126,18 @@ export function GanttChart() {
     setPopupDraft((current) => (current && current.taskId === taskId ? { ...current, ...patch } : current));
   };
 
+  // The two fixed zones are the only geometry the phone layout changes in JS
+  // rather than in CSS: the row layout, the day header and the three SVG
+  // overlays all position themselves against these numbers, so a width the
+  // stylesheet alone knew about would leave the bars and the grid disagreeing
+  // about where the timeline starts.
+  const isMobile = useIsMobile();
   const pxPerDay = BASE_PX_PER_DAY * zoomLevel;
-  const zone1Width = useMemo(() => computeZone1Width(items), [items]);
+  const zone1Width = useMemo(
+    () => computeZone1Width(items, isMobile ? MOBILE_ZONE1_MAX_WIDTH_PX : undefined),
+    [items, isMobile],
+  );
+  const zone3Width = isMobile ? MOBILE_ZONE3_WIDTH_PX : ZONE3_WIDTH_PX;
   const sortedItems = useMemo(() => sortItems(items, sortMode), [items, sortMode]);
 
   const { minDate, days } = useMemo(() => {
@@ -138,13 +154,17 @@ export function GanttChart() {
   // the two fixed zones — matches GanttRow's own zone math exactly so bars
   // line up under the day headers below.
   const timelineWidth = days.length * pxPerDay;
-  const rowWidth = zone1Width + timelineWidth + ZONE3_WIDTH_PX;
+  const rowWidth = zone1Width + timelineWidth + zone3Width;
 
   return (
     <div>
-      <div className="mb-3 flex items-center justify-between">
+      {/* Title and controls sit on one line until there isn't room for one:
+          on a phone the controls take their own full-width row underneath,
+          which is also what gives the zoom buttons and the add-task form
+          room to grow to thumb size. */}
+      <div className="mb-3 flex items-center justify-between max-md:flex-col max-md:items-stretch max-md:gap-2">
         <h2 className="text-lg font-semibold tracking-tight text-[#1E2B38]">Timeline</h2>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 max-md:flex-wrap max-md:justify-between">
           <ZoomControl />
           <AddTaskForm />
         </div>
@@ -176,7 +196,7 @@ export function GanttChart() {
             </div>
             <div
               className="sticky right-0 z-20 flex-shrink-0 border-l border-slate-200 bg-slate-50"
-              style={{ width: ZONE3_WIDTH_PX }}
+              style={{ width: zone3Width }}
             />
           </div>
           {/* Explicit z-stack, back to front: date grid (z-0), the connector
@@ -200,6 +220,7 @@ export function GanttChart() {
                   pxPerDay={pxPerDay}
                   timelineWidth={timelineWidth}
                   zone1Width={zone1Width}
+                  zone3Width={zone3Width}
                   isPopupOpen={isPopupOpen}
                   popupRef={popupRef}
                   commentText={isPopupOpen ? popupDraft.commentText : ''}

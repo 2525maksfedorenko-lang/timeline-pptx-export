@@ -4,7 +4,6 @@ import { useTimelineStore } from '../store/timelineStore';
 import { usePeopleStore } from '../store/peopleStore';
 import { TaskDetailsModal } from './TaskDetailsModal';
 import { resolveAssignee } from './assigneeSelection';
-import { ZONE3_WIDTH_PX } from './ganttLayout';
 import { daysBetween, getItemBar, shiftIsoDate } from '../export/dateScale';
 import { clampProgress } from '../utils/clampProgress';
 import { needsDarkText } from '../utils/colorContrast';
@@ -22,8 +21,14 @@ interface GanttRowProps {
   timelineWidth: number;
   // Zone 1's width (see computeZone1Width) — sized to the longest label
   // across all rows, so it's the same for every row and every row's label
-  // fits on one line with no ellipsis.
+  // fits on one line with no ellipsis (capped on a phone, where labels
+  // ellipsize instead).
   zone1Width: number;
+  // Zone 3's width: the four-icon desktop zone, or the single-control phone
+  // one (see MOBILE_ZONE3_WIDTH_PX). Passed in rather than read from the
+  // constant here so this row and the day header above it can't end up
+  // reserving different amounts of space for it.
+  zone3Width: number;
   // The comment/assignee popup's open/closed state and draft fields live in
   // GanttChart (see PopupDraft there), not here — that's what guarantees
   // only one row's popup can ever be open at once.
@@ -129,9 +134,6 @@ const BAR_TRACK_COLOR = '#E2E8F0';
 // measurement is made against.
 const PROGRESS_FONT = '600 11px ui-sans-serif, system-ui, sans-serif';
 const PROGRESS_PADDING_PX = 5;
-// Invisible resize-handle strip at each end of a bar — narrow enough to
-// stay out of the way of the move-drag area covering the rest of it.
-const RESIZE_HANDLE_WIDTH_PX = 6;
 
 export function GanttRow({
   item,
@@ -139,6 +141,7 @@ export function GanttRow({
   pxPerDay,
   timelineWidth,
   zone1Width,
+  zone3Width,
   isPopupOpen,
   popupRef,
   commentText,
@@ -202,8 +205,7 @@ export function GanttRow({
   const descendantIds = useMemo(() => getDescendantIds(items, item.id), [items, item.id]);
   const hasSubtasks = descendantIds.length > 0;
 
-  const handleToggleVisibility = (event: React.MouseEvent) => {
-    event.stopPropagation();
+  const toggleIncludeInExport = () => {
     if (hasSubtasks) {
       toggleIncludeInExportCascade(item.id);
     } else {
@@ -211,13 +213,27 @@ export function GanttRow({
     }
   };
 
-  const handleDelete = (event: React.MouseEvent) => {
+  const handleToggleVisibility = (event: React.MouseEvent) => {
     event.stopPropagation();
+    toggleIncludeInExport();
+  };
+
+  // Split from its click handler because the phone layout offers the same
+  // two actions from inside the task modal (see zone 3) — and there, a
+  // confirmed delete should also close the modal it was triggered from,
+  // which is what the return value is for.
+  const confirmAndDelete = () => {
     const confirmed = window.confirm(
       `Delete '${item.label}' and its ${descendantIds.length} subtasks? This can't be undone.`,
     );
-    if (!confirmed) return;
+    if (!confirmed) return false;
     deleteTaskCascade(item.id);
+    return true;
+  };
+
+  const handleDelete = (event: React.MouseEvent) => {
+    event.stopPropagation();
+    confirmAndDelete();
   };
 
   const handleTriggerClick = (event: React.MouseEvent) => {
@@ -391,12 +407,19 @@ export function GanttRow({
           style={{ backgroundColor: `#${TASK_STATUS_COLORS[status]}` }}
           title={TASK_STATUS_LABELS[status]}
         />
+        {/* On a phone the label column is capped (MOBILE_ZONE1_MAX_WIDTH_PX),
+            so the label ellipsizes instead of setting the column's width, and
+            the tag pills drop out of the row entirely — they'd take the space
+            the label needs, and they're still on the bar's own popup and in
+            every export. */}
         <div className="flex min-w-0 flex-1 flex-wrap content-center items-center gap-x-1.5 gap-y-0.5">
-          <span className="whitespace-nowrap text-xs font-medium text-slate-900">{item.label}</span>
+          <span className="whitespace-nowrap text-xs font-medium text-slate-900 max-md:min-w-0 max-md:truncate">
+            {item.label}
+          </span>
           {item.tags?.map((tag) => (
             <span
               key={tag}
-              className="whitespace-nowrap rounded bg-slate-100 px-1 text-[9px] font-medium leading-[14px] text-slate-600"
+              className="whitespace-nowrap rounded bg-slate-100 px-1 text-[9px] font-medium leading-[14px] text-slate-600 max-md:hidden"
             >
               {tag}
             </span>
@@ -450,16 +473,18 @@ export function GanttRow({
               narrow zones changes just that end's date instead of moving
               the whole bar, which is what the wider middle area (still
               plain cursor-grab, still handleMouseDown="move") continues to
-              do. */}
+              do. Width is a class rather than an inline style purely so the
+              phone layout can widen it: w-1.5 is the same 6px a cursor
+              wants, max-md:w-6 the 24px a fingertip does, and the 33% cap
+              keeps both handles off a short bar's move area rather than
+              swallowing it whole. */}
           <div
             onMouseDown={handleResizeStartMouseDown}
-            className="absolute inset-y-0 left-0 cursor-ew-resize"
-            style={{ width: RESIZE_HANDLE_WIDTH_PX }}
+            className="absolute inset-y-0 left-0 w-1.5 cursor-ew-resize max-md:w-6 max-md:max-w-[33%]"
           />
           <div
             onMouseDown={handleResizeEndMouseDown}
-            className="absolute inset-y-0 right-0 cursor-ew-resize"
-            style={{ width: RESIZE_HANDLE_WIDTH_PX }}
+            className="absolute inset-y-0 right-0 w-1.5 cursor-ew-resize max-md:w-6 max-md:max-w-[33%]"
           />
         </div>
       </div>
@@ -468,24 +493,31 @@ export function GanttRow({
           slots (trash reserves its slot even when hidden) so every row's
           zone 3 is pixel-identical, never overlapping the row above or below
           it. Sticky and z-20 for the same reason as zone 1, mirrored: bars
-          scroll under it, never across it. */}
+          scroll under it, never across it.
+
+          On a phone only the assignee badge survives here, grown to fill the
+          row's height as one real touch target. It already opens the task
+          modal (same handleTriggerClick as the comment icon), so nothing is
+          lost by dropping that icon; the eye and the trash move *into* that
+          modal rather than disappearing — four 16px icons in a 104px column
+          is a mouse-only proposition. */}
       <div
-        className="sticky right-0 z-20 flex flex-shrink-0 items-center gap-1.5 border-l border-slate-100 bg-white px-2"
-        style={{ width: ZONE3_WIDTH_PX }}
+        className="sticky right-0 z-20 flex flex-shrink-0 items-center gap-1.5 border-l border-slate-100 bg-white px-2 max-md:justify-center max-md:px-1.5"
+        style={{ width: zone3Width }}
       >
         <button
           type="button"
           data-popup-trigger
           onMouseDown={(event) => event.stopPropagation()}
           onClick={handleTriggerClick}
-          className={`${ICON_BUTTON_CLASS} rounded-full ${item.assignee ? '' : 'text-slate-400 hover:text-slate-600'}`}
+          className={`${ICON_BUTTON_CLASS} rounded-full max-md:h-10 max-md:w-10 ${item.assignee ? '' : 'text-slate-400 hover:text-slate-600'}`}
           style={assigneeColor ? { backgroundColor: assigneeColor } : undefined}
           title={item.assignee ? item.assignee.name : 'Set assignee'}
           aria-label={item.assignee ? `Assignee: ${item.assignee.name}` : 'Set assignee'}
         >
           {item.assignee && assigneeColor ? (
             <span
-              className="text-[9px] font-semibold"
+              className="text-[9px] font-semibold max-md:text-xs"
               style={{ color: needsDarkText(assigneeColor) ? '#1E2B38' : '#FFFFFF' }}
             >
               {getInitials(item.assignee.name)}
@@ -500,7 +532,7 @@ export function GanttRow({
           data-popup-trigger
           onMouseDown={(event) => event.stopPropagation()}
           onClick={handleTriggerClick}
-          className={`${ICON_BUTTON_CLASS} text-slate-700/70 hover:text-slate-900`}
+          className={`${ICON_BUTTON_CLASS} text-slate-700/70 hover:text-slate-900 max-md:hidden`}
           title="Add comment / assignee"
           aria-label="Add comment / assignee"
         >
@@ -511,7 +543,7 @@ export function GanttRow({
           type="button"
           onMouseDown={(event) => event.stopPropagation()}
           onClick={handleToggleVisibility}
-          className={`${ICON_BUTTON_CLASS} text-slate-700/70 hover:text-slate-900`}
+          className={`${ICON_BUTTON_CLASS} text-slate-700/70 hover:text-slate-900 max-md:hidden`}
           title={included ? 'Exclude from export' : 'Include in export'}
           aria-label={included ? 'Exclude from export' : 'Include in export'}
         >
@@ -523,14 +555,14 @@ export function GanttRow({
             type="button"
             onMouseDown={(event) => event.stopPropagation()}
             onClick={handleDelete}
-            className={`${ICON_BUTTON_CLASS} text-slate-700/70 hover:text-red-600`}
+            className={`${ICON_BUTTON_CLASS} text-slate-700/70 hover:text-red-600 max-md:hidden`}
             title="Delete task and subtasks"
             aria-label="Delete task and subtasks"
           >
             <TrashIcon />
           </button>
         ) : (
-          <span className={ICON_BUTTON_CLASS} aria-hidden="true" />
+          <span className={`${ICON_BUTTON_CLASS} max-md:hidden`} aria-hidden="true" />
         )}
 
         {isPopupOpen && (
@@ -550,6 +582,15 @@ export function GanttRow({
             canSave={canSaveNote}
             onSave={() => void handleSaveNote()}
             onClose={onRequestClosePopup}
+            includedInExport={included}
+            onToggleIncludeInExport={toggleIncludeInExport}
+            onDelete={
+              hasSubtasks
+                ? () => {
+                    if (confirmAndDelete()) onRequestClosePopup();
+                  }
+                : undefined
+            }
           />
         )}
       </div>

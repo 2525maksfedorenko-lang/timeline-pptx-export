@@ -13,6 +13,15 @@ export const MIN_ZONE1_WIDTH_PX = 160;
 // slack — no wider, so no dead space opens up on its left edge.
 export const ZONE3_WIDTH_PX = 104;
 
+// Phone-sized viewports (see useIsMobile) get their own pair of widths: the
+// two fixed zones are chrome, and on a 375px screen the desktop pair would
+// leave under 110px for the timeline itself — the actual content. Zone 1 is
+// capped rather than content-sized, with labels ellipsizing into it; zone 3
+// keeps a single 40px-square control (the assignee badge, which also opens
+// the task modal) instead of four 16px icons no thumb can hit apart.
+export const MOBILE_ZONE1_MAX_WIDTH_PX = 124;
+export const MOBILE_ZONE3_WIDTH_PX = 52;
+
 // Must match the label's actual on-screen styling in GanttRow
 // (`text-xs font-medium`) — otherwise the measured width and the rendered
 // width disagree and labels clip (too small) or leave dead space (too big).
@@ -26,13 +35,17 @@ const ZONE1_CHROME_PX = 34;
  * one line with no ellipsis, or MIN_ZONE1_WIDTH_PX, whichever is larger. All
  * rows share one width (computed from the whole item list, not each row's
  * own label) so zone 2/3 still line up across rows and with the day header
- * above them. */
-export function computeZone1Width(items: TimelineItem[]): number {
+ * above them.
+ *
+ * `maxWidthPx` caps that — the phone layout passes
+ * MOBILE_ZONE1_MAX_WIDTH_PX, trading full labels (they ellipsize instead,
+ * see GanttRow's `max-md:truncate`) for a timeline wide enough to read. */
+export function computeZone1Width(items: TimelineItem[], maxWidthPx = Infinity): number {
   const maxLabelWidth = items.reduce(
     (max, item) => Math.max(max, measureTextWidthPx(item.label, ZONE1_LABEL_FONT)),
     0,
   );
-  return Math.max(MIN_ZONE1_WIDTH_PX, Math.ceil(maxLabelWidth) + ZONE1_CHROME_PX);
+  return Math.min(Math.max(MIN_ZONE1_WIDTH_PX, Math.ceil(maxLabelWidth) + ZONE1_CHROME_PX), maxWidthPx);
 }
 
 // A row's total height and its bar's vertical center, in px — must match

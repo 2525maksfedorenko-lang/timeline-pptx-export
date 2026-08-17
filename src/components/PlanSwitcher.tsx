@@ -83,7 +83,7 @@ export function PlanSwitcher() {
           <button
             type="button"
             onClick={() => handleDelete(plan.id, plan.name)}
-            className="text-slate-400 opacity-0 transition-opacity hover:text-red-600 group-hover:opacity-100"
+            className="text-slate-400 opacity-0 transition-opacity hover:text-red-600 group-hover:opacity-100 max-md:opacity-100"
             aria-label={`Delete plan ${plan.name}`}
           >
             ×
@@ -150,7 +150,7 @@ export function PlanSwitcher() {
           disabled={!activePlan}
           title="Save current plan as JSON"
           aria-label="Save current plan as JSON"
-          className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-[#2A9D90] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+          className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-[#2A9D90] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent max-md:p-3"
         >
           <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4" aria-hidden="true">
             <path
@@ -167,7 +167,7 @@ export function PlanSwitcher() {
           onClick={handleLoadJsonClick}
           title="Load plan from JSON"
           aria-label="Load plan from JSON"
-          className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-[#2A9D90]"
+          className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-[#2A9D90] max-md:p-3"
         >
           <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4" aria-hidden="true">
             <path

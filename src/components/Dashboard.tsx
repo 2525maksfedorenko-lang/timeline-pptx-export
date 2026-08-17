@@ -46,7 +46,7 @@ function StatusDonut({ segments }: { segments: StatusSegment[] }) {
   let cumulative = 0;
 
   return (
-    <div className="flex items-center gap-6">
+    <div className="flex items-center gap-6 max-md:flex-col max-md:items-start max-md:gap-4">
       <div className="relative shrink-0" style={{ width: DONUT_SIZE, height: DONUT_SIZE }}>
         <svg width={DONUT_SIZE} height={DONUT_SIZE} viewBox={`0 0 ${DONUT_SIZE} ${DONUT_SIZE}`}>
           <g transform={`rotate(-90 ${DONUT_SIZE / 2} ${DONUT_SIZE / 2})`}>

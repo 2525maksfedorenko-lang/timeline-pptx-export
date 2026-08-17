@@ -76,23 +76,26 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 p-8">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-3xl font-semibold text-slate-800">
+    <div className="min-h-screen bg-slate-50 p-8 max-md:p-4">
+      {/* Title and the two export buttons share a line until there isn't
+          one to share: on a phone the buttons take their own row and split
+          it evenly, which also gets them to a thumb-sized height. */}
+      <div className="mb-6 flex items-center justify-between max-md:flex-col max-md:items-stretch max-md:gap-3">
+        <h1 className="text-3xl font-semibold text-slate-800 max-md:text-2xl">
           Timeline PPTX Export
         </h1>
         <div className="flex gap-3">
           <button
             type="button"
             onClick={() => handleExport('pptx')}
-            className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700"
+            className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700 max-md:min-h-11 max-md:flex-1"
           >
             Export to PowerPoint
           </button>
           <button
             type="button"
             onClick={() => handleExport('pdf')}
-            className="rounded-md bg-slate-700 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-slate-800"
+            className="rounded-md bg-slate-700 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-slate-800 max-md:min-h-11 max-md:flex-1"
           >
             Export as PDF
           </button>
@@ -100,13 +103,13 @@ function App() {
       </div>
       <PlanSwitcher />
 
-      <div className="mb-4 inline-flex rounded-md border border-[#E5E5E1] bg-white p-1">
+      <div className="mb-4 inline-flex rounded-md border border-[#E5E5E1] bg-white p-1 max-md:flex">
         {(['timeline', 'dashboard'] as const).map((tab) => (
           <button
             key={tab}
             type="button"
             onClick={() => setActiveTab(tab)}
-            className={`rounded px-3 py-1.5 text-sm font-medium capitalize transition-colors ${
+            className={`rounded px-3 py-1.5 text-sm font-medium capitalize transition-colors max-md:min-h-11 max-md:flex-1 ${
               activeTab === tab ? 'bg-[#1E2B38] text-white' : 'text-slate-500 hover:text-[#1E2B38]'
             }`}
           >
@@ -117,7 +120,7 @@ function App() {
 
       {activeTab === 'timeline' ? <GanttChart /> : <Dashboard highlightSection={highlightSection} />}
 
-      <div className="mt-6" style={{ maxWidth: '50%' }}>
+      <div className="mt-6 max-w-[50%] max-md:max-w-none">
         <ExportSettingsPanel />
       </div>
 

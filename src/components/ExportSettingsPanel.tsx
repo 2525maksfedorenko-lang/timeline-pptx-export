@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useIsMobile } from '../utils/useIsMobile';
 import { useTimelineStore, type ExportOptions } from '../store/timelineStore';
 import { getTaskStatus, TASK_STATUS_LABELS, type SortMode, type TaskStatus } from '../types/timeline';
 import { toHtml } from '../utils/renderMarkdown';
@@ -34,8 +35,52 @@ const MONTH_OPTIONS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', '
   (label, value) => ({ value, label }),
 );
 
+/** The panel's long sections, collapsed independently on a phone. Flat on a
+ * desktop, where the whole panel is half a wide screen and reads fine as one
+ * list; stacked on a phone it runs to several screens of scrolling, most of
+ * it settings you aren't currently touching. */
+type MobileSection = 'tasks' | 'timeframe' | 'comments';
+
+const MOBILE_SECTION_DEFAULTS: Record<MobileSection, boolean> = {
+  // The task list is the one people actually come here for, so it's the one
+  // that starts open.
+  tasks: true,
+  timeframe: false,
+  comments: false,
+};
+
+/** The ▸/▾ control that collapses one section. Rendered only below the
+ * breakpoint — a desktop header has no such element at all, rather than a
+ * hidden one — and as its own button rather than a click handler on the
+ * header row, which would swallow the taps meant for the action button
+ * (e.g. "Select all") sitting in that same row. */
+function SectionToggle({ isOpen, label, onToggle }: { isOpen: boolean; label: string; onToggle: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={isOpen}
+      aria-label={`${isOpen ? 'Collapse' : 'Expand'} ${label}`}
+      className="-my-2 flex h-11 w-11 items-center justify-center rounded-md text-xs text-[#1E2B38]"
+    >
+      {isOpen ? '▾' : '▸'}
+    </button>
+  );
+}
+
 export function ExportSettingsPanel() {
-  const [isOpen, setIsOpen] = useState(true);
+  const isMobile = useIsMobile();
+  // Open by default on a desktop, where it's a sidebar; closed on a phone,
+  // where it would otherwise bury the chart under a screenful of settings.
+  const [isOpen, setIsOpen] = useState(!isMobile);
+  const [openSections, setOpenSections] = useState(MOBILE_SECTION_DEFAULTS);
+
+  // Sections only collapse below the breakpoint: on a desktop this is always
+  // true, so every section body renders unconditionally as before.
+  const isSectionOpen = (section: MobileSection) => !isMobile || openSections[section];
+  const toggleSection = (section: MobileSection) =>
+    setOpenSections((current) => ({ ...current, [section]: !current[section] }));
+
   const items = useTimelineStore((state) => state.items);
   const updateItem = useTimelineStore((state) => state.updateItem);
   const comments = useTimelineStore((state) => state.comments);
@@ -91,17 +136,17 @@ export function ExportSettingsPanel() {
 
   return (
     <div className="mb-6 rounded-lg border border-[#E5E5E1] bg-white">
-      <div className="flex items-center justify-between px-4 py-3">
+      <div className="flex items-center justify-between px-4 py-3 max-md:flex-col max-md:items-stretch max-md:gap-3">
         <button
           type="button"
           onClick={() => setIsOpen((open) => !open)}
-          className="flex items-center gap-2 text-left"
+          className="flex items-center gap-2 text-left max-md:min-h-11 max-md:justify-between"
         >
           <span className="text-sm font-semibold tracking-tight text-[#1E2B38]">Export settings</span>
           <span className="text-[#1E2B38]">{isOpen ? '▲' : '▼'}</span>
         </button>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 max-md:justify-between">
           <label htmlFor="sort-mode-select" className="text-xs font-medium text-slate-500">
             Sort by
           </label>
@@ -109,7 +154,7 @@ export function ExportSettingsPanel() {
             id="sort-mode-select"
             value={sortMode}
             onChange={(event) => updateExportOptions({ sortMode: event.target.value as SortMode })}
-            className="rounded-md border border-[#E5E5E1] px-2 py-1 text-sm text-[#1E2B38] focus:border-[#2A9D90] focus:outline-none"
+            className="rounded-md border border-[#E5E5E1] px-2 py-1 text-sm text-[#1E2B38] focus:border-[#2A9D90] focus:outline-none max-md:min-h-11 max-md:flex-1"
           >
             {SORT_MODE_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
@@ -123,50 +168,59 @@ export function ExportSettingsPanel() {
       {isOpen && (
         <div className="border-t border-[#E5E5E1] px-4 py-4">
           <div className="mb-3 flex items-center justify-between">
-            <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
+            <span className="flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-slate-500">
               Tasks included in export
+              {isMobile && (
+                <SectionToggle
+                  isOpen={openSections.tasks}
+                  label="tasks included in export"
+                  onToggle={() => toggleSection('tasks')}
+                />
+              )}
             </span>
             <button
               type="button"
               onClick={handleToggleAll}
-              className="rounded-md border border-[#2A9D90] px-3 py-1 text-xs font-medium text-[#2A9D90] transition-colors hover:bg-[#2A9D90]/10"
+              className="rounded-md border border-[#2A9D90] px-3 py-1 text-xs font-medium text-[#2A9D90] transition-colors hover:bg-[#2A9D90]/10 max-md:min-h-11"
             >
               {allIncluded ? 'Deselect all' : 'Select all'}
             </button>
           </div>
 
-          <ul className="mb-4 max-h-64 space-y-1 overflow-y-auto">
-            {rows.map(({ item, depth }) => (
-              <li
-                key={item.id}
-                className="flex items-center gap-2 py-0.5"
-                style={{ paddingLeft: depth * 20 }}
-              >
-                <input
-                  type="checkbox"
-                  checked={item.includeInExport !== false}
-                  onChange={(event) =>
-                    updateItem(item.id, { includeInExport: event.target.checked })
-                  }
-                  className="h-4 w-4 rounded border-[#E5E5E1] text-[#2A9D90] focus:ring-[#2A9D90]"
-                />
-                <span className="flex-1 truncate text-sm font-medium text-[#1E2B38]">{item.label}</span>
-                <select
-                  value={getTaskStatus(item)}
-                  onChange={(event) =>
-                    updateItem(item.id, { status: event.target.value as TaskStatus })
-                  }
-                  className="rounded border border-[#E5E5E1] px-1.5 py-0.5 text-xs text-[#1E2B38] focus:border-[#2A9D90] focus:outline-none"
+          {isSectionOpen('tasks') && (
+            <ul className="mb-4 max-h-64 space-y-1 overflow-y-auto">
+              {rows.map(({ item, depth }) => (
+                <li
+                  key={item.id}
+                  className="flex items-center gap-2 py-0.5 max-md:py-1.5"
+                  style={{ paddingLeft: depth * 20 }}
                 >
-                  {TASK_STATUS_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </li>
-            ))}
-          </ul>
+                  <input
+                    type="checkbox"
+                    checked={item.includeInExport !== false}
+                    onChange={(event) =>
+                      updateItem(item.id, { includeInExport: event.target.checked })
+                    }
+                    className="h-4 w-4 rounded border-[#E5E5E1] text-[#2A9D90] focus:ring-[#2A9D90] max-md:h-5 max-md:w-5"
+                  />
+                  <span className="flex-1 truncate text-sm font-medium text-[#1E2B38]">{item.label}</span>
+                  <select
+                    value={getTaskStatus(item)}
+                    onChange={(event) =>
+                      updateItem(item.id, { status: event.target.value as TaskStatus })
+                    }
+                    className="rounded border border-[#E5E5E1] px-1.5 py-0.5 text-xs text-[#1E2B38] focus:border-[#2A9D90] focus:outline-none max-md:py-1.5 max-md:text-sm"
+                  >
+                    {TASK_STATUS_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </li>
+              ))}
+            </ul>
+          )}
 
           <label
             htmlFor="comment-mode-select"
@@ -180,7 +234,7 @@ export function ExportSettingsPanel() {
             onChange={(event) =>
               updateExportOptions({ commentMode: event.target.value as ExportOptions['commentMode'] })
             }
-            className="w-full rounded-md border border-[#E5E5E1] px-3 py-2 text-sm text-[#1E2B38] focus:border-[#2A9D90] focus:outline-none"
+            className="w-full rounded-md border border-[#E5E5E1] px-3 py-2 text-sm text-[#1E2B38] focus:border-[#2A9D90] focus:outline-none max-md:min-h-11"
           >
             {COMMENT_MODE_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
@@ -189,48 +243,59 @@ export function ExportSettingsPanel() {
             ))}
           </select>
 
-          <label className="mt-3 flex items-center gap-2 text-sm text-[#1E2B38]">
+          <label className="mt-3 flex items-center gap-2 text-sm text-[#1E2B38] max-md:min-h-11">
             <input
               type="checkbox"
               checked={showDependencies}
               onChange={(event) => updateExportOptions({ showDependencies: event.target.checked })}
-              className="h-4 w-4 rounded border-[#E5E5E1] text-[#2A9D90] focus:ring-[#2A9D90]"
+              className="h-4 w-4 rounded border-[#E5E5E1] text-[#2A9D90] focus:ring-[#2A9D90] max-md:h-5 max-md:w-5"
             />
             Show dependencies
           </label>
 
-          <label className="mt-2 flex items-center gap-2 text-sm text-[#1E2B38]">
+          <label className="mt-2 flex items-center gap-2 text-sm text-[#1E2B38] max-md:min-h-11">
             <input
               type="checkbox"
               checked={showHierarchyLines}
               onChange={(event) => updateExportOptions({ showHierarchyLines: event.target.checked })}
-              className="h-4 w-4 rounded border-[#E5E5E1] text-[#2A9D90] focus:ring-[#2A9D90]"
+              className="h-4 w-4 rounded border-[#E5E5E1] text-[#2A9D90] focus:ring-[#2A9D90] max-md:h-5 max-md:w-5"
             />
             Show hierarchy lines
           </label>
 
           <div className="mt-4 border-t border-[#E5E5E1] pt-4">
             <div className="mb-1 flex items-center justify-between">
-              <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
+              <span className="flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-slate-500">
                 Export timeframe (optional)
+                {isMobile && (
+                  <SectionToggle
+                    isOpen={openSections.timeframe}
+                    label="export timeframe"
+                    onToggle={() => toggleSection('timeframe')}
+                  />
+                )}
               </span>
               {exportTimeframe && (
                 <button
                   type="button"
                   onClick={() => updateExportOptions({ exportTimeframe: null })}
-                  className="text-xs font-medium text-[#2A9D90] hover:underline"
+                  className="text-xs font-medium text-[#2A9D90] hover:underline max-md:min-h-11 max-md:px-2"
                 >
                   Clear
                 </button>
               )}
             </div>
-            <div className="flex items-center gap-2">
+            {/* Four month/year dropdowns fit one line on a desktop; on a
+                phone the from/to pairs stack instead of squeezing to ~70px
+                each. */}
+            {isSectionOpen('timeframe') && (
+            <div className="flex items-center gap-2 max-md:flex-col max-md:items-stretch">
               <div className="flex flex-1 gap-1">
                 <select
                   aria-label="From month"
                   value={fromMonth}
                   onChange={(event) => setTimeframe(Number(event.target.value), fromYear, toMonth, toYear)}
-                  className="min-w-0 flex-1 rounded-md border border-[#E5E5E1] px-2 py-1.5 text-sm text-[#1E2B38] focus:border-[#2A9D90] focus:outline-none"
+                  className="min-w-0 flex-1 rounded-md border border-[#E5E5E1] px-2 py-1.5 text-sm text-[#1E2B38] focus:border-[#2A9D90] focus:outline-none max-md:min-h-11"
                 >
                   {MONTH_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -242,7 +307,7 @@ export function ExportSettingsPanel() {
                   aria-label="From year"
                   value={fromYear}
                   onChange={(event) => setTimeframe(fromMonth, Number(event.target.value), toMonth, toYear)}
-                  className="w-20 flex-shrink-0 rounded-md border border-[#E5E5E1] px-2 py-1.5 text-sm text-[#1E2B38] focus:border-[#2A9D90] focus:outline-none"
+                  className="w-20 flex-shrink-0 rounded-md border border-[#E5E5E1] px-2 py-1.5 text-sm text-[#1E2B38] focus:border-[#2A9D90] focus:outline-none max-md:min-h-11"
                 >
                   {yearOptions.map((year) => (
                     <option key={year} value={year}>
@@ -257,7 +322,7 @@ export function ExportSettingsPanel() {
                   aria-label="To month"
                   value={toMonth}
                   onChange={(event) => setTimeframe(fromMonth, fromYear, Number(event.target.value), toYear)}
-                  className="min-w-0 flex-1 rounded-md border border-[#E5E5E1] px-2 py-1.5 text-sm text-[#1E2B38] focus:border-[#2A9D90] focus:outline-none"
+                  className="min-w-0 flex-1 rounded-md border border-[#E5E5E1] px-2 py-1.5 text-sm text-[#1E2B38] focus:border-[#2A9D90] focus:outline-none max-md:min-h-11"
                 >
                   {MONTH_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -269,7 +334,7 @@ export function ExportSettingsPanel() {
                   aria-label="To year"
                   value={toYear}
                   onChange={(event) => setTimeframe(fromMonth, fromYear, toMonth, Number(event.target.value))}
-                  className="w-20 flex-shrink-0 rounded-md border border-[#E5E5E1] px-2 py-1.5 text-sm text-[#1E2B38] focus:border-[#2A9D90] focus:outline-none"
+                  className="w-20 flex-shrink-0 rounded-md border border-[#E5E5E1] px-2 py-1.5 text-sm text-[#1E2B38] focus:border-[#2A9D90] focus:outline-none max-md:min-h-11"
                 >
                   {yearOptions.map((year) => (
                     <option key={year} value={year}>
@@ -279,13 +344,22 @@ export function ExportSettingsPanel() {
                 </select>
               </div>
             </div>
+            )}
           </div>
 
           {comments.length > 0 && (
             <div className="mt-4 border-t border-[#E5E5E1] pt-4">
-              <span className="mb-2 block text-xs font-medium uppercase tracking-wide text-slate-500">
+              <span className="mb-2 flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-slate-500">
                 Comments
+                {isMobile && (
+                  <SectionToggle
+                    isOpen={openSections.comments}
+                    label="comments"
+                    onToggle={() => toggleSection('comments')}
+                  />
+                )}
               </span>
+              {isSectionOpen('comments') && (
               <ul className="space-y-3">
                 {comments.map((comment) => {
                   const task = items.find((item) => item.id === comment.taskId);
@@ -308,6 +382,7 @@ export function ExportSettingsPanel() {
                   );
                 })}
               </ul>
+              )}
             </div>
           )}
         </div>
