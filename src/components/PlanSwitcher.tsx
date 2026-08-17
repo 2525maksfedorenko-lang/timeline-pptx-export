@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { useTimelineStore } from '../store/timelineStore';
 import { savePlan as savePlanToDb } from '../store/planStorage';
 import { exportPlanToJsonFile, parsePlanJson } from '../import/planJson';
+import { parseExcelFile } from '../import/excelImport';
 
 export function PlanSwitcher() {
   const savedPlans = useTimelineStore((state) => state.savedPlans);
@@ -10,10 +11,13 @@ export function PlanSwitcher() {
   const saveCurrentAsPlan = useTimelineStore((state) => state.saveCurrentAsPlan);
   const deletePlan = useTimelineStore((state) => state.deletePlan);
   const loadPlans = useTimelineStore((state) => state.loadPlans);
+  const items = useTimelineStore((state) => state.items);
+  const addItem = useTimelineStore((state) => state.addItem);
 
   const [isCreating, setIsCreating] = useState(false);
   const [newPlanName, setNewPlanName] = useState('');
   const jsonFileInputRef = useRef<HTMLInputElement>(null);
+  const sheetFileInputRef = useRef<HTMLInputElement>(null);
 
   const activePlan = savedPlans.find((plan) => plan.id === activePlanId);
 
@@ -37,6 +41,31 @@ export function PlanSwitcher() {
 
   const handleLoadJsonClick = () => {
     jsonFileInputRef.current?.click();
+  };
+
+  const handleLoadSheetClick = () => {
+    sheetFileInputRef.current?.click();
+  };
+
+  // Tasks from a spreadsheet join the plan that's open, unlike a JSON plan
+  // file, which replaces it. Rows are independent, so this reports what came
+  // in and what didn't rather than refusing the file over one bad row.
+  const handleSheetFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    try {
+      const { items: importedItems, errors } = await parseExcelFile(file, items);
+      importedItems.forEach((item) => addItem(item));
+
+      const summary = `Imported ${importedItems.length} task${importedItems.length === 1 ? '' : 's'}.`;
+      if (errors.length > 0) {
+        alert(`${summary}\n\n${errors.length} row${errors.length === 1 ? '' : 's'} skipped:\n${errors.join('\n')}`);
+      }
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to import the spreadsheet.');
+    }
   };
 
   const handleJsonFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -155,6 +184,32 @@ export function PlanSwitcher() {
           <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4" aria-hidden="true">
             <path
               d="M10 3v9m0 0-3-3m3 3 3-3M4 13v2a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-2"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
+        <input
+          ref={sheetFileInputRef}
+          type="file"
+          accept=".xlsx,.csv"
+          onChange={(event) => void handleSheetFileChange(event)}
+          className="hidden"
+        />
+        <button
+          type="button"
+          onClick={handleLoadSheetClick}
+          title="Import tasks from Excel or CSV (columns: Label, Start, End, Progress, Status, Assignee, Parent)"
+          aria-label="Import tasks from Excel or CSV"
+          className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-[#2A9D90] max-md:p-3"
+        >
+          {/* A grid, to read as "spreadsheet" beside the two plain
+              file arrows either side of it. */}
+          <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4" aria-hidden="true">
+            <path
+              d="M3.5 4.5h13v11h-13v-11Zm0 3.7h13m-13 3.6h13M8.2 4.5v11"
               stroke="currentColor"
               strokeWidth="1.5"
               strokeLinecap="round"
