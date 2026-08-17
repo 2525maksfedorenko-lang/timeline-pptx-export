@@ -1,7 +1,8 @@
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { getTaskStatus, TASK_STATUS_COLORS, TASK_STATUS_LABELS, type TimelineItem } from '../types/timeline';
 import { useTimelineStore } from '../store/timelineStore';
 import { usePeopleStore } from '../store/peopleStore';
+import { BarActionMenu, type MenuAnchor } from './BarActionMenu';
 import { StatusSelect } from './StatusSelect';
 import { TaskDetailsModal } from './TaskDetailsModal';
 import { resolveAssignee } from './assigneeSelection';
@@ -80,6 +81,7 @@ type DragMode = 'move' | 'resize-start' | 'resize-end';
 interface DragState {
   mode: DragMode;
   startX: number;
+  startY: number;
   startLeft: number;
   startWidth: number;
 }
@@ -152,6 +154,12 @@ const BAR_TRACK_COLOR = '#E2E8F0';
 // measurement is made against.
 const PROGRESS_FONT = '600 11px ui-sans-serif, system-ui, sans-serif';
 const PROGRESS_PADDING_PX = 5;
+// How far the pointer may travel between pressing and releasing on a bar
+// and still count as a click (which opens the bar's action menu) rather
+// than a drag. Small enough that a deliberate move never opens the menu,
+// loose enough that the hand-tremor few pixels of a real click don't
+// register as a drag.
+const CLICK_MOVEMENT_TOLERANCE_PX = 5;
 
 // The branch-hover treatment (see isDimmed/isHighlighted), as two signals
 // landing on different elements.
@@ -196,6 +204,7 @@ export function GanttRow({
 }: GanttRowProps) {
   const items = useTimelineStore((state) => state.items);
   const updateItem = useTimelineStore((state) => state.updateItem);
+  const addItem = useTimelineStore((state) => state.addItem);
   const addComment = useTimelineStore((state) => state.addComment);
   const toggleIncludeInExportCascade = useTimelineStore((state) => state.toggleIncludeInExportCascade);
   const deleteTaskCascade = useTimelineStore((state) => state.deleteTaskCascade);
@@ -203,6 +212,11 @@ export function GanttRow({
   const addPerson = usePeopleStore((state) => state.addPerson);
   const barRef = useRef<HTMLDivElement>(null);
   const dragState = useRef<DragState | null>(null);
+  // Where this row's action menu is open, if it is. Local rather than
+  // lifted like the comment popup: the menu closes itself on any outside
+  // mousedown, and pressing another bar is one — so a second menu can't be
+  // open by the time the first would notice.
+  const [menuAnchor, setMenuAnchor] = useState<MenuAnchor | null>(null);
 
   // The zone-3 icons fade with the rest of an unrelated row's contents;
   // ICON_BUTTON_CLASS itself stays untouched so the sizing rules stay in one
@@ -351,7 +365,13 @@ export function GanttRow({
   const beginBarInteraction = (event: React.MouseEvent, mode: DragMode) => {
     event.preventDefault();
     event.stopPropagation();
-    dragState.current = { mode, startX: event.clientX, startLeft: left, startWidth: barWidth };
+    dragState.current = {
+      mode,
+      startX: event.clientX,
+      startY: event.clientY,
+      startLeft: left,
+      startWidth: barWidth,
+    };
 
     // How many days this bar currently spans (daysBetween, not the +1
     // getItemBar renders a track at) — the room a resize has to shrink
@@ -395,6 +415,15 @@ export function GanttRow({
       const rawDeltaX = upEvent.clientX - drag.startX;
 
       if (drag.mode === 'move') {
+        // Click or drag? Measured in pixels travelled, not in days shifted:
+        // a 20px drag on a zoomed-out chart rounds to 0 days and would
+        // otherwise be mistaken for a click. Only the bar's body can open
+        // the menu — a press on either resize handle enters the branches
+        // below and never reaches here.
+        const isClick =
+          Math.abs(rawDeltaX) <= CLICK_MOVEMENT_TOLERANCE_PX &&
+          Math.abs(upEvent.clientY - drag.startY) <= CLICK_MOVEMENT_TOLERANCE_PX;
+
         const deltaDays = Math.round(rawDeltaX / pxPerDay);
         if (deltaDays !== 0) {
           updateItem(item.id, {
@@ -404,6 +433,8 @@ export function GanttRow({
         } else if (barRef.current) {
           barRef.current.style.left = `${left}px`;
         }
+
+        if (isClick) setMenuAnchor({ x: upEvent.clientX, y: upEvent.clientY });
         return;
       }
 
@@ -647,6 +678,16 @@ export function GanttRow({
           </button>
         ) : (
           <span className={`${iconButtonClass} max-md:hidden`} aria-hidden="true" />
+        )}
+
+        {menuAnchor && (
+          <BarActionMenu
+            item={item}
+            anchor={menuAnchor}
+            onChangeStatus={(next) => updateItem(item.id, { status: next })}
+            onAddSubtask={addItem}
+            onClose={() => setMenuAnchor(null)}
+          />
         )}
 
         {isPopupOpen && (

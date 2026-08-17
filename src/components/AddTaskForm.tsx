@@ -4,6 +4,7 @@ import { usePeopleStore } from '../store/peopleStore';
 import { AssigneeSelect } from './AssigneeSelect';
 import { resolveAssignee } from './assigneeSelection';
 import { TASK_STATUS_LABELS, type TaskStatus } from '../types/timeline';
+import { buildNewTask, isCompleteTask } from '../utils/newTask';
 
 const TASK_STATUS_OPTIONS: { value: TaskStatus; label: string }[] = (
   Object.keys(TASK_STATUS_LABELS) as TaskStatus[]
@@ -37,23 +38,14 @@ export function AddTaskForm() {
     setIsOpen(false);
   };
 
-  const canAdd = label.trim() !== '' && start !== '' && end !== '';
+  const canAdd = isCompleteTask({ label, start, end, status });
 
   const handleAdd = async () => {
     if (!canAdd) return;
 
     const assignee = await resolveAssignee(selectedAssigneeId, newPersonName, people, addPerson);
 
-    addItem({
-      id: crypto.randomUUID(),
-      label: label.trim(),
-      start,
-      end,
-      status,
-      progress: 0,
-      includeInExport: true,
-      ...(assignee ? { assignee } : {}),
-    });
+    addItem(buildNewTask({ label, start, end, status }, assignee ? { assignee } : {}));
 
     reset();
     setIsOpen(false);
