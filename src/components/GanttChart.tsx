@@ -45,7 +45,7 @@ export function GanttChart() {
   const [popupDraft, setPopupDraft] = useState<PopupDraft | null>(null);
   const popupRef = useRef<HTMLDivElement | null>(null);
 
-  // Which bar the pointer is over, if any. useState rather than the useRef
+  // Which row the pointer is over, if any. useState rather than the useRef
   // the bar drags use (see GanttRow): this one *has* to re-render to show
   // anything, and it changes once per pointer crossing rather than once per
   // mousemove, so there's no render-churn reason to keep it out of state.
@@ -234,10 +234,11 @@ export function GanttChart() {
                   onToggleTrigger={(initialAssigneeId) => handleToggleTaskPopup(item.id, initialAssigneeId)}
                   onRequestClosePopup={closeTaskPopup}
                   isDimmed={highlightedIds !== null && !highlightedIds.has(item.id)}
-                  onBarHoverChange={(isHovered) =>
+                  isHighlighted={highlightedIds !== null && highlightedIds.has(item.id)}
+                  onRowHoverChange={(isHovered) =>
                     // Clearing only when this row is still the hovered one:
-                    // moving between two adjacent bars can deliver the new
-                    // bar's mouseenter before the old bar's mouseleave, and
+                    // moving between two adjacent rows can deliver the new
+                    // row's mouseenter before the old row's mouseleave, and
                     // an unconditional reset would drop the fresh hover.
                     setHoveredTaskId((current) =>
                       isHovered ? item.id : current === item.id ? null : current,

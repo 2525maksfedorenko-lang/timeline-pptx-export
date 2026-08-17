@@ -45,11 +45,21 @@ interface GanttRowProps {
   onToggleTrigger: (initialAssigneeId: string) => void;
   onRequestClosePopup: () => void;
   // Hover-highlight of a task's structural branch, owned by GanttChart (see
-  // hoveredTaskId there) since it spans rows: true when some *other* row's
-  // branch is hovered and this bar isn't part of it. On-screen only — the
-  // exporters never see it, the same way HierarchyConnectors is screen-only.
+  // hoveredTaskId there) since it spans rows. Two flags rather than one
+  // because they drive opposite treatments on different parts of the row:
+  // `isDimmed` fades a row that some *other* branch's hover excluded,
+  // `isHighlighted` marks a row that belongs to the hovered branch. Both are
+  // false when nothing is hovered, which is the neutral state. On-screen
+  // only — the exporters never see either, the same way HierarchyConnectors
+  // is screen-only.
   isDimmed: boolean;
-  onBarHoverChange: (isHovered: boolean) => void;
+  isHighlighted: boolean;
+  // Fired for the whole row, not just its bar: a bar can be scrolled far out
+  // of view horizontally while its label is always in reach (the label
+  // column is sticky), so binding hover to the bar alone made deep branches
+  // impossible to inspect — you had to find the bar before you could hover
+  // it.
+  onRowHoverChange: (isHovered: boolean) => void;
 }
 
 // One drag state shape for all three bar interactions (move + resize each
@@ -135,6 +145,23 @@ const BAR_TRACK_COLOR = '#E2E8F0';
 const PROGRESS_FONT = '600 11px ui-sans-serif, system-ui, sans-serif';
 const PROGRESS_PADDING_PX = 5;
 
+// The branch-hover treatment (see isDimmed/isHighlighted), as two signals
+// landing on different elements.
+//
+// Fading unrelated rows: applied to the *contents* of the two sticky columns,
+// never to the columns themselves — their background is what stops a
+// horizontally scrolled bar showing through them, and a translucent column
+// would undo exactly the fix that made the labels readable while scrolling.
+// A notch stronger than the bar's own opacity-30, since 12px text at 30%
+// stops being legible while a 32px-tall bar at 30% is still perfectly
+// readable as a shape.
+const ROW_DIM_CLASS = 'opacity-40';
+// Marking related rows: a solid (never translucent, same reason) pale teal
+// wash across the sticky columns. This is the half of the treatment the bars
+// can't provide — a related bar is often scrolled out of view, and then the
+// label column is the only place the branch can be seen at all.
+const branchTintClass = (isHighlighted: boolean) => (isHighlighted ? 'bg-[#F1F8F7]' : 'bg-white');
+
 export function GanttRow({
   item,
   minDate,
@@ -155,7 +182,8 @@ export function GanttRow({
   onToggleTrigger,
   onRequestClosePopup,
   isDimmed,
-  onBarHoverChange,
+  isHighlighted,
+  onRowHoverChange,
 }: GanttRowProps) {
   const items = useTimelineStore((state) => state.items);
   const updateItem = useTimelineStore((state) => state.updateItem);
@@ -166,6 +194,11 @@ export function GanttRow({
   const addPerson = usePeopleStore((state) => state.addPerson);
   const barRef = useRef<HTMLDivElement>(null);
   const dragState = useRef<DragState | null>(null);
+
+  // The zone-3 icons fade with the rest of an unrelated row's contents;
+  // ICON_BUTTON_CLASS itself stays untouched so the sizing rules stay in one
+  // place.
+  const iconButtonClass = `${ICON_BUTTON_CLASS}${isDimmed ? ` ${ROW_DIM_CLASS}` : ''}`;
 
   const { left, width: barWidth } = getItemBar(item, minDate, pxPerDay);
   const progress = clampProgress(item.progress ?? 0);
@@ -381,7 +414,12 @@ export function GanttRow({
   const handleResizeEndMouseDown = (event: React.MouseEvent) => beginBarInteraction(event, 'resize-end');
 
   return (
-    <div className="flex h-10 border-b border-slate-100" style={{ opacity: included ? 1 : 0.5 }}>
+    <div
+      className="flex h-10 border-b border-slate-100"
+      style={{ opacity: included ? 1 : 0.5 }}
+      onMouseEnter={() => onRowHoverChange(true)}
+      onMouseLeave={() => onRowHoverChange(false)}
+    >
       {/* Zone 1: status dot + label (+ tags, if any). Fixed width,
           independent of the bar — a label is exactly as visible on a 1-day
           task as a 3-month one. overflow-hidden is the hard guarantee that
@@ -399,11 +437,11 @@ export function GanttRow({
           opaque bg-white is the other half of that: sticky only reserves the
           space, it doesn't hide what scrolls beneath it. */}
       <div
-        className="sticky left-0 z-20 flex flex-shrink-0 items-center gap-1.5 overflow-hidden border-r border-slate-100 bg-white px-2"
+        className={`sticky left-0 z-20 flex flex-shrink-0 items-center gap-1.5 overflow-hidden border-r border-slate-100 px-2 ${branchTintClass(isHighlighted)}`}
         style={{ width: zone1Width }}
       >
         <span
-          className="h-2 w-2 flex-shrink-0 rounded-full"
+          className={`h-2 w-2 flex-shrink-0 rounded-full ${isDimmed ? ROW_DIM_CLASS : ''}`}
           style={{ backgroundColor: `#${TASK_STATUS_COLORS[status]}` }}
           title={TASK_STATUS_LABELS[status]}
         />
@@ -412,7 +450,11 @@ export function GanttRow({
             the tag pills drop out of the row entirely — they'd take the space
             the label needs, and they're still on the bar's own popup and in
             every export. */}
-        <div className="flex min-w-0 flex-1 flex-wrap content-center items-center gap-x-1.5 gap-y-0.5">
+        <div
+          className={`flex min-w-0 flex-1 flex-wrap content-center items-center gap-x-1.5 gap-y-0.5 transition-opacity ${
+            isDimmed ? ROW_DIM_CLASS : ''
+          }`}
+        >
           <span className="whitespace-nowrap text-xs font-medium text-slate-900 max-md:min-w-0 max-md:truncate">
             {item.label}
           </span>
@@ -445,8 +487,6 @@ export function GanttRow({
         <div
           ref={barRef}
           onMouseDown={handleMouseDown}
-          onMouseEnter={() => onBarHoverChange(true)}
-          onMouseLeave={() => onBarHoverChange(false)}
           className={`absolute top-1 h-8 cursor-grab select-none transition-opacity active:cursor-grabbing ${
             isDimmed ? 'opacity-30' : ''
           }`}
@@ -502,7 +542,7 @@ export function GanttRow({
           modal rather than disappearing — four 16px icons in a 104px column
           is a mouse-only proposition. */}
       <div
-        className="sticky right-0 z-20 flex flex-shrink-0 items-center gap-1.5 border-l border-slate-100 bg-white px-2 max-md:justify-center max-md:px-1.5"
+        className={`sticky right-0 z-20 flex flex-shrink-0 items-center gap-1.5 border-l border-slate-100 px-2 max-md:justify-center max-md:px-1.5 ${branchTintClass(isHighlighted)}`}
         style={{ width: zone3Width }}
       >
         <button
@@ -510,7 +550,7 @@ export function GanttRow({
           data-popup-trigger
           onMouseDown={(event) => event.stopPropagation()}
           onClick={handleTriggerClick}
-          className={`${ICON_BUTTON_CLASS} rounded-full max-md:h-10 max-md:w-10 ${item.assignee ? '' : 'text-slate-400 hover:text-slate-600'}`}
+          className={`${iconButtonClass} rounded-full max-md:h-10 max-md:w-10 ${item.assignee ? '' : 'text-slate-400 hover:text-slate-600'}`}
           style={assigneeColor ? { backgroundColor: assigneeColor } : undefined}
           title={item.assignee ? item.assignee.name : 'Set assignee'}
           aria-label={item.assignee ? `Assignee: ${item.assignee.name}` : 'Set assignee'}
@@ -532,7 +572,7 @@ export function GanttRow({
           data-popup-trigger
           onMouseDown={(event) => event.stopPropagation()}
           onClick={handleTriggerClick}
-          className={`${ICON_BUTTON_CLASS} text-slate-700/70 hover:text-slate-900 max-md:hidden`}
+          className={`${iconButtonClass} text-slate-700/70 hover:text-slate-900 max-md:hidden`}
           title="Add comment / assignee"
           aria-label="Add comment / assignee"
         >
@@ -543,7 +583,7 @@ export function GanttRow({
           type="button"
           onMouseDown={(event) => event.stopPropagation()}
           onClick={handleToggleVisibility}
-          className={`${ICON_BUTTON_CLASS} text-slate-700/70 hover:text-slate-900 max-md:hidden`}
+          className={`${iconButtonClass} text-slate-700/70 hover:text-slate-900 max-md:hidden`}
           title={included ? 'Exclude from export' : 'Include in export'}
           aria-label={included ? 'Exclude from export' : 'Include in export'}
         >
@@ -555,14 +595,14 @@ export function GanttRow({
             type="button"
             onMouseDown={(event) => event.stopPropagation()}
             onClick={handleDelete}
-            className={`${ICON_BUTTON_CLASS} text-slate-700/70 hover:text-red-600 max-md:hidden`}
+            className={`${iconButtonClass} text-slate-700/70 hover:text-red-600 max-md:hidden`}
             title="Delete task and subtasks"
             aria-label="Delete task and subtasks"
           >
             <TrashIcon />
           </button>
         ) : (
-          <span className={`${ICON_BUTTON_CLASS} max-md:hidden`} aria-hidden="true" />
+          <span className={`${iconButtonClass} max-md:hidden`} aria-hidden="true" />
         )}
 
         {isPopupOpen && (
