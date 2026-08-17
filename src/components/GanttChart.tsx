@@ -13,8 +13,10 @@ import {
 } from './ganttLayout';
 import { ZoomControl } from './ZoomControl';
 import { BASE_PX_PER_DAY, MS_PER_DAY, formatShortDate, getDateRange } from '../export/dateScale';
+import { MAX_VISIBLE_DAYS_FOR_DAY_LINES } from '../export/dateGrid';
 import { sortItems } from '../utils/sortItems';
 import { getRelatedTreeIds } from '../utils/taskHierarchy';
+import { useElementWidth } from '../utils/useElementWidth';
 import { useIsMobile } from '../utils/useIsMobile';
 
 /** The one comment/assignee popup that may be open at a time, across every
@@ -24,6 +26,10 @@ import { useIsMobile } from '../utils/useIsMobile';
  * `initialAssigneeId` is a snapshot of what selectedAssigneeId was when the
  * popup opened, so a backdrop click can tell "untouched" apart from
  * "user actually picked something" without a second effect/ref in GanttRow. */
+// Roughly the width of "Aug" at the header's 10px monospace size, plus
+// breathing room — the point below which per-day captions start colliding.
+const MIN_DAY_CAPTION_WIDTH_PX = 22;
+
 interface PopupDraft {
   taskId: string;
   commentText: string;
@@ -44,6 +50,7 @@ export function GanttChart() {
 
   const [popupDraft, setPopupDraft] = useState<PopupDraft | null>(null);
   const popupRef = useRef<HTMLDivElement | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
 
   // Which row the pointer is over, if any. useState rather than the useRef
   // the bar drags use (see GanttRow): this one *has* to re-render to show
@@ -156,6 +163,28 @@ export function GanttChart() {
   const timelineWidth = days.length * pxPerDay;
   const rowWidth = zone1Width + timelineWidth + zone3Width;
 
+  // How much time the chart shows at once: the scroll viewport's own width
+  // divided by the current pixels-per-day. This is what makes the zoom
+  // control drive the grid — zooming out fits more days on screen, and past
+  // 90 of them the daily lines stop being a grid and become a smear (see
+  // getVisibleGridLevels). Before the first measurement lands, fall back to
+  // the whole plan, which errs toward the coarser grid rather than painting
+  // one dense frame.
+  const viewportWidth = useElementWidth(scrollRef);
+  const visibleDays = viewportWidth > 0 ? (viewportWidth - zone1Width - zone3Width) / pxPerDay : days.length;
+
+  // Day captions in the header thin out as the columns narrow, for the same
+  // reason the grid does: "Aug" needs about 22px, so below that only every
+  // Nth column is captioned instead of every column overlapping its
+  // neighbours. At the default zoom (32px/day) the stride is 1 — every day
+  // captioned, exactly as before.
+  const dayCaptionStride = Math.max(1, Math.ceil(MIN_DAY_CAPTION_WIDTH_PX / pxPerDay));
+  // The header's per-day separators come and go with the daily grid lines
+  // below them, so the two strips never disagree about how fine this range
+  // is: once the body shows weeks, a comb of day borders in the header is
+  // the same visual noise the grid just dropped.
+  const showDayCellBorders = visibleDays <= MAX_VISIBLE_DAYS_FOR_DAY_LINES;
+
   return (
     <div>
       {/* Title and controls sit on one line until there isn't room for one:
@@ -169,7 +198,7 @@ export function GanttChart() {
           <AddTaskForm />
         </div>
       </div>
-      <div className="w-full overflow-x-auto rounded-lg border border-slate-200 bg-white">
+      <div ref={scrollRef} className="w-full overflow-x-auto rounded-lg border border-slate-200 bg-white">
         <div style={{ width: rowWidth }}>
           <div className="flex border-b border-slate-200 bg-slate-50">
             <div
@@ -179,7 +208,7 @@ export function GanttChart() {
               Task
             </div>
             <div className="flex flex-shrink-0" style={{ width: timelineWidth }}>
-              {days.map((day) => (
+              {days.map((day, index) => (
                 <div
                   key={day.toISOString()}
                   // The date tier: monospace, a notch smaller than before
@@ -187,10 +216,12 @@ export function GanttChart() {
                   // wraps to "Aug" / "01" inside the fixed pxPerDay column
                   // exactly as it did before, since both halves are narrower
                   // than the column even at the tightest zoom.
-                  className="flex-shrink-0 border-r border-slate-100 py-2 text-center font-mono text-[10px] tracking-[0.02em] text-slate-500"
+                  className={`flex-shrink-0 py-2 text-center font-mono text-[10px] tracking-[0.02em] text-slate-500 ${
+                    showDayCellBorders ? 'border-r border-slate-100' : ''
+                  }`}
                   style={{ width: pxPerDay }}
                 >
-                  {formatShortDate(day)}
+                  {index % dayCaptionStride === 0 ? formatShortDate(day) : ''}
                 </div>
               ))}
             </div>
@@ -207,7 +238,13 @@ export function GanttChart() {
               would fall back to DOM order among positioned siblings, which
               is far too easy to break by reordering a line here. */}
           <div className="relative">
-            <DateGridLines minDate={minDate} totalDays={days.length} pxPerDay={pxPerDay} zone1Width={zone1Width} />
+            <DateGridLines
+              minDate={minDate}
+              totalDays={days.length}
+              pxPerDay={pxPerDay}
+              zone1Width={zone1Width}
+              visibleDays={visibleDays}
+            />
             <HierarchyConnectors items={sortedItems} minDate={minDate} pxPerDay={pxPerDay} zone1Width={zone1Width} />
             <DependencyConnectors items={sortedItems} minDate={minDate} pxPerDay={pxPerDay} zone1Width={zone1Width} />
             {sortedItems.map((item) => {

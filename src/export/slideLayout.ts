@@ -83,6 +83,16 @@ export const SUBTASK_DATE_FONT_SIZE_PT = 10;
 // on top (see textMetrics.ts).
 export const STATUS_LETTER_SPACING_EM = 0.06;
 export const DATE_LETTER_SPACING_EM = 0.02;
+// Date captions on the overview's date axis: month-level captions are the
+// primary scale, week-level ones a notch smaller. They live here rather than
+// in each exporter because the model measures a caption's width at exactly
+// the size both engines then draw it at, to decide how many of them fit
+// without colliding (see buildAxisLabels).
+export const AXIS_MONTH_FONT_SIZE_PT = 8;
+export const AXIS_WEEK_FONT_SIZE_PT = 7;
+// Clear space kept between two neighbouring axis captions.
+export const AXIS_LABEL_GAP_IN = 0.08;
+
 // Status names in the summary slide's status-breakdown legend, a notch
 // under the count/percentage they sit next to (10pt) for the same reason as
 // BAR_STATUS_FONT_SIZE_PT.

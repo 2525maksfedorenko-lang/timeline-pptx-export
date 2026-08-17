@@ -37,6 +37,8 @@ import {
   BAR_PROGRESS_FONT_SIZE_PT,
   BAR_RADIUS_IN,
   BAR_STATUS_FONT_SIZE_PT,
+  AXIS_MONTH_FONT_SIZE_PT,
+  AXIS_WEEK_FONT_SIZE_PT,
   COMMENT_BODY_FONT_SIZE_PT,
   COMMENT_LINE_HEIGHT_IN,
   CONTENT_BOTTOM_IN,
@@ -259,7 +261,7 @@ function drawOverviewSlide(doc: jsPDF, model: OverviewSlideModel, links: SlideLi
   doc.setFont(PDF_MONO_FONT_FACE, 'normal');
   doc.setTextColor(withHash(COLORS.footerText));
   model.axisLabels.forEach((label) => {
-    const fontSize = label.level === 'month' ? 8 : 7;
+    const fontSize = label.level === 'month' ? AXIS_MONTH_FONT_SIZE_PT : AXIS_WEEK_FONT_SIZE_PT;
     doc.setFontSize(fontSize);
     drawTrackedText(
       doc,

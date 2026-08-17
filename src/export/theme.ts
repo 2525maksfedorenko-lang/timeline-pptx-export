@@ -22,6 +22,11 @@ export const COLORS = {
   // distinguishable after antialiasing at sub-pixel widths.
   gridLine: 'D8D6CC',
   weekGridLine: 'DCDBD2',
+  // Year boundaries, only drawn on ranges long enough that months are the
+  // *fine* level (see getVisibleGridLevels). A clear step darker than the
+  // monthly line, since on a multi-year range it's the one mark that says
+  // where one year ends and the next begins.
+  yearGridLine: 'BDB9A9',
   // Pale, but deliberately not *as* pale as the slide background it sits on
   // (slideBg F1F2F4): a lighter daily line simply disappears in the export.
   dayGridLine: 'E9EAE2',

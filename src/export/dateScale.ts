@@ -103,6 +103,14 @@ export function formatShortDate(date: Date): string {
   return date.toLocaleDateString('en-US', { day: '2-digit', month: 'short' });
 }
 
+/** "Jan 2027" — the axis caption for ranges too long for a day-level date
+ * to mean anything (see getVisibleGridLevels). Formatted in UTC because the
+ * grid marks it labels are built from UTC date parts, so a 1 January mark
+ * can't come out labelled "Dec 2026" west of Greenwich. */
+export function formatMonthYear(date: Date): string {
+  return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' });
+}
+
 export interface DateRange {
   minDate: Date;
   maxDate: Date;

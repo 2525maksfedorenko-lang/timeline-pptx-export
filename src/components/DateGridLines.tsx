@@ -7,6 +7,10 @@ interface DateGridLinesProps {
   totalDays: number;
   pxPerDay: number;
   zone1Width: number;
+  // Days visible in the scroll viewport at the current zoom — not the plan's
+  // length. Passed down (rather than derived here) because only GanttChart
+  // measures the viewport; see getVisibleGridLevels for what it decides.
+  visibleDays: number;
 }
 
 /** SVG overlay drawing the day/week/month date lines behind the Gantt bars,
@@ -15,15 +19,18 @@ interface DateGridLinesProps {
  * the same picture at two scales, not two implementations that agree by
  * coincidence.
  *
- * One line per calendar day is a lot of lines on a long range, and that's
- * the point: at 0.3px in the palest tone they read as texture behind the
- * bars, with the weekly and monthly lines standing out of it. Sits at the
- * bottom of the row area's z-stack, under the connector overlays and well
- * under the bars themselves. */
-export function DateGridLines({ minDate, totalDays, pxPerDay, zone1Width }: DateGridLinesProps) {
+ * One line per calendar day is a lot of lines on a short range, and that's
+ * the point: at 0.5px in the palest tone they read as texture behind the
+ * bars, with the weekly and monthly lines standing out of it. Which levels
+ * are drawn at all depends on how much time is on screen (`visibleDays`), so
+ * zooming out drops the daily lines and then the weekly ones instead of
+ * packing them into a solid block — the same rule the exported slides use
+ * for their own width. Sits at the bottom of the row area's z-stack, under
+ * the connector overlays and well under the bars themselves. */
+export function DateGridLines({ minDate, totalDays, pxPerDay, zone1Width, visibleDays }: DateGridLinesProps) {
   const grid = useMemo(
-    () => buildDateGrid(minDate, new Date(minDate.getTime() + (totalDays - 1) * MS_PER_DAY)),
-    [minDate, totalDays],
+    () => buildDateGrid(minDate, new Date(minDate.getTime() + (totalDays - 1) * MS_PER_DAY), visibleDays),
+    [minDate, totalDays, visibleDays],
   );
 
   return (

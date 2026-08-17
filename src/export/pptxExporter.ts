@@ -34,6 +34,8 @@ import {
   BAR_PROGRESS_FONT_SIZE_PT,
   BAR_RADIUS_IN,
   BAR_STATUS_FONT_SIZE_PT,
+  AXIS_MONTH_FONT_SIZE_PT,
+  AXIS_WEEK_FONT_SIZE_PT,
   COMMENT_BODY_FONT_SIZE_PT,
   COMMENT_META_ROW_HEIGHT_IN,
   CONTENT_BOTTOM_IN,
@@ -275,7 +277,7 @@ function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel, links: S
   // marks them as dates. Still comfortably inside AXIS_LABEL_MIN_PITCH_IN
   // (0.5in) at the widest: "Aug 01" is 6 glyphs * 0.6em * 8pt = 0.4in.
   model.axisLabels.forEach((label) => {
-    const fontSize = label.level === 'month' ? 8 : 7;
+    const fontSize = label.level === 'month' ? AXIS_MONTH_FONT_SIZE_PT : AXIS_WEEK_FONT_SIZE_PT;
     slide.addText(label.text, {
       x: label.x,
       y: model.dateAxisY,

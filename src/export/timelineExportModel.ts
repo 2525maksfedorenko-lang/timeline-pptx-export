@@ -16,6 +16,7 @@ import { buildTaskHierarchy } from '../utils/taskHierarchy';
 import {
   daysBetween,
   BASE_PX_PER_DAY,
+  formatMonthYear,
   formatShortDate,
   getDateRange,
   getItemBar,
@@ -23,6 +24,7 @@ import {
 import {
   buildDateGrid,
   DATE_GRID_LEVELS,
+  MAX_VISIBLE_DAYS_FOR_WEEK_LINES,
   type DateGrid,
   type DateGridLevel,
   type DateGridMark,
@@ -37,6 +39,9 @@ import {
   BAR_PROGRESS_FONT_SIZE_PT,
   BAR_PROGRESS_PADDING_IN,
   BAR_STATUS_FONT_SIZE_PT,
+  AXIS_LABEL_GAP_IN,
+  AXIS_MONTH_FONT_SIZE_PT,
+  AXIS_WEEK_FONT_SIZE_PT,
   STATUS_LETTER_SPACING_EM,
   DATE_LETTER_SPACING_EM,
   letterSpacingPt,
@@ -307,31 +312,64 @@ function buildSummarySlide(items: TimelineItem[]): SummarySlideModel {
   };
 }
 
-// Horizontal room a date caption ("Sep 01") needs before the next one may
-// start. Measured against the week captions, which are the smaller of the
-// two sizes and therefore the ones that crowd first.
-const AXIS_LABEL_MIN_PITCH_IN = 0.5;
+/** Drops any caption that would start before the previous kept one has
+ * ended (plus a gap), walking left to right. Measuring each caption's own
+ * drawn width beats the fixed pitch this used to use: "Jan 2027" is half as
+ * wide again as "Sep 01", so one constant could only ever be right for one
+ * of the two formats. */
+function thinAxisLabels(
+  labels: OverviewAxisLabelModel[],
+  widthOf: (label: OverviewAxisLabelModel) => number,
+): OverviewAxisLabelModel[] {
+  const kept: OverviewAxisLabelModel[] = [];
+  let nextFreeX = -Infinity;
 
-/** Date captions for the overview axis: one per month line, plus week-line
- * captions wherever they still fit. Week captions are thinned to every Nth
- * week once consecutive ones would sit closer than a caption is wide (a
- * 3-month range packs weeks ~0.2in apart at slide scale), and any that would
- * collide with a month caption is dropped in favor of it. Day lines get no
- * caption at any range — see OverviewAxisLabelModel. */
-function buildAxisLabels(grid: DateGrid, toX: (mark: DateGridMark) => number): OverviewAxisLabelModel[] {
-  const monthLabels: OverviewAxisLabelModel[] = grid.month.map((mark) => ({
-    level: 'month',
-    text: formatShortDate(mark.date),
-    x: toX(mark),
-  }));
+  labels.forEach((label) => {
+    if (label.x < nextFreeX) return;
+    kept.push(label);
+    nextFreeX = label.x + widthOf(label) + AXIS_LABEL_GAP_IN;
+  });
 
-  const weekPitch = grid.week.length > 1 ? toX(grid.week[1]) - toX(grid.week[0]) : Infinity;
-  const stride = weekPitch > 0 ? Math.max(1, Math.ceil(AXIS_LABEL_MIN_PITCH_IN / weekPitch)) : 1;
+  return kept;
+}
 
-  const weekLabels: OverviewAxisLabelModel[] = grid.week
-    .filter((_, index) => index % stride === 0)
-    .map((mark) => ({ level: 'week' as const, text: formatShortDate(mark.date), x: toX(mark) }))
-    .filter((label) => monthLabels.every((month) => Math.abs(month.x - label.x) >= AXIS_LABEL_MIN_PITCH_IN));
+/** Date captions for the overview axis, thinned to what actually fits.
+ *
+ * Which lines get captioned follows the grid's own density (see
+ * getVisibleGridLevels): a range past a year has no week lines to caption at
+ * all, and its month captions carry the year — "Jan 2027" rather than
+ * "Jan 01", since on a multi-year axis the day of the month is noise and the
+ * year is the thing you need. Month captions are thinned the same way week
+ * captions always were, because 36 of them across a 9in axis collide just as
+ * readily as weekly ones do. Day and year lines get no caption of their own:
+ * a caption per day is an unreadable smear at any range, and every 1 January
+ * already carries a month caption that names its year. */
+function buildAxisLabels(
+  grid: DateGrid,
+  toX: (mark: DateGridMark) => number,
+  isMultiYear: boolean,
+): OverviewAxisLabelModel[] {
+  const monthLabels = thinAxisLabels(
+    grid.month.map((mark) => ({
+      level: 'month' as const,
+      text: isMultiYear ? formatMonthYear(mark.date) : formatShortDate(mark.date),
+      x: toX(mark),
+    })),
+    (label) => measureMonoTextWidthIn(label.text, AXIS_MONTH_FONT_SIZE_PT),
+  );
+
+  // Week captions fill the gaps the month captions leave, so they're thinned
+  // against the months already kept as well as against each other.
+  const weekLabels = thinAxisLabels(
+    grid.week.map((mark) => ({ level: 'week' as const, text: formatShortDate(mark.date), x: toX(mark) })),
+    (label) => measureMonoTextWidthIn(label.text, AXIS_WEEK_FONT_SIZE_PT),
+  ).filter((label) =>
+    monthLabels.every(
+      (month) =>
+        label.x + measureMonoTextWidthIn(label.text, AXIS_WEEK_FONT_SIZE_PT) + AXIS_LABEL_GAP_IN <= month.x ||
+        label.x >= month.x + measureMonoTextWidthIn(month.text, AXIS_MONTH_FONT_SIZE_PT) + AXIS_LABEL_GAP_IN,
+    ),
+  );
 
   return [...monthLabels, ...weekLabels];
 }
@@ -423,7 +461,11 @@ function buildOverviewSlide(
     gridLines = DATE_GRID_LEVELS.flatMap((level) =>
       grid[level].map((mark) => ({ level, x: toX(mark) })),
     );
-    axisLabels = buildAxisLabels(grid, toX);
+    // The slide shows the whole window at once, so the grid's density tier
+    // follows the window's own length — and the axis captions follow the
+    // same tier, so lines and captions can't disagree about how coarse this
+    // range is.
+    axisLabels = buildAxisLabels(grid, toX, totalDays > MAX_VISIBLE_DAYS_FOR_WEEK_LINES);
 
     let y = CONTENT_TOP_IN + GROUP_HEADER_HEIGHT_IN;
 

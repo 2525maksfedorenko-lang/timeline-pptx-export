@@ -1,9 +1,11 @@
 import { daysBetween, getWeekMarkers, MS_PER_DAY } from './dateScale';
 import { COLORS } from './theme';
 
-/** The three densities of vertical date line drawn behind the timeline bars
- * — on screen (GanttChart) and on the exported overview slides alike. */
-export type DateGridLevel = 'day' | 'week' | 'month';
+/** The densities of vertical date line drawn behind the timeline bars — on
+ * screen (GanttChart) and on the exported overview slides alike. Which of
+ * them are actually drawn depends on how much time is on screen at once; see
+ * getVisibleGridLevels. */
+export type DateGridLevel = 'day' | 'week' | 'month' | 'year';
 
 export interface DateGridLevelStyle {
   /** Hex without a leading '#', matching theme.ts's COLORS convention. */
@@ -23,12 +25,34 @@ export const DATE_GRID_STYLES: Record<DateGridLevel, DateGridLevelStyle> = {
   day: { color: COLORS.dayGridLine, widthPt: 0.25, widthPx: 0.5 },
   week: { color: COLORS.weekGridLine, widthPt: 0.5, widthPx: 1 },
   month: { color: COLORS.gridLine, widthPt: 1, widthPx: 1.75 },
+  year: { color: COLORS.yearGridLine, widthPt: 1.75, widthPx: 3 },
 };
 
 /** Back-to-front draw order: the palest, densest level first, so a month
  * line is never overpainted by the day line sharing its position (every
- * month boundary is also a day boundary, and every Monday is both). */
-export const DATE_GRID_LEVELS: DateGridLevel[] = ['day', 'week', 'month'];
+ * month boundary is also a day boundary, and every Monday is both, and every
+ * 1 January is all four). */
+export const DATE_GRID_LEVELS: DateGridLevel[] = ['day', 'week', 'month', 'year'];
+
+// How much time can be on screen at once before a level stops being worth
+// drawing. Both thresholds are in days of *visible* range — the span the
+// renderer fits across its own width, not the length of the plan — because
+// that is what decides how close together the lines land: 90 days of daily
+// lines across a slide is one line every 0.1in, and a year of them is one
+// every 0.025in, which is not a grid any more, just a darker background.
+export const MAX_VISIBLE_DAYS_FOR_DAY_LINES = 90;
+export const MAX_VISIBLE_DAYS_FOR_WEEK_LINES = 365;
+
+/** Which levels are worth drawing for a range of `visibleDays`: everything
+ * down to daily on a quarter or less, weeks and months up to a year, and
+ * months against year boundaries beyond that. Each tier keeps two or three
+ * levels, so the grid always reads as a hierarchy rather than as one
+ * undifferentiated comb. */
+export function getVisibleGridLevels(visibleDays: number): DateGridLevel[] {
+  if (visibleDays > MAX_VISIBLE_DAYS_FOR_WEEK_LINES) return ['month', 'year'];
+  if (visibleDays > MAX_VISIBLE_DAYS_FOR_DAY_LINES) return ['week', 'month'];
+  return ['day', 'week', 'month'];
+}
 
 export interface DateGridMark {
   /** Whole days from the range start. Callers scale this into px (screen) or
@@ -44,12 +68,20 @@ function toIsoDate(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
-/** The day/week/month marks for one date range, derived from a single walk
- * of the range rather than three independent date computations: the weekly
- * and monthly levels are both filtered views of the daily one, so the three
- * can never disagree about where a given calendar day sits. */
-export function buildDateGrid(minDate: Date, maxDate: Date): DateGrid {
+/** The marks for one date range, derived from a single walk of the range
+ * rather than independent date computations per level: the weekly, monthly
+ * and yearly levels are all filtered views of the daily one, so they can
+ * never disagree about where a given calendar day sits.
+ *
+ * `visibleDays` is how much of the range the renderer shows at once, and it
+ * decides which levels come back populated — the rest come back empty, so a
+ * renderer can keep iterating every level and simply draw nothing for the
+ * ones this range is too long for. It defaults to the whole range, which is
+ * what an exported slide shows; the on-screen chart passes what actually
+ * fits in its scroll viewport at the current zoom. */
+export function buildDateGrid(minDate: Date, maxDate: Date, visibleDays?: number): DateGrid {
   const totalDays = Math.max(1, daysBetween(minDate, maxDate) + 1);
+  const levels = new Set(getVisibleGridLevels(visibleDays ?? totalDays));
 
   const day: DateGridMark[] = Array.from({ length: totalDays }, (_, dayOffset) => ({
     dayOffset,
@@ -69,5 +101,15 @@ export function buildDateGrid(minDate: Date, maxDate: Date): DateGrid {
   // month-level date caption.
   const month = day.filter((mark, index) => index === 0 || mark.date.getUTCDate() === 1);
 
-  return { day, week, month };
+  // Only true 1 Januarys — unlike the month level, this one takes no
+  // range-start anchor: a year line at the very edge of the axis would sit
+  // on top of the month line already there and mark nothing.
+  const year = day.filter((mark) => mark.date.getUTCMonth() === 0 && mark.date.getUTCDate() === 1);
+
+  return {
+    day: levels.has('day') ? day : [],
+    week: levels.has('week') ? week : [],
+    month: levels.has('month') ? month : [],
+    year: levels.has('year') ? year : [],
+  };
 }
