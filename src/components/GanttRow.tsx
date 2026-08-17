@@ -9,6 +9,7 @@ import { clampProgress } from '../utils/clampProgress';
 import { needsDarkText } from '../utils/colorContrast';
 import { getInitials } from '../utils/initials';
 import { measureTextWidthPx } from '../utils/measureTextWidth';
+import { resolveBarColor } from '../utils/barColor';
 import { getDescendantIds } from '../utils/taskHierarchy';
 
 interface GanttRowProps {
@@ -127,7 +128,6 @@ function PersonIcon() {
 
 const ICON_BUTTON_CLASS = 'flex h-4 w-4 flex-shrink-0 items-center justify-center';
 
-const DEFAULT_BAR_COLOR = '#3b82f6';
 // Neutral badge fill (hex without '#', matching Person.color's own
 // convention) for an assignee whose name no longer matches any saved
 // Person (e.g. removed from peopleStore after the task was assigned) —
@@ -219,7 +219,10 @@ export function GanttRow({
   // the fill, in dark text on the gray track. The fit is a real measurement
   // against the fill's own pixel width — a percentage cutoff would say
   // nothing about how wide "100%" renders on a two-day bar.
-  const barColor = item.color ?? DEFAULT_BAR_COLOR;
+  // Same rule the exporters use (see resolveBarColor): the task's own color
+  // when it has one, its status color otherwise — no separate on-screen
+  // default. Prefixed here because this one is going into a CSS property.
+  const barColor = `#${resolveBarColor(item)}`;
   const progressText = item.progress != null ? `${progress}%` : '';
   const fillWidth = (barWidth * progress) / 100;
   const progressInsideFill =

@@ -10,6 +10,7 @@ import {
 import { parseMarkdownBlocks, type MarkdownBlock } from '../utils/renderMarkdown';
 import { getStatusSegments, type StatusSegment } from '../utils/dashboardMetrics';
 import { clampProgress } from '../utils/clampProgress';
+import { resolveBarColor } from '../utils/barColor';
 import { needsDarkText } from '../utils/colorContrast';
 import { buildTaskHierarchy } from '../utils/taskHierarchy';
 import {
@@ -27,7 +28,7 @@ import {
   type DateGridMark,
 } from './dateGrid';
 import { measureLetterSpacingWidthIn, measureMonoTextWidthIn, measureTextWidthIn } from './textMetrics';
-import { COLORS, statusColor } from './theme';
+import { COLORS } from './theme';
 import {
   BAR_HEIGHT_IN,
   BAR_LABEL_FONT_SIZE_PT,
@@ -457,7 +458,7 @@ function buildOverviewSlide(
       const windowClippedWidth = Math.max(clippedRightIn - (barX - CONTENT_X_IN), 0);
       const trackWidth = Math.min(Math.max(windowClippedWidth, MIN_TRACK_WIDTH_IN), maxTrackWidth);
       const fillWidth = progress > 0 ? Math.max((trackWidth * progress) / 100, 0.05) : 0;
-      const barColor = statusColor(progress);
+      const barColor = resolveBarColor(item);
 
       // The progress text goes inside the fill only when the fill measurably
       // holds it at the size it's actually drawn — not at some percentage of

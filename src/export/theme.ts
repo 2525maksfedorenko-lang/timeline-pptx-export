@@ -38,13 +38,6 @@ export function withHash(hex: string) {
   return `#${hex}`;
 }
 
-/** Status color for a progress value, per the aicoo style guide. */
-export function statusColor(progress: number): string {
-  if (progress >= 100) return COLORS.teal;
-  if (progress >= 34) return COLORS.amber;
-  return COLORS.coral;
-}
-
 // Closest built-in equivalents for a uniform sans-serif look in each engine.
 export const PPTX_FONT_FACE = 'Arial';
 export const PDF_FONT_FACE = 'helvetica';

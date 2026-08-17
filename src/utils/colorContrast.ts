@@ -1,6 +1,7 @@
 // Picking readable text colors for text drawn on top of an arbitrary fill
-// (e.g. a progress label sitting inside a task bar, whose color is per-task
-// on screen and status-derived in exports).
+// (e.g. a progress label sitting inside a task bar, whose fill is the task's
+// own color or its status color — see resolveBarColor, which the screen and
+// both exporters share).
 
 function toLinearChannel(value: number): number {
   const srgb = value / 255;
