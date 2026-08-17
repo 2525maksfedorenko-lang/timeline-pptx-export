@@ -10,7 +10,9 @@ import { needsDarkText } from '../utils/colorContrast';
 import { getInitials } from '../utils/initials';
 import { measureTextWidthPx } from '../utils/measureTextWidth';
 import { resolveBarColor } from '../utils/barColor';
+import { isNestedTask, resolveBarGeometry } from '../utils/barNesting';
 import { getDescendantIds } from '../utils/taskHierarchy';
+import { BAR_HEIGHT_PX } from './ganttLayout';
 
 interface GanttRowProps {
   item: TimelineItem;
@@ -199,6 +201,15 @@ export function GanttRow({
   // ICON_BUTTON_CLASS itself stays untouched so the sizing rules stay in one
   // place.
   const iconButtonClass = `${ICON_BUTTON_CLASS}${isDimmed ? ` ${ROW_DIM_CLASS}` : ''}`;
+
+  // A subtask's bar is drawn shorter than a top-level task's and centered on
+  // the same line, so nesting reads from the bar itself and not only from
+  // the label column. The row's own height is untouched — see
+  // resolveBarGeometry.
+  const { height: barHeight, offset: barOffsetY } = resolveBarGeometry(
+    BAR_HEIGHT_PX,
+    isNestedTask(items, item),
+  );
 
   const { left, width: barWidth } = getItemBar(item, minDate, pxPerDay);
   const progress = clampProgress(item.progress ?? 0);
@@ -490,10 +501,13 @@ export function GanttRow({
         <div
           ref={barRef}
           onMouseDown={handleMouseDown}
-          className={`absolute top-1 h-8 cursor-grab select-none transition-opacity active:cursor-grabbing ${
+          className={`absolute cursor-grab select-none transition-opacity active:cursor-grabbing ${
             isDimmed ? 'opacity-30' : ''
           }`}
-          style={{ left, width: barWidth }}
+          // top/height join left/width here rather than staying Tailwind
+          // classes because they now vary per row; the drag handler only ever
+          // writes left and width, so React owns these two uncontested.
+          style={{ left, width: barWidth, top: barOffsetY, height: barHeight }}
         >
           <div
             className="h-full overflow-hidden rounded-md shadow-sm"

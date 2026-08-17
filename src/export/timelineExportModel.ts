@@ -11,6 +11,7 @@ import { parseMarkdownBlocks, type MarkdownBlock } from '../utils/renderMarkdown
 import { getStatusSegments, type StatusSegment } from '../utils/dashboardMetrics';
 import { clampProgress } from '../utils/clampProgress';
 import { resolveBarColor } from '../utils/barColor';
+import { isNestedTask, resolveBarGeometry } from '../utils/barNesting';
 import { needsDarkText } from '../utils/colorContrast';
 import { buildTaskHierarchy } from '../utils/taskHierarchy';
 import {
@@ -122,8 +123,16 @@ export interface OverviewBarModel {
   color: string;
   statusText: string;
   statusColor: string;
+  // The row's top edge. Everything drawn on the bar's *line* — its label,
+  // status, progress, tag pills — is positioned against this and a full
+  // BAR_HEIGHT_IN box, so those stay put whatever height the bar itself is.
   y: number;
   barX: number;
+  // The track's own rectangle. A nested task's bar is drawn shorter than a
+  // top-level one and centered in the same slot (see resolveBarGeometry), so
+  // this is `y` plus a centering offset rather than `y` itself.
+  barY: number;
+  barHeight: number;
   trackWidth: number;
   fillWidth: number;
   // Progress percentage drawn on the bar itself, in the box
@@ -501,6 +510,13 @@ function buildOverviewSlide(
       const trackWidth = Math.min(Math.max(windowClippedWidth, MIN_TRACK_WIDTH_IN), maxTrackWidth);
       const fillWidth = progress > 0 ? Math.max((trackWidth * progress) / 100, 0.05) : 0;
       const barColor = resolveBarColor(item);
+      // Nesting is judged against the items actually drawn on this slide:
+      // a task whose parent isn't among them is a root here, and is drawn
+      // full height like one.
+      const { height: barHeight, offset: barOffsetY } = resolveBarGeometry(
+        BAR_HEIGHT_IN,
+        isNestedTask(items, item),
+      );
 
       // The progress text goes inside the fill only when the fill measurably
       // holds it at the size it's actually drawn — not at some percentage of
@@ -569,6 +585,8 @@ function buildOverviewSlide(
         statusColor: TASK_STATUS_COLORS[status],
         y,
         barX,
+        barY: y + barOffsetY,
+        barHeight,
         trackWidth,
         fillWidth,
         progressText,

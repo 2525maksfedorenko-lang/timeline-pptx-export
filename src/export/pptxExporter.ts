@@ -246,9 +246,9 @@ function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel, links: S
     // second one's relationship.
     slide.addShape('roundRect', {
       x: bar.barX,
-      y: bar.y,
+      y: bar.barY,
       w: bar.trackWidth,
-      h: BAR_HEIGHT_IN,
+      h: bar.barHeight,
       rectRadius: BAR_RADIUS_IN,
       fill: { color: COLORS.border },
       line: { color: COLORS.border },
@@ -258,9 +258,9 @@ function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel, links: S
     if (bar.fillWidth > 0) {
       slide.addShape('roundRect', {
         x: bar.barX,
-        y: bar.y,
+        y: bar.barY,
         w: bar.fillWidth,
-        h: BAR_HEIGHT_IN,
+        h: bar.barHeight,
         rectRadius: BAR_RADIUS_IN,
         fill: { color: bar.color },
         line: { color: bar.color },

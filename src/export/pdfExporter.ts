@@ -246,11 +246,11 @@ function drawOverviewSlide(doc: jsPDF, model: OverviewSlideModel, links: SlideLi
 
   model.bars.forEach((bar) => {
     doc.setFillColor(withHash(COLORS.border));
-    doc.roundedRect(bar.barX, bar.y, bar.trackWidth, BAR_HEIGHT_IN, BAR_RADIUS_IN, BAR_RADIUS_IN, 'F');
+    doc.roundedRect(bar.barX, bar.barY, bar.trackWidth, bar.barHeight, BAR_RADIUS_IN, BAR_RADIUS_IN, 'F');
 
     if (bar.fillWidth > 0) {
       doc.setFillColor(withHash(bar.color));
-      doc.roundedRect(bar.barX, bar.y, bar.fillWidth, BAR_HEIGHT_IN, BAR_RADIUS_IN, BAR_RADIUS_IN, 'F');
+      doc.roundedRect(bar.barX, bar.barY, bar.fillWidth, bar.barHeight, BAR_RADIUS_IN, BAR_RADIUS_IN, 'F');
     }
   });
 

@@ -48,9 +48,13 @@ export function computeZone1Width(items: TimelineItem[], maxWidthPx = Infinity):
   return Math.min(Math.max(MIN_ZONE1_WIDTH_PX, Math.ceil(maxLabelWidth) + ZONE1_CHROME_PX), maxWidthPx);
 }
 
-// A row's total height and its bar's vertical center, in px — must match
-// GanttRow's own classes (`h-10` row, `top-1 h-8` bar) exactly, since the
-// dependency-connector overlay positions itself against these without
-// touching the DOM.
+// A row's total height, its bar's full height and the bar's vertical center,
+// in px. The row height must match GanttRow's own `h-10` class, and the
+// connector overlays position themselves against the center without touching
+// the DOM — so both stay fixed whatever a bar does. BAR_HEIGHT_PX is what a
+// top-level task's bar is drawn at; a nested task's is a fraction of it (see
+// resolveBarGeometry), centered on the same line, which is why the center
+// below is a constant rather than something derived per row.
 export const ROW_HEIGHT_PX = 40;
+export const BAR_HEIGHT_PX = 32;
 export const BAR_CENTER_Y_PX = 20;
