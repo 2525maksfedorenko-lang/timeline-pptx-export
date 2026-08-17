@@ -42,6 +42,8 @@ import {
   CONTENT_TOP_IN,
   CONTENT_WIDTH_IN,
   CONTENT_X_IN,
+  DASHBOARD_TABLE_TOP_IN,
+  STATUS_RIGHT_PADDING_IN,
   DEPENDENCY_LINE_WIDTH_PT,
   DETAIL_ROW_INDENT_IN,
   FOOTER_HEIGHT_IN,
@@ -364,8 +366,9 @@ function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel, links: S
     slide.addText(bar.statusText, {
       x: CONTENT_X_IN,
       y: bar.y,
-      w: CONTENT_WIDTH_IN,
+      w: CONTENT_WIDTH_IN - STATUS_RIGHT_PADDING_IN,
       h: BAR_HEIGHT_IN,
+      margin: 0,
       fontSize: BAR_STATUS_FONT_SIZE_PT,
       charSpacing: letterSpacingPt(BAR_STATUS_FONT_SIZE_PT, STATUS_LETTER_SPACING_EM),
       bold: true,
@@ -597,7 +600,7 @@ function drawDetailSlide(slide: PptxSlide, model: DetailSlideModel, links: Slide
         ...rowText(SUBTASK_STATUS_FONT_SIZE_PT, LIST_ROW_HEIGHT_IN),
         x: CONTENT_X_IN,
         y: row.y,
-        w: CONTENT_WIDTH_IN,
+        w: CONTENT_WIDTH_IN - STATUS_RIGHT_PADDING_IN,
         charSpacing: letterSpacingPt(SUBTASK_STATUS_FONT_SIZE_PT, STATUS_LETTER_SPACING_EM),
         bold: true,
         color: row.statusColor,
@@ -826,11 +829,11 @@ function drawDashboardTableSlide(slide: PptxSlide, model: DashboardTableSlideMod
   const tableWidth = CONTENT_WIDTH_IN - DASHBOARD_TABLE_QR_COLUMN_WIDTH_IN - DASHBOARD_TABLE_GAP_IN;
 
   if (model.table) {
-    drawTableBlock(slide, model.table, CONTENT_X_IN, CONTENT_TOP_IN, tableWidth);
+    drawTableBlock(slide, model.table, CONTENT_X_IN, DASHBOARD_TABLE_TOP_IN, tableWidth);
   } else {
     slide.addText(model.emptyMessage, {
       x: CONTENT_X_IN,
-      y: CONTENT_TOP_IN,
+      y: DASHBOARD_TABLE_TOP_IN,
       w: tableWidth,
       h: 0.4,
       fontSize: 13,
@@ -846,7 +849,7 @@ function drawDashboardTableSlide(slide: PptxSlide, model: DashboardTableSlideMod
     model.qrDisplay,
     qrX,
     DASHBOARD_TABLE_QR_COLUMN_WIDTH_IN,
-    CONTENT_TOP_IN,
+    DASHBOARD_TABLE_TOP_IN,
     DASHBOARD_TABLE_QR_SIZE_IN,
   );
 }

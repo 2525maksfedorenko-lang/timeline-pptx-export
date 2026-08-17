@@ -73,6 +73,7 @@ import {
   ROW_HEIGHT_IN,
   ROW_LABEL_HEIGHT_IN,
   SECTION_GAP_IN,
+  STATUS_RIGHT_PADDING_IN,
   SUBTASK_META_STATUS_GAP_IN,
   SUBTASK_STATUS_FONT_SIZE_PT,
   SUBTASK_TEXT_FONT_SIZE_PT,
@@ -558,7 +559,13 @@ function buildOverviewSlide(
             LABEL_TAG_GAP_IN
           : 0;
       const labelWidth = Math.max(
-        CONTENT_X_IN + CONTENT_WIDTH_IN - labelX - statusTextWidth - LABEL_STATUS_GAP_IN - tagsReservedWidth,
+        CONTENT_X_IN +
+          CONTENT_WIDTH_IN -
+          STATUS_RIGHT_PADDING_IN -
+          labelX -
+          statusTextWidth -
+          LABEL_STATUS_GAP_IN -
+          tagsReservedWidth,
         0,
       );
       const label = truncateToWidth(item.label, BAR_LABEL_FONT_SIZE_PT, labelWidth);
@@ -889,6 +896,7 @@ function buildDetailSection(
 
       const availableWidth =
         CONTENT_WIDTH_IN -
+        STATUS_RIGHT_PADDING_IN -
         DETAIL_ROW_INDENT_IN -
         statusTextWidth -
         SUBTASK_META_STATUS_GAP_IN -

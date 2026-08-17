@@ -104,6 +104,22 @@ export function letterSpacingPt(fontSizePt: number, em: number): number {
   return fontSizePt * em;
 }
 
+// Clear space kept between a right-aligned status text and the right edge of
+// the content area, on the overview bars and on a detail slide's subtask
+// rows alike. Without it the status is anchored *on* that edge: measured in
+// the generated PDF, "In progress" ended at 9.502in against a content edge
+// of 9.500, i.e. touching it and a hair past. Wide enough to read as a
+// margin rather than as a rounding accident.
+export const STATUS_RIGHT_PADDING_IN = 0.12;
+
+// Top of the dashboard tables' slides (Delayed / At risk). A slide's content
+// normally starts at CONTENT_TOP_IN, which is right for text — but these
+// slides open with a filled table header, and a solid band reads as
+// crowding the dark title bar in a way a line of text at the same y does
+// not. Kept as its own constant rather than raising CONTENT_TOP_IN, which
+// the overview's bars-per-slide ceiling is derived from.
+export const DASHBOARD_TABLE_TOP_IN = CONTENT_TOP_IN + 0.18;
+
 // Minimum clear gap always kept between a label and the status text sharing
 // its row, even after the label has been reserved room / truncated against
 // the status's own measured width — a small buffer against the font-metric

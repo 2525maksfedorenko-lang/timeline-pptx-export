@@ -45,6 +45,8 @@ import {
   CONTENT_TOP_IN,
   CONTENT_WIDTH_IN,
   CONTENT_X_IN,
+  DASHBOARD_TABLE_TOP_IN,
+  STATUS_RIGHT_PADDING_IN,
   DEPENDENCY_LINE_WIDTH_PT,
   FOOTER_HEIGHT_IN,
   GROUP_HEADER_HEIGHT_IN,
@@ -337,7 +339,7 @@ function drawOverviewSlide(doc: jsPDF, model: OverviewSlideModel, links: SlideLi
     drawTrackedText(
       doc,
       bar.statusText,
-      CONTENT_X_IN + CONTENT_WIDTH_IN,
+      CONTENT_X_IN + CONTENT_WIDTH_IN - STATUS_RIGHT_PADDING_IN,
       centerY,
       letterSpacingPt(BAR_STATUS_FONT_SIZE_PT, STATUS_LETTER_SPACING_EM),
       { baseline: 'middle', align: 'right' },
@@ -520,7 +522,7 @@ function drawDetailSlide(doc: jsPDF, model: DetailSlideModel, links: SlideLinks)
       drawTrackedText(
         doc,
         row.statusText,
-        CONTENT_X_IN + CONTENT_WIDTH_IN,
+        CONTENT_X_IN + CONTENT_WIDTH_IN - STATUS_RIGHT_PADDING_IN,
         centerY,
         letterSpacingPt(SUBTASK_STATUS_FONT_SIZE_PT, STATUS_LETTER_SPACING_EM),
         { baseline: 'middle', align: 'right' },
@@ -736,7 +738,7 @@ function drawDashboardTableSlide(doc: jsPDF, model: DashboardTableSlideModel, qr
     const originalAddPage = doc.addPage.bind(doc);
     doc.addPage = (() => doc) as typeof doc.addPage;
     try {
-      drawTableBlock(doc, model.table, CONTENT_X_IN, CONTENT_TOP_IN, tableWidth);
+      drawTableBlock(doc, model.table, CONTENT_X_IN, DASHBOARD_TABLE_TOP_IN, tableWidth);
     } finally {
       doc.addPage = originalAddPage;
     }
@@ -744,7 +746,7 @@ function drawDashboardTableSlide(doc: jsPDF, model: DashboardTableSlideModel, qr
     doc.setFont(PDF_FONT_FACE, 'normal');
     doc.setFontSize(13);
     doc.setTextColor(withHash(COLORS.footerText));
-    drawText(doc, model.emptyMessage, CONTENT_X_IN, CONTENT_TOP_IN, { baseline: 'top' });
+    drawText(doc, model.emptyMessage, CONTENT_X_IN, DASHBOARD_TABLE_TOP_IN, { baseline: 'top' });
   }
 
   const qrX = CONTENT_X_IN + tableWidth + DASHBOARD_TABLE_GAP_IN;
@@ -754,7 +756,7 @@ function drawDashboardTableSlide(doc: jsPDF, model: DashboardTableSlideModel, qr
     model.qrDisplay,
     qrX,
     DASHBOARD_TABLE_QR_COLUMN_WIDTH_IN,
-    CONTENT_TOP_IN,
+    DASHBOARD_TABLE_TOP_IN,
     DASHBOARD_TABLE_QR_SIZE_IN,
   );
 }
