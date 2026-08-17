@@ -11,7 +11,10 @@ interface DependencyConnectorsProps {
   items: TimelineItem[];
   minDate: Date;
   pxPerDay: number;
-  zone1Width: number;
+  // Where zone 2 (the timeline) starts, in px from the row's left edge —
+  // the fixed zones before it added up. Passed in rather than derived here
+  // so every overlay and the rows themselves share one number.
+  timelineStartX: number;
 }
 
 const CONNECTOR_COLOR = '#8A94A0';
@@ -25,7 +28,7 @@ const CONNECTOR_COLOR = '#8A94A0';
  * the same bracket shape for parent→subtask structure instead — a
  * different concept (composition, not sequencing), kept as separate logic
  * on purpose even though the two share their path geometry. */
-export function DependencyConnectors({ items, minDate, pxPerDay, zone1Width }: DependencyConnectorsProps) {
+export function DependencyConnectors({ items, minDate, pxPerDay, timelineStartX }: DependencyConnectorsProps) {
   const showDependencies = useTimelineStore((state) => state.exportOptions.showDependencies);
 
   if (!showDependencies) return null;
@@ -46,9 +49,9 @@ export function DependencyConnectors({ items, minDate, pxPerDay, zone1Width }: D
       const predecessorIndex = rowIndexById.get(predecessor.id)!;
       const { left: predecessorLeft, width: predecessorWidth } = getItemBar(predecessor, minDate, pxPerDay);
 
-      const x1 = zone1Width + predecessorLeft + predecessorWidth;
+      const x1 = timelineStartX + predecessorLeft + predecessorWidth;
       const y1 = predecessorIndex * ROW_HEIGHT_PX + BAR_CENTER_Y_PX;
-      const x2 = zone1Width + successorLeft;
+      const x2 = timelineStartX + successorLeft;
       const y2 = successorIndex * ROW_HEIGHT_PX + BAR_CENTER_Y_PX;
 
       return [{ key: `${predecessor.id}->${successor.id}`, d: buildConnectorPath(x1, y1, x2, y2) }];

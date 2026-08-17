@@ -20,6 +20,10 @@ export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
   blocked: 'Blocked',
 };
 
+/** Every status, in the order they're offered in a picker — one list, so a
+ * new status can't reach some dropdowns and miss others. */
+export const TASK_STATUS_VALUES = Object.keys(TASK_STATUS_LABELS) as TaskStatus[];
+
 export function getTaskStatus(item: Pick<TimelineItem, 'status'>): TaskStatus {
   return item.status ?? DEFAULT_TASK_STATUS;
 }

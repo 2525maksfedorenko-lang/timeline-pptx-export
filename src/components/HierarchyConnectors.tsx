@@ -11,7 +11,10 @@ interface HierarchyConnectorsProps {
   items: TimelineItem[];
   minDate: Date;
   pxPerDay: number;
-  zone1Width: number;
+  // Where zone 2 (the timeline) starts, in px from the row's left edge —
+  // the fixed zones before it added up. Passed in rather than derived here
+  // so every overlay and the rows themselves share one number.
+  timelineStartX: number;
 }
 
 const CONNECTOR_COLOR = '#C7CDD4';
@@ -25,7 +28,7 @@ const CONNECTOR_COLOR = '#C7CDD4';
  * showDependencies, showHierarchyLines never reaches the PPTX/PDF exporters
  * — the exported detail slides already show this structure their own way,
  * see CLAUDE.md's scope-discipline note against duplicating it there. */
-export function HierarchyConnectors({ items, minDate, pxPerDay, zone1Width }: HierarchyConnectorsProps) {
+export function HierarchyConnectors({ items, minDate, pxPerDay, timelineStartX }: HierarchyConnectorsProps) {
   const showHierarchyLines = useTimelineStore((state) => state.exportOptions.showHierarchyLines);
 
   if (!showHierarchyLines) return null;
@@ -45,9 +48,9 @@ export function HierarchyConnectors({ items, minDate, pxPerDay, zone1Width }: Hi
     const { left: parentLeft, width: parentWidth } = getItemBar(parent, minDate, pxPerDay);
     const { left: childLeft } = getItemBar(child, minDate, pxPerDay);
 
-    const x1 = zone1Width + parentLeft + parentWidth;
+    const x1 = timelineStartX + parentLeft + parentWidth;
     const y1 = parentIndex * ROW_HEIGHT_PX + BAR_CENTER_Y_PX;
-    const x2 = zone1Width + childLeft;
+    const x2 = timelineStartX + childLeft;
     const y2 = childIndex * ROW_HEIGHT_PX + BAR_CENTER_Y_PX;
 
     return [{ key: `${parent.id}=>${child.id}`, d: buildConnectorPath(x1, y1, x2, y2) }];

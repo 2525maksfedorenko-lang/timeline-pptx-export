@@ -6,7 +6,10 @@ interface DateGridLinesProps {
   minDate: Date;
   totalDays: number;
   pxPerDay: number;
-  zone1Width: number;
+  // Where zone 2 (the timeline) starts, in px from the row's left edge —
+  // the fixed zones before it added up. Passed in rather than derived here
+  // so every overlay and the rows themselves share one number.
+  timelineStartX: number;
   // Days visible in the scroll viewport at the current zoom — not the plan's
   // length. Passed down (rather than derived here) because only GanttChart
   // measures the viewport; see getVisibleGridLevels for what it decides.
@@ -27,7 +30,7 @@ interface DateGridLinesProps {
  * packing them into a solid block — the same rule the exported slides use
  * for their own width. Sits at the bottom of the row area's z-stack, under
  * the connector overlays and well under the bars themselves. */
-export function DateGridLines({ minDate, totalDays, pxPerDay, zone1Width, visibleDays }: DateGridLinesProps) {
+export function DateGridLines({ minDate, totalDays, pxPerDay, timelineStartX, visibleDays }: DateGridLinesProps) {
   const grid = useMemo(
     () => buildDateGrid(minDate, new Date(minDate.getTime() + (totalDays - 1) * MS_PER_DAY), visibleDays),
     [minDate, totalDays, visibleDays],
@@ -42,7 +45,7 @@ export function DateGridLines({ minDate, totalDays, pxPerDay, zone1Width, visibl
           strokeWidth={DATE_GRID_STYLES[level].widthPx}
         >
           {grid[level].map((mark) => {
-            const x = zone1Width + mark.dayOffset * pxPerDay;
+            const x = timelineStartX + mark.dayOffset * pxPerDay;
             return <line key={mark.dayOffset} x1={x} x2={x} y1={0} y2="100%" />;
           })}
         </g>

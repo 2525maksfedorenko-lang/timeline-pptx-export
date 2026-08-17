@@ -1,5 +1,12 @@
 import { useMemo, useRef } from 'react';
-import { getTaskStatus, TASK_STATUS_COLORS, TASK_STATUS_LABELS, type TimelineItem } from '../types/timeline';
+import {
+  getTaskStatus,
+  TASK_STATUS_COLORS,
+  TASK_STATUS_LABELS,
+  TASK_STATUS_VALUES,
+  type TaskStatus,
+  type TimelineItem,
+} from '../types/timeline';
 import { useTimelineStore } from '../store/timelineStore';
 import { usePeopleStore } from '../store/peopleStore';
 import { TaskDetailsModal } from './TaskDetailsModal';
@@ -27,6 +34,11 @@ interface GanttRowProps {
   // fits on one line with no ellipsis (capped on a phone, where labels
   // ellipsize instead).
   zone1Width: number;
+  // Zone 0's width (the status column), and 0 on a phone, where the column
+  // isn't rendered at all — 112px of extra chrome would leave a 375px screen
+  // with under 90px of timeline. Zone 1 sticks to the right of it, so it
+  // needs the number too.
+  statusZoneWidth: number;
   // Zone 3's width: the four-icon desktop zone, or the single-control phone
   // one (see MOBILE_ZONE3_WIDTH_PX). Passed in rather than read from the
   // constant here so this row and the day header above it can't end up
@@ -170,6 +182,7 @@ export function GanttRow({
   pxPerDay,
   timelineWidth,
   zone1Width,
+  statusZoneWidth,
   zone3Width,
   isPopupOpen,
   popupRef,
@@ -215,6 +228,12 @@ export function GanttRow({
   const progress = clampProgress(item.progress ?? 0);
   const status = getTaskStatus(item);
   const included = item.includeInExport !== false;
+
+  // The status chip is filled with the status's own color, with its text
+  // flipped to whichever of dark/light stays readable on it — the same
+  // contrast rule the progress percentage on a bar uses.
+  const statusColor = `#${TASK_STATUS_COLORS[status]}`;
+  const statusTextColor = needsDarkText(statusColor) ? '#1E2B38' : '#FFFFFF';
 
   // Matched by name, not id — a task only ever remembers its assignee's
   // name (see Person.color's doc comment in peopleStore.ts), so two people
@@ -450,12 +469,50 @@ export function GanttRow({
           would break on DOM order and paint the bars *over* the labels. The
           opaque bg-white is the other half of that: sticky only reserves the
           space, it doesn't hide what scrolls beneath it. */}
+      {/* Zone 0: the task's status, as the chip you change it with. Its own
+          sticky column ahead of the label so a row reads status-first, the
+          way the rest of aicoo does — and a fixed width, since the chip is
+          the same size whatever the task. Hidden on a phone (see
+          statusZoneWidth); the status dot in zone 1 takes over there. */}
       <div
-        className={`sticky left-0 z-20 flex flex-shrink-0 items-center gap-1.5 overflow-hidden border-r border-slate-100 px-2 ${branchTintClass(isHighlighted)}`}
-        style={{ width: zone1Width }}
+        className={`sticky left-0 z-20 flex flex-shrink-0 items-center border-r border-slate-100 px-2 max-md:hidden ${branchTintClass(
+          isHighlighted,
+        )}`}
+        style={{ width: statusZoneWidth }}
+      >
+        <div className={`relative w-full ${isDimmed ? ROW_DIM_CLASS : ''}`}>
+          <select
+            value={status}
+            onChange={(event) => updateItem(item.id, { status: event.target.value as TaskStatus })}
+            className="w-full cursor-pointer appearance-none rounded-full py-1 pl-2 pr-4 text-left text-[11px] font-semibold focus:outline-none focus:ring-2 focus:ring-[#2A9D90]/40"
+            style={{ backgroundColor: statusColor, color: statusTextColor }}
+            aria-label={`Status: ${TASK_STATUS_LABELS[status]}`}
+          >
+            {TASK_STATUS_VALUES.map((value) => (
+              // Options are painted by the OS menu, which inherits the
+              // select's own colors — a chip-colored dropdown would leave
+              // three of the four unreadable, so each option resets them.
+              <option key={value} value={value} style={{ backgroundColor: '#FFFFFF', color: '#1E2B38' }}>
+                {TASK_STATUS_LABELS[value]}
+              </option>
+            ))}
+          </select>
+          <span
+            className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px]"
+            style={{ color: statusTextColor }}
+            aria-hidden="true"
+          >
+            ▾
+          </span>
+        </div>
+      </div>
+
+      <div
+        className={`sticky z-20 flex flex-shrink-0 items-center gap-1.5 overflow-hidden border-r border-slate-100 px-2 ${branchTintClass(isHighlighted)}`}
+        style={{ width: zone1Width, left: statusZoneWidth }}
       >
         <span
-          className={`h-2 w-2 flex-shrink-0 rounded-full ${isDimmed ? ROW_DIM_CLASS : ''}`}
+          className={`hidden h-2 w-2 flex-shrink-0 rounded-full max-md:block ${isDimmed ? ROW_DIM_CLASS : ''}`}
           style={{ backgroundColor: `#${TASK_STATUS_COLORS[status]}` }}
           title={TASK_STATUS_LABELS[status]}
         />

@@ -8,6 +8,7 @@ import { HierarchyConnectors } from './HierarchyConnectors';
 import {
   MOBILE_ZONE1_MAX_WIDTH_PX,
   MOBILE_ZONE3_WIDTH_PX,
+  STATUS_ZONE_WIDTH_PX,
   ZONE3_WIDTH_PX,
   computeZone1Width,
 } from './ganttLayout';
@@ -145,6 +146,14 @@ export function GanttChart() {
     [items, isMobile],
   );
   const zone3Width = isMobile ? MOBILE_ZONE3_WIDTH_PX : ZONE3_WIDTH_PX;
+  // Zone 0 exists on a desktop only: on a 375px phone it would take 112 of
+  // the ~200px the timeline has left after the other two fixed zones, so
+  // there the status stays a colored dot in zone 1 and stays editable from
+  // the export settings list.
+  const statusZoneWidth = isMobile ? 0 : STATUS_ZONE_WIDTH_PX;
+  // Where zone 2 begins: the fixed zones ahead of it, added up once here so
+  // the rows, the day header and all three SVG overlays can't disagree.
+  const timelineStartX = statusZoneWidth + zone1Width;
   const sortedItems = useMemo(() => sortItems(items, sortMode), [items, sortMode]);
 
   const { minDate, days } = useMemo(() => {
@@ -161,7 +170,7 @@ export function GanttChart() {
   // the two fixed zones — matches GanttRow's own zone math exactly so bars
   // line up under the day headers below.
   const timelineWidth = days.length * pxPerDay;
-  const rowWidth = zone1Width + timelineWidth + zone3Width;
+  const rowWidth = timelineStartX + timelineWidth + zone3Width;
 
   // How much time the chart shows at once: the scroll viewport's own width
   // divided by the current pixels-per-day. This is what makes the zoom
@@ -171,7 +180,7 @@ export function GanttChart() {
   // the whole plan, which errs toward the coarser grid rather than painting
   // one dense frame.
   const viewportWidth = useElementWidth(scrollRef);
-  const visibleDays = viewportWidth > 0 ? (viewportWidth - zone1Width - zone3Width) / pxPerDay : days.length;
+  const visibleDays = viewportWidth > 0 ? (viewportWidth - timelineStartX - zone3Width) / pxPerDay : days.length;
 
   // Day captions in the header thin out as the columns narrow, for the same
   // reason the grid does: "Aug" needs about 22px, so below that only every
@@ -201,9 +210,17 @@ export function GanttChart() {
       <div ref={scrollRef} className="w-full overflow-x-auto rounded-lg border border-slate-200 bg-white">
         <div style={{ width: rowWidth }}>
           <div className="flex border-b border-slate-200 bg-slate-50">
+            {!isMobile && (
+              <div
+                className="sticky left-0 z-20 flex-shrink-0 border-r border-slate-200 bg-slate-50 px-2 py-2 text-xs font-medium text-slate-500"
+                style={{ width: statusZoneWidth }}
+              >
+                Status
+              </div>
+            )}
             <div
-              className="sticky left-0 z-20 flex-shrink-0 border-r border-slate-200 bg-slate-50 px-2 py-2 text-xs font-medium text-slate-500"
-              style={{ width: zone1Width }}
+              className="sticky z-20 flex-shrink-0 border-r border-slate-200 bg-slate-50 px-2 py-2 text-xs font-medium text-slate-500"
+              style={{ width: zone1Width, left: statusZoneWidth }}
             >
               Task
             </div>
@@ -242,11 +259,11 @@ export function GanttChart() {
               minDate={minDate}
               totalDays={days.length}
               pxPerDay={pxPerDay}
-              zone1Width={zone1Width}
+              timelineStartX={timelineStartX}
               visibleDays={visibleDays}
             />
-            <HierarchyConnectors items={sortedItems} minDate={minDate} pxPerDay={pxPerDay} zone1Width={zone1Width} />
-            <DependencyConnectors items={sortedItems} minDate={minDate} pxPerDay={pxPerDay} zone1Width={zone1Width} />
+            <HierarchyConnectors items={sortedItems} minDate={minDate} pxPerDay={pxPerDay} timelineStartX={timelineStartX} />
+            <DependencyConnectors items={sortedItems} minDate={minDate} pxPerDay={pxPerDay} timelineStartX={timelineStartX} />
             {sortedItems.map((item) => {
               const isPopupOpen = popupDraft?.taskId === item.id;
               return (
@@ -257,6 +274,7 @@ export function GanttChart() {
                   pxPerDay={pxPerDay}
                   timelineWidth={timelineWidth}
                   zone1Width={zone1Width}
+                  statusZoneWidth={statusZoneWidth}
                   zone3Width={zone3Width}
                   isPopupOpen={isPopupOpen}
                   popupRef={popupRef}

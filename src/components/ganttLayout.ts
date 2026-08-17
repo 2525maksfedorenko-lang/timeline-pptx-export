@@ -12,6 +12,11 @@ export const MIN_ZONE1_WIDTH_PX = 160;
 // Four 16px icon slots + their gaps + the zone's own padding, with a little
 // slack — no wider, so no dead space opens up on its left edge.
 export const ZONE3_WIDTH_PX = 104;
+// Zone 0, the status column: wide enough for the longest status chip
+// ("In progress" at 11px plus the chip's padding and its caret) and no
+// wider, since every pixel here comes straight out of the timeline. Fixed,
+// like zone 3 — a status chip is exactly as wide whatever the task.
+export const STATUS_ZONE_WIDTH_PX = 118;
 
 // Phone-sized viewports (see useIsMobile) get their own pair of widths: the
 // two fixed zones are chrome, and on a 375px screen the desktop pair would
