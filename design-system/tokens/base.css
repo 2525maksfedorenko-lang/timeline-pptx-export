@@ -1,0 +1,5 @@
+body{margin:0;font-family:var(--font-sans);font-size:var(--text-sm);line-height:var(--leading-sm);background:hsl(var(--background));color:hsl(var(--foreground));-webkit-font-smoothing:antialiased}
+*,*::before,*::after{box-sizing:border-box;border-color:hsl(var(--border))}
+a{color:hsl(var(--primary));text-underline-offset:4px;text-decoration:none}
+a:hover{text-decoration:underline}
+.dark a{color:hsl(var(--foreground))}

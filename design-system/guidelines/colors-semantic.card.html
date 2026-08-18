@@ -1,0 +1,14 @@
+<!-- @dsCard group="Colors" viewport="700x120" name="Semantic status" subtitle="on track / delayed / done chips and the active-inactive dots" -->
+<!doctype html><html lang="en"><head><meta charset="utf-8"><link rel="stylesheet" href="../styles.css"><style>body{margin:0;padding:14px;background:hsl(var(--background));font-family:var(--font-sans);color:hsl(var(--foreground))}.row{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}.sw{width:96px}.chip{height:52px;border-radius:var(--radius-md);border:1px solid hsl(var(--border))}.n{font-size:11px;font-weight:600;margin-top:5px}.v{font-size:10px;color:hsl(var(--muted-foreground));font-family:var(--font-mono)}</style></head><body>
+<div class="row" style="align-items:center">
+  <span style="background:var(--status-ontrack-bg);color:var(--status-ontrack-fg);border-radius:var(--radius-md);padding:4px 8px;font-size:12px">on track</span>
+  <span style="background:var(--status-delayed-bg);color:var(--status-delayed-fg);border-radius:var(--radius-md);padding:4px 8px;font-size:12px">delayed</span>
+  <span style="background:var(--status-ontrack-bg);color:var(--status-ontrack-fg);border-radius:var(--radius-md);padding:4px 8px;font-size:12px">done</span>
+  <span style="background:var(--status-neutral-bg);color:var(--status-neutral-fg);border-radius:var(--radius-md);padding:4px 8px;font-size:12px">no status</span>
+  <span style="display:inline-flex;align-items:center;gap:8px;font-size:14px"><span style="height:8px;width:8px;border-radius:9999px;background:var(--status-active-dot)"></span>Active</span>
+  <span style="display:inline-flex;align-items:center;gap:8px;font-size:14px"><span style="height:8px;width:8px;border-radius:9999px;background:var(--status-inactive-dot)"></span>Inactive</span>
+  <span style="display:inline-flex;align-items:center;gap:6px;border-radius:9999px;background:var(--badge-live-bg);color:var(--badge-live-fg);padding:2px 8px;font-size:11px;font-weight:500"><span style="height:6px;width:6px;border-radius:9999px;background:var(--badge-live-dot)"></span>Active</span>
+  <span style="background:hsl(var(--destructive));color:hsl(var(--destructive-foreground));border-radius:var(--radius-md);padding:4px 8px;font-size:12px">destructive</span>
+</div>
+<div class="v" style="margin-top:10px">--status-*-bg / --status-*-fg · exact Tailwind green-100/800, red-100/800, gray-100/800 the product resolves to</div>
+</body></html>

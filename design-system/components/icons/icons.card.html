@@ -1,0 +1,27 @@
+<!-- @dsCard group="Components" viewport="700x150" name="Icons" subtitle="lucide 0.436 — the product's only icon system" -->
+<!doctype html><html lang="en"><head><meta charset="utf-8"><link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>body{margin:0;padding:16px;background:hsl(var(--background))}.row{display:flex;flex-wrap:wrap;align-items:center;gap:10px}.col{display:flex;flex-direction:column;gap:10px}.lbl{font-size:11px;color:hsl(var(--muted-foreground));text-transform:uppercase;letter-spacing:.06em}</style></head><body><div id="root"></div>
+<script type="text/babel">
+const { Icon } = window.AicooCoordinatorDesignSystem_42e5f1;
+const NAMES = ["layout-dashboard","folder-kanban","message-square","hash","book-open","boxes","calendar","chevron-right","chevrons-up-down","plus","search","settings","shield-check","user-circle","log-out","help-circle","languages","sun","moon","monitor","mail","mic-2","plug","users","grip-vertical","pen-square","archive","alert-circle","clock","clipboard-edit","refresh-cw","milestone","file-plus","check","x"];
+function Demo(){return (
+<div className="col">
+  <div className="row" style={{gap:14}}>
+    {NAMES.map(n => <Icon key={n} name={n} size={20} color="hsl(var(--foreground))" />)}
+  </div>
+  <div className="row" style={{gap:18,paddingTop:6,borderTop:"1px solid hsl(var(--border))"}}>
+    <span className="lbl">16 / 20 / 14</span>
+    <Icon name="folder-kanban" size={16} /><Icon name="folder-kanban" size={20} /><Icon name="folder-kanban" size={14} />
+    <span className="lbl">vendor marks</span>
+    <img src="../../assets/slack-logo.svg" style={{height:18}} alt="Slack" />
+    <img src="../../assets/teams-logo.svg" style={{height:18}} alt="Teams" />
+    <img src="../../assets/sembly-ai-logo.svg" style={{height:18}} alt="Sembly AI" />
+  </div>
+</div>)}
+ReactDOM.createRoot(document.getElementById("root")).render(<Demo />);
+</script></body></html>

@@ -1,0 +1,11 @@
+<!-- @dsCard group="Brand" viewport="700x160" name="Interaction states" subtitle="Hover, selected, focus, disabled — colour changes only, no transforms" -->
+<!doctype html><html lang="en"><head><meta charset="utf-8"><link rel="stylesheet" href="../styles.css"><style>body{margin:0;padding:14px;background:hsl(var(--background));font-family:var(--font-sans);color:hsl(var(--foreground))}.row{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}.sw{width:96px}.chip{height:52px;border-radius:var(--radius-md);border:1px solid hsl(var(--border))}.n{font-size:11px;font-weight:600;margin-top:5px}.v{font-size:10px;color:hsl(var(--muted-foreground));font-family:var(--font-mono)}</style></head><body>
+<div class="row" style="align-items:stretch;gap:10px">
+<div style="width:150px;border:1px solid hsl(var(--border));border-radius:var(--radius-lg);background:hsl(var(--card));padding:12px;font-size:12px;box-shadow:var(--shadow-sm)">rest<br><span class="v">card / shadow-sm</span></div>
+<div style="width:150px;border:1px solid hsl(var(--border));border-radius:var(--radius-lg);background:hsl(var(--muted) / .5);padding:12px;font-size:12px;box-shadow:var(--shadow-md)">hover<br><span class="v">muted/50 + shadow-md</span></div>
+<div style="width:150px;border:1px solid hsl(var(--primary));border-radius:var(--radius-lg);background:hsl(var(--card));padding:12px;font-size:12px;box-shadow:0 0 0 2px hsl(var(--primary) / .2)">selected<br><span class="v">primary border + ring/20</span></div>
+<div style="width:150px;border:1px solid hsl(var(--input));border-radius:var(--radius-md);padding:12px;font-size:12px;outline:2px solid hsl(var(--ring));outline-offset:2px">focus-visible<br><span class="v">2px ring, offset 2</span></div>
+<div style="width:150px;border:1px solid hsl(var(--input));border-radius:var(--radius-md);padding:12px;font-size:12px;opacity:.5">disabled<br><span class="v">opacity .5</span></div>
+</div>
+<div class="v" style="margin-top:10px">Primary fills darken to /0.9 on hover, secondary to /0.8. Ghost and outline fill with --accent. Nothing scales or bounces; transitions are 150ms colour-only.</div>
+</body></html>

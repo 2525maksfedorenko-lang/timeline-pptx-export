@@ -1,0 +1,40 @@
+<svg width="684" height="684" viewBox="0 0 684 684" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="AICOO logo">
+  <g fill="none" stroke="#EBF0F5" stroke-width="19">
+    <path d="M42 342 A300 300 0 0 1 192 82.192379"></path>
+    <path d="M492 82.192379 A300 300 0 0 1 642 342"></path>
+    <path d="M492 601.807621 A300 300 0 0 1 192 601.807621"></path>
+    <line x1="42" y1="342" x2="642" y2="342"></line>
+    <line x1="192" y1="82.192379" x2="492" y2="601.807621"></line>
+    <line x1="492" y1="82.192379" x2="192" y2="601.807621"></line>
+    <line x1="192" y1="82.192379" x2="642" y2="342"></line>
+    <line x1="642" y1="342" x2="192" y2="601.807621"></line>
+    <line x1="192" y1="601.807621" x2="192" y2="82.192379"></line>
+  </g>
+  <g fill="#EBF0F5">
+    <circle cx="42" cy="342" r="42"></circle>
+    <circle cx="192" cy="82.192379" r="42"></circle>
+    <circle cx="492" cy="82.192379" r="42"></circle>
+    <circle cx="642" cy="342" r="42"></circle>
+    <circle cx="492" cy="601.807621" r="42"></circle>
+    <circle cx="192" cy="601.807621" r="42"></circle>
+  </g>
+  <g fill="none" stroke="#1E2A38" stroke-width="15">
+    <path d="M42 342 A300 300 0 0 1 192 82.192379"></path>
+    <path d="M492 82.192379 A300 300 0 0 1 642 342"></path>
+    <path d="M492 601.807621 A300 300 0 0 1 192 601.807621"></path>
+    <line x1="42" y1="342" x2="642" y2="342"></line>
+    <line x1="192" y1="82.192379" x2="492" y2="601.807621"></line>
+    <line x1="492" y1="82.192379" x2="192" y2="601.807621"></line>
+    <line x1="192" y1="82.192379" x2="642" y2="342"></line>
+    <line x1="642" y1="342" x2="192" y2="601.807621"></line>
+    <line x1="192" y1="601.807621" x2="192" y2="82.192379"></line>
+  </g>
+  <g fill="#1E2A38">
+    <circle cx="42" cy="342" r="40"></circle>
+    <circle cx="192" cy="82.192379" r="40"></circle>
+    <circle cx="492" cy="82.192379" r="40"></circle>
+    <circle cx="642" cy="342" r="40"></circle>
+    <circle cx="492" cy="601.807621" r="40"></circle>
+    <circle cx="192" cy="601.807621" r="40"></circle>
+  </g>
+</svg>

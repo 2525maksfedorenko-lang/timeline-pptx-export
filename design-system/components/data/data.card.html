@@ -1,0 +1,40 @@
+<!-- @dsCard group="Components" viewport="700x300" name="Data" subtitle="Table with status chips, due dates and progress" -->
+<!doctype html><html lang="en"><head><meta charset="utf-8"><link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>body{margin:0;padding:16px;background:hsl(var(--background))}.row{display:flex;flex-wrap:wrap;align-items:center;gap:10px}.col{display:flex;flex-direction:column;gap:10px}.lbl{font-size:11px;color:hsl(var(--muted-foreground));text-transform:uppercase;letter-spacing:.06em}</style></head><body><div id="root"></div>
+<script type="text/babel">
+const { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, Progress, Button, Icon } = window.AicooCoordinatorDesignSystem_42e5f1;
+const rows = [
+  { title:"Rollout DACH", active:true, status:"on track", due:"Sep 30, 2026", progress:64 },
+  { title:"Warehouse migration Phase 2", active:true, status:"delayed", due:"Aug 14, 2026", progress:38 },
+  { title:"Supplier onboarding", active:false, status:"done", due:"Jul 01, 2026", progress:100 },
+];
+const chip = (s) => s === "delayed"
+  ? { background:"var(--status-delayed-bg)", color:"var(--status-delayed-fg)" }
+  : { background:"var(--status-ontrack-bg)", color:"var(--status-ontrack-fg)" };
+function Demo(){return (
+<div style={{borderRadius:"var(--radius-md)",border:"1px solid hsl(var(--border))",background:"hsl(var(--card))",padding:8}}>
+  <Table>
+    <TableHeader><TableRow>
+      <TableHead>Project name</TableHead><TableHead>Assistant active</TableHead><TableHead>Status</TableHead><TableHead>Due date</TableHead><TableHead>Progress</TableHead><TableHead />
+    </TableRow></TableHeader>
+    <TableBody>
+      {rows.map(r => (
+        <TableRow key={r.title} clickable>
+          <TableCell>{r.title}</TableCell>
+          <TableCell><span style={{display:"inline-flex",alignItems:"center",gap:8}}><span style={{height:8,width:8,borderRadius:"var(--radius-full)",background:r.active?"var(--status-active-dot)":"var(--status-inactive-dot)"}} />{r.active?"Active":"Inactive"}</span></TableCell>
+          <TableCell><span style={{padding:"4px 8px",fontSize:"var(--text-xs)",borderRadius:"var(--radius-md)",...chip(r.status)}}>{r.status}</span></TableCell>
+          <TableCell><span style={{display:"inline-flex",alignItems:"center",gap:6}}><Icon name="calendar" color="hsl(var(--muted-foreground))" />{r.due}</span></TableCell>
+          <TableCell><span style={{display:"inline-flex",alignItems:"center",gap:8,width:180}}><span style={{fontSize:"var(--text-sm)",color:"hsl(var(--muted-foreground))",width:40}}>{r.progress}%</span><Progress value={r.progress} style={{height:8}} /></span></TableCell>
+          <TableCell style={{textAlign:"right"}}><Button variant="ghost" size="icon"><Icon name="ellipsis-vertical" /></Button></TableCell>
+        </TableRow>
+      ))}
+    </TableBody>
+  </Table>
+</div>)}
+ReactDOM.createRoot(document.getElementById("root")).render(<Demo />);
+</script></body></html>

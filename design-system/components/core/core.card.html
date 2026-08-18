@@ -1,0 +1,55 @@
+<!-- @dsCard group="Components" viewport="700x240" name="Core" subtitle="Button, Badge, Card, Progress, Separator, Skeleton, Link" -->
+<!doctype html><html lang="en"><head><meta charset="utf-8"><link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>body{margin:0;padding:16px;background:hsl(var(--background))}.row{display:flex;flex-wrap:wrap;align-items:center;gap:10px}.col{display:flex;flex-direction:column;gap:10px}.lbl{font-size:11px;color:hsl(var(--muted-foreground));text-transform:uppercase;letter-spacing:.06em}</style></head><body><div id="root"></div>
+<script type="text/babel">
+const { Button, Badge, Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter, Progress, Separator, Skeleton, Link, Icon } = window.AicooCoordinatorDesignSystem_42e5f1;
+function Demo(){return (
+<div className="col" style={{gap:14}}>
+  <div className="row">
+    <Button>Create</Button>
+    <Button variant="secondary">Secondary</Button>
+    <Button variant="outline">Load more</Button>
+    <Button variant="ghost">Ghost</Button>
+    <Button variant="destructive">Delete</Button>
+    <Button variant="link">Forgot password?</Button>
+    <Button disabled>Disabled</Button>
+  </div>
+  <div className="row">
+    <Button size="sm">Small 36</Button>
+    <Button>Default 40</Button>
+    <Button size="lg">Large 44</Button>
+    <Button size="icon"><Icon name="plus" /></Button>
+    <Button><Icon name="plus" />New channel</Button>
+    <Separator orientation="vertical" style={{height:24}} />
+    <Badge>3</Badge>
+    <Badge variant="secondary">12</Badge>
+    <Badge variant="destructive">Overdue</Badge>
+    <Badge variant="outline" style={{fontSize:"var(--text-2xs)"}}>Archived</Badge>
+    <Badge variant="outline" style={{background:"var(--kanban-8-bg)",color:"var(--kanban-8-fg)",borderColor:"var(--kanban-8-border)"}}>Proposed</Badge>
+  </div>
+  <div className="row" style={{alignItems:"stretch"}}>
+    <Card style={{width:260}}>
+      <CardHeader style={{padding:"16px 16px 8px"}}><CardTitle style={{fontSize:"var(--text-sm)",fontWeight:500}}>Delayed Tasks</CardTitle></CardHeader>
+      <CardContent style={{padding:"0 16px 16px"}}>
+        <div style={{fontSize:"var(--text-2xl)",fontWeight:700}}>7</div>
+        <p style={{margin:0,fontSize:"var(--text-xs)",color:"hsl(var(--muted-foreground))"}}>Tasks past their due date</p>
+      </CardContent>
+    </Card>
+    <Card style={{width:200,borderStyle:"dashed",boxShadow:"none",padding:12,display:"flex",alignItems:"center",gap:8}}>
+      <span style={{display:"inline-flex",alignItems:"center",justifyContent:"center",height:24,width:24,borderRadius:"var(--radius-full)",background:"hsl(var(--primary) / 0.1)",color:"hsl(var(--primary))"}}><Icon name="plus" size={14} /></span>
+      <span style={{fontSize:"var(--text-sm)",fontWeight:500}}>Add project</span>
+    </Card>
+    <div className="col" style={{width:180,justifyContent:"center"}}>
+      <Progress value={64} style={{height:8}} />
+      <Skeleton style={{height:14,width:"75%"}} />
+      <Link href="#">Sign up</Link>
+    </div>
+  </div>
+</div>)}
+ReactDOM.createRoot(document.getElementById("root")).render(<Demo />);
+</script></body></html>

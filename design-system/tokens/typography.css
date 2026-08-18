@@ -1,0 +1,27 @@
+/* Type scale = Tailwind defaults as used across the product.
+   Body copy is text-sm (14px); page titles text-lg semibold; KPI numbers text-2xl bold. */
+:root{
+  --text-2xs:10px;      --leading-2xs:14px;   /* micro badges, counts */
+  --text-xs:12px;       --leading-xs:16px;    /* meta, table meta, badges */
+  --text-13:13px;       --leading-13:18px;    /* sidebar sub-items */
+  --text-sm:14px;       --leading-sm:20px;    /* DEFAULT body / controls */
+  --text-base:16px;     --leading-base:24px;
+  --text-lg:18px;       --leading-lg:28px;    /* page + dialog titles */
+  --text-xl:20px;       --leading-xl:28px;
+  --text-2xl:24px;      --leading-2xl:32px;   /* CardTitle, KPI value */
+  --text-3xl:30px;      --leading-3xl:36px;
+  --text-4xl:36px;      --leading-4xl:40px;
+
+  --font-weight-normal:400;
+  --font-weight-medium:500;
+  --font-weight-semibold:600;
+  --font-weight-bold:700;
+
+  --tracking-tight:-0.025em;
+  --tracking-widest:0.1em;
+
+  --text-body:var(--text-sm);
+  --text-title-page:var(--text-lg);
+  --text-title-card:var(--text-2xl);
+  --text-meta:var(--text-xs);
+}

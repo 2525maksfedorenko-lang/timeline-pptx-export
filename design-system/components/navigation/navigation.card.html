@@ -1,0 +1,77 @@
+<!-- @dsCard group="Components" viewport="700x400" name="Navigation" subtitle="Sidebar, Tabs, NavigationMenu, Accordion, Collapsible, ScrollArea" -->
+<!doctype html><html lang="en"><head><meta charset="utf-8"><link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>body{margin:0;padding:16px;background:hsl(var(--background))}.row{display:flex;flex-wrap:wrap;align-items:center;gap:10px}.col{display:flex;flex-direction:column;gap:10px}.lbl{font-size:11px;color:hsl(var(--muted-foreground));text-transform:uppercase;letter-spacing:.06em}</style></head><body><div id="root"></div>
+<script type="text/babel">
+const { Sidebar, SidebarHeader, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarMenuSub, SidebarMenuSubButton, Tabs, NavigationMenu, Accordion, Collapsible, ScrollArea, Icon, Badge } = window.AicooCoordinatorDesignSystem_42e5f1;
+function Demo(){return (
+<div style={{display:"grid",gridTemplateColumns:"288px 1fr",gap:18,height:352}}>
+  <div style={{height:"100%",border:"1px solid hsl(var(--border))",borderRadius:"var(--radius-md)",overflow:"hidden"}}>
+    <Sidebar style={{width:"100%",height:"100%",borderRight:"none"}}>
+      <SidebarHeader><img src="../../assets/aicoo-logo-orbit-lightblue-text.svg" alt="aicoo" style={{height:28}} /></SidebarHeader>
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>Workspaces</SidebarGroupLabel>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton size="lg" icon={<span style={{display:"inline-flex",alignItems:"center",justifyContent:"center",height:32,width:32,borderRadius:"var(--radius-lg)",background:"#3b82f6",fontSize:12,fontWeight:600}}>AG</span>} trailing={<Icon name="chevrons-up-down" size={14} />}>
+                <span style={{display:"grid"}}><span style={{fontWeight:600}}>Acme GmbH</span><span style={{fontSize:"var(--text-xs)",opacity:.75}}>Active</span></span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupLabel>Platform</SidebarGroupLabel>
+          <SidebarMenu>
+            <SidebarMenuItem><SidebarMenuButton size="sm" isActive icon={<Icon name="layout-dashboard" />}>Dashboard</SidebarMenuButton></SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton size="sm" icon={<Icon name="folder-kanban" />} trailing={<Icon name="chevron-right" size={14} style={{transform:"rotate(90deg)"}} />}>Projects</SidebarMenuButton>
+              <SidebarMenuSub>
+                <li><SidebarMenuSubButton icon={<Icon name="calendar" size={14} />}>Rollout DACH · Plan</SidebarMenuSubButton></li>
+                <li><SidebarMenuSubButton depth={1} icon={<Icon name="book-open" size={14} />}>Wiki</SidebarMenuSubButton></li>
+              </SidebarMenuSub>
+            </SidebarMenuItem>
+            <SidebarMenuItem><SidebarMenuButton size="sm" icon={<Icon name="message-square" />} trailing={<Icon name="chevron-right" size={14} />}>Communication</SidebarMenuButton></SidebarMenuItem>
+            <SidebarMenuItem><SidebarMenuButton size="sm" icon={<Icon name="book-open" />}>Wiki</SidebarMenuButton></SidebarMenuItem>
+            <SidebarMenuItem><SidebarMenuButton size="sm" icon={<Icon name="boxes" />}>Resources</SidebarMenuButton></SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroup>
+      </SidebarContent>
+      <SidebarFooter>
+        <SidebarMenu>
+          <SidebarMenuItem><SidebarMenuButton icon={<Icon name="sun" />}>Appearance</SidebarMenuButton></SidebarMenuItem>
+          <SidebarMenuItem><SidebarMenuButton icon={<Icon name="languages" />} trailing={<span style={{fontSize:"var(--text-xs)",opacity:.7,textTransform:"uppercase"}}>en</span>}>Language</SidebarMenuButton></SidebarMenuItem>
+          <SidebarMenuItem><SidebarMenuButton size="lg" icon={<Icon name="user-circle" />} trailing={<Icon name="chevrons-up-down" size={14} />}>Maria Lang</SidebarMenuButton></SidebarMenuItem>
+          <SidebarMenuItem><SidebarMenuButton icon={<Icon name="help-circle" />}>Help &amp; Support</SidebarMenuButton></SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
+    </Sidebar>
+  </div>
+  <div className="col" style={{gap:16}}>
+    <div className="col" style={{gap:6}}><span className="lbl">Tabs</span>
+      <Tabs defaultValue="active" tabs={[{value:"active",label:"Active"},{value:"archived",label:"Archived"}]} />
+    </div>
+    <div className="col" style={{gap:6}}><span className="lbl">NavigationMenu</span>
+      <NavigationMenu activeValue="start" items={[{value:"start",label:"Start",icon:<Icon name="layout-dashboard" />},{value:"settings",label:"Settings",icon:<Icon name="settings" />},{value:"admin",label:"Admin",icon:<Icon name="shield-check" />}]} />
+    </div>
+    <div className="col" style={{gap:6}}><span className="lbl">Collapsible + Accordion + ScrollArea</span>
+      <Collapsible defaultOpen trigger={(open)=>(
+        <div className="row" style={{justifyContent:"space-between"}}>
+          <span style={{fontSize:"var(--text-lg)",fontWeight:600}}>Key Performance Indicators</span>
+          <span className="row" style={{gap:6,fontSize:"var(--text-sm)",color:"hsl(var(--muted-foreground))"}}>{open?"Hide":"Show"}<Icon name="chevron-down" size={14} style={{transform:open?"rotate(180deg)":"none"}} /></span>
+        </div>)}>
+        <ScrollArea style={{maxHeight:120,border:"1px solid hsl(var(--border))",borderRadius:"var(--radius-md)",padding:"0 12px"}}>
+          <Accordion defaultOpenValue="a" items={[
+            {value:"a",title:"How are proposals generated?",content:"Channel events are analysed and proposed as task updates."},
+            {value:"b",title:"What counts as a delayed project?",content:"Projects whose ETC falls beyond the deadline."}]} />
+        </ScrollArea>
+      </Collapsible>
+    </div>
+  </div>
+</div>)}
+ReactDOM.createRoot(document.getElementById("root")).render(<Demo />);
+</script></body></html>

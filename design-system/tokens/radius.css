@@ -1,0 +1,9 @@
+/* One source radius var; everything else derives from it (tailwind.config.js). */
+:root{
+  --radius:0.5rem;
+  --radius-lg:var(--radius);                 /* 8px  — Card, Button, Input, Dialog */
+  --radius-md:calc(var(--radius) - 2px);     /* 6px  — menu items, chips */
+  --radius-sm:calc(var(--radius) - 4px);     /* 4px  — checkbox, select item */
+  --radius-xl:0.75rem;                       /* 12px — ChannelCard / WikiCard */
+  --radius-full:9999px;                      /* Badge, Switch, Progress, avatars */
+}

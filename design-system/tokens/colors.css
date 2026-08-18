@@ -1,0 +1,112 @@
+/* Ported verbatim from frontend/src/globals.css (:root and .dark).
+   IMPORTANT: --token values are RAW HSL COMPONENTS, exactly as upstream.
+   Use hsl(var(--primary)) — never var(--primary) alone.
+   Every token also has a resolved --color-* twin for convenience. */
+:root{
+  --nav-background:212 30% 17%; /* @kind color */
+  --nav-foreground:210 33% 94%; /* @kind color */
+  --nav-hover:212 30% 25%; /* @kind color */
+  --background:0 0% 100%; /* @kind color */
+  --base-background:210 33% 94%; /* @kind color */
+  --foreground:0 0% 3.9%; /* @kind color */
+  --card:0 0% 100%; /* @kind color */
+  --card-foreground:0 0% 3.9%; /* @kind color */
+  --popover:0 0% 100%; /* @kind color */
+  --popover-foreground:0 0% 3.9%; /* @kind color */
+  --primary:212 30% 17%; /* @kind color */
+  --primary-foreground:210 33% 94%; /* @kind color */
+  --secondary:0 0% 96.1%; /* @kind color */
+  --secondary-foreground:0 0% 9%; /* @kind color */
+  --muted:0 0% 96.1%; /* @kind color */
+  --muted-foreground:0 0% 45.1%; /* @kind color */
+  --accent:0 0% 96.1%; /* @kind color */
+  --accent-foreground:0 0% 9%; /* @kind color */
+  --destructive:0 84.2% 60.2%; /* @kind color */
+  --destructive-foreground:0 0% 98%; /* @kind color */
+  --border:0 0% 89.8%; /* @kind color */
+  --input:0 0% 89.8%; /* @kind color */
+  --ring:0 0% 3.9%; /* @kind color */
+  --chart-1:12 76% 61%; /* @kind color */
+  --chart-2:173 58% 39%; /* @kind color */
+  --chart-3:197 37% 24%; /* @kind color */
+  --chart-4:43 74% 66%; /* @kind color */
+  --chart-5:27 87% 67%; /* @kind color */
+  --sidebar-background:212 30% 17%; /* @kind color */
+  --sidebar-foreground:210 33% 94%; /* @kind color */
+  --sidebar-primary:212 30% 17%; /* @kind color */
+  --sidebar-primary-foreground:210 33% 94%; /* @kind color */
+  --sidebar-accent:212 30% 25%; /* @kind color */
+  --sidebar-accent-foreground:210 33% 94%; /* @kind color */
+  --sidebar-border:0 0% 89.8%; /* @kind color */
+  --sidebar-ring:0 0% 3.9%; /* @kind color */
+
+  --color-background:hsl(var(--background));
+  --color-base-background:hsl(var(--base-background));
+  --color-foreground:hsl(var(--foreground));
+  --color-card:hsl(var(--card));
+  --color-card-foreground:hsl(var(--card-foreground));
+  --color-popover:hsl(var(--popover));
+  --color-popover-foreground:hsl(var(--popover-foreground));
+  --color-primary:hsl(var(--primary));
+  --color-primary-foreground:hsl(var(--primary-foreground));
+  --color-secondary:hsl(var(--secondary));
+  --color-secondary-foreground:hsl(var(--secondary-foreground));
+  --color-muted:hsl(var(--muted));
+  --color-muted-foreground:hsl(var(--muted-foreground));
+  --color-accent:hsl(var(--accent));
+  --color-accent-foreground:hsl(var(--accent-foreground));
+  --color-destructive:hsl(var(--destructive));
+  --color-destructive-foreground:hsl(var(--destructive-foreground));
+  --color-border:hsl(var(--border));
+  --color-input:hsl(var(--input));
+  --color-ring:hsl(var(--ring));
+  --color-sidebar:hsl(var(--sidebar-background));
+  --color-sidebar-foreground:hsl(var(--sidebar-foreground));
+  --color-sidebar-accent:hsl(var(--sidebar-accent));
+  --color-sidebar-border:hsl(var(--sidebar-border));
+  --color-nav-background:hsl(var(--nav-background));
+  --color-nav-hover:hsl(var(--nav-hover));
+  --color-chart-1:hsl(var(--chart-1));
+  --color-chart-2:hsl(var(--chart-2));
+  --color-chart-3:hsl(var(--chart-3));
+  --color-chart-4:hsl(var(--chart-4));
+  --color-chart-5:hsl(var(--chart-5));
+}
+.dark{
+  --nav-background:212 22% 8%; /* @kind color */
+  --nav-foreground:0 0% 98%; /* @kind color */
+  --nav-hover:212 22% 15%; /* @kind color */
+  --background:212 30% 11%; /* @kind color */
+  --base-background:212 30% 11%; /* @kind color */
+  --foreground:0 0% 98%; /* @kind color */
+  --card:212 22% 8%; /* @kind color */
+  --card-foreground:0 0% 98%; /* @kind color */
+  --popover:0 0% 2%; /* @kind color */
+  --popover-foreground:0 0% 98%; /* @kind color */
+  --primary:0 0% 98%; /* @kind color */
+  --primary-foreground:0 0% 9%; /* @kind color */
+  --secondary:212 22% 3%; /* @kind color */
+  --secondary-foreground:0 0% 98%; /* @kind color */
+  --muted:212 22% 3%; /* @kind color */
+  --muted-foreground:0 0% 63.9%; /* @kind color */
+  --accent:212 22% 25%; /* @kind color */
+  --accent-foreground:0 0% 98%; /* @kind color */
+  --destructive:0 62.8% 30.6%; /* @kind color */
+  --destructive-foreground:0 0% 98%; /* @kind color */
+  --border:212 22% 25%; /* @kind color */
+  --input:212 22% 3%; /* @kind color */
+  --ring:0 0% 83.1%; /* @kind color */
+  --chart-1:220 70% 50%; /* @kind color */
+  --chart-2:160 60% 45%; /* @kind color */
+  --chart-3:30 80% 55%; /* @kind color */
+  --chart-4:280 65% 60%; /* @kind color */
+  --chart-5:340 75% 55%; /* @kind color */
+  --sidebar-background:212 22% 8%; /* @kind color */
+  --sidebar-foreground:0 0% 98%; /* @kind color */
+  --sidebar-primary:0 0% 98%; /* @kind color */
+  --sidebar-primary-foreground:0 0% 9%; /* @kind color */
+  --sidebar-accent:212 22% 15%; /* @kind color */
+  --sidebar-accent-foreground:0 0% 98%; /* @kind color */
+  --sidebar-border:212 22% 25%; /* @kind color */
+  --sidebar-ring:0 0% 83.1%; /* @kind color */
+}

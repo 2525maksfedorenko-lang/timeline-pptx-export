@@ -1,0 +1,6 @@
+/* No @font-face in the source product: aicoo Coordinator ships the platform UI stack
+   (Tailwind's default `font-sans`). Do not substitute a webfont. */
+:root{
+  --font-sans:ui-sans-serif,system-ui,sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol","Noto Color Emoji";
+  --font-mono:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
+}

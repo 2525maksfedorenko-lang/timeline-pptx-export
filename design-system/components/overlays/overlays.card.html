@@ -1,0 +1,54 @@
+<!-- @dsCard group="Components" viewport="700x850" name="Overlays" subtitle="Dialog, AlertDialog, Sheet, Popover, DropdownMenu, Tooltip, ConfirmationPopover" -->
+<!doctype html><html lang="en"><head><meta charset="utf-8"><link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>body{margin:0;padding:16px;background:hsl(var(--background))}.row{display:flex;flex-wrap:wrap;align-items:center;gap:10px}.col{display:flex;flex-direction:column;gap:10px}.lbl{font-size:11px;color:hsl(var(--muted-foreground));text-transform:uppercase;letter-spacing:.06em}</style></head><body><div id="root"></div>
+<script type="text/babel">
+const { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogFooter, AlertDialog, Sheet, SheetHeader, SheetTitle, SheetDescription, Popover, DropdownMenu, Tooltip, ConfirmationPopover, Button, Input, Label, Icon } = window.AicooCoordinatorDesignSystem_42e5f1;
+const Frame = ({label, height=260, children}) => (
+  <div className="col" style={{gap:6}}>
+    <span className="lbl">{label}</span>
+    <div style={{position:"relative",height,border:"1px solid hsl(var(--border))",borderRadius:"var(--radius-md)",overflow:"hidden",background:"hsl(var(--base-background))"}}>{children}</div>
+  </div>
+);
+function Demo(){return (
+<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+  <Frame label="Dialog">
+    <Dialog open>
+      <DialogHeader><DialogTitle>Create wiki</DialogTitle><DialogDescription>Wikis attach to work items.</DialogDescription></DialogHeader>
+      <div className="col" style={{gap:6}}><Label>Title</Label><Input placeholder="Wiki title" /></div>
+      <DialogFooter><Button variant="outline">Cancel</Button><Button>Create</Button></DialogFooter>
+    </Dialog>
+  </Frame>
+  <Frame label="AlertDialog" height={230}>
+    <AlertDialog open title="Delete Project" confirmLabel="Delete" destructive description="All items associated with this project will also be permanently deleted. Are you sure? You will not be able to undo this action." />
+  </Frame>
+  <Frame label="Sheet (right)" height={230}>
+    <Sheet open side="right" width={280}>
+      <SheetHeader><SheetTitle>Onboarding DACH</SheetTitle><SheetDescription>2 linked work items</SheetDescription></SheetHeader>
+      <div style={{fontSize:"var(--text-sm)",color:"hsl(var(--muted-foreground))"}}>Revision history, access and page list live here.</div>
+    </Sheet>
+  </Frame>
+  <Frame label="DropdownMenu (open)" height={200}>
+    <div style={{padding:12}}>
+      <DropdownMenu defaultOpen minWidth={190} trigger={<Button variant="ghost" size="icon"><Icon name="ellipsis-vertical" /></Button>}
+        items={[{label:"Open Project Plan",value:"plan",icon:<Icon name="calendar" size={14} />},{label:"Open Kanban Board",value:"kanban",icon:<Icon name="folder-kanban" size={14} />},{separator:true},{label:"Delete",value:"del",icon:<Icon name="trash-2" size={14} />}]} />
+    </div>
+  </Frame>
+  <Frame label="Popover (open) · Tooltip (hover the icon button)" height={200}>
+    <div style={{padding:12,display:"flex",gap:12,alignItems:"flex-start",justifyContent:"space-between"}}>
+      <Popover defaultOpen align="start" width={200} trigger={<Button variant="outline">Filters</Button>}>
+        <div style={{fontSize:"var(--text-sm)"}}>Owner, source, status…</div>
+      </Popover>
+      <Tooltip content="Projects" side="bottom"><Button variant="outline" size="icon"><Icon name="folder-kanban" /></Button></Tooltip>
+    </div>
+  </Frame>
+  <Frame label="ConfirmationPopover (an AlertDialog, despite the name)" height={200}>
+    <ConfirmationPopover open title="Edit task" prompt="Delete this task?" />
+  </Frame>
+</div>)}
+ReactDOM.createRoot(document.getElementById("root")).render(<Demo />);
+</script></body></html>

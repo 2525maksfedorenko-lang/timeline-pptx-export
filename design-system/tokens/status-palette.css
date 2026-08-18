@@ -1,0 +1,40 @@
+/* Semantic status colours. The product paints statuses with Tailwind palette
+   utilities (bg-green-100 text-green-800 …), not with tokens; these are the exact
+   Tailwind v3 hexes it resolves to, named so designs stay consistent. */
+:root{
+  --status-ontrack-bg:#dcfce7;   /* green-100 */
+  --status-ontrack-fg:#166534;   /* green-800 */
+  --status-done-bg:#dcfce7;
+  --status-done-fg:#166534;
+  --status-delayed-bg:#fee2e2;   /* red-100 */
+  --status-delayed-fg:#991b1b;   /* red-800 */
+  --status-neutral-bg:#f3f4f6;   /* gray-100 */
+  --status-neutral-fg:#1f2937;   /* gray-800 */
+  --status-active-dot:#22c55e;   /* green-500 */
+  --status-inactive-dot:#ef4444; /* red-500 */
+  --status-issue:#f97316;        /* orange-500 */
+
+  /* Kanban status_type 1–8 chips */
+  --kanban-1-bg:#dbeafe; --kanban-1-fg:#1e40af; --kanban-1-border:#bfdbfe; /* blue */
+  --kanban-2-bg:#fef9c3; --kanban-2-fg:#854d0e; --kanban-2-border:#fef08a; /* yellow */
+  --kanban-3-bg:#dcfce7; --kanban-3-fg:#166534; --kanban-3-border:#bbf7d0; /* green */
+  --kanban-4-bg:#fee2e2; --kanban-4-fg:#991b1b; --kanban-4-border:#fecaca; /* red */
+  --kanban-5-bg:#ffedd5; --kanban-5-fg:#9a3412; --kanban-5-border:#fed7aa; /* orange */
+  --kanban-6-bg:#e0e7ff; --kanban-6-fg:#3730a3; --kanban-6-border:#c7d2fe; /* indigo */
+  --kanban-7-bg:#fce7f3; --kanban-7-fg:#9d174d; --kanban-7-border:#fbcfe8; /* pink */
+  --kanban-8-bg:#f3e8ff; --kanban-8-fg:#6b21a8; --kanban-8-border:#e9d5ff; /* purple */
+
+  /* Communication source colours (ChannelCard.SOURCE_COLOR) */
+  --source-slack-bg:#f3e8ff;   --source-slack-fg:#7e22ce;
+  --source-email-bg:#dbeafe;   --source-email-fg:#1d4ed8;
+  --source-sembly-bg:#ccfbf1;  --source-sembly-fg:#0f766e;
+  --source-recording-bg:#fef3c7;--source-recording-fg:#b45309;
+  --source-chat-bg:#d1fae5;    --source-chat-fg:#047857;
+  --source-wiki-bg:#e0e7ff;    --source-wiki-fg:#4338ca;
+
+  /* Workitem-kind accents */
+  --kind-project:#a855f7;  /* purple-500 */
+  --kind-phase:#d97706;    /* amber-600 */
+  --kind-task:#3b82f6;     /* blue-500 */
+  --badge-live-bg:#dcfce7; --badge-live-fg:#047857; --badge-live-dot:#10b981;
+}

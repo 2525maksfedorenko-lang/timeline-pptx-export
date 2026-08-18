@@ -1,0 +1,14 @@
+/* Tailwind shadow scale, used sparingly: cards rest at shadow-sm and lift to
+   shadow-md on hover; popovers/menus shadow-md; dialogs shadow-lg. No inner shadows. */
+:root{
+  --shadow-sm:0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow:0 1px 3px 0 rgb(0 0 0 / 0.1),0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-md:0 4px 6px -1px rgb(0 0 0 / 0.1),0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg:0 10px 15px -3px rgb(0 0 0 / 0.1),0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --overlay-scrim:rgb(0 0 0 / 0.8);
+  --focus-ring-width:2px;
+  --focus-ring-offset:2px;
+  --selection-ring-project:0 0 0 2px rgba(168,85,247,0.35),0 0 16px 4px rgba(168,85,247,0.28);
+  --selection-ring-phase:0 0 0 2px rgba(245,158,11,0.35),0 0 16px 4px rgba(245,158,11,0.28);
+  --selection-ring-task:0 0 0 2px rgba(59,130,246,0.35),0 0 16px 4px rgba(59,130,246,0.28);
+}
