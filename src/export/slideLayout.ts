@@ -106,6 +106,47 @@ export const AXIS_WEEK_FONT_SIZE_PT = 7;
 // Clear space kept between two neighbouring axis captions.
 export const AXIS_LABEL_GAP_IN = 0.08;
 
+// --- Overview slide: three fixed zones ---------------------------------------
+// The on-screen chart is a fixed Status column, a fixed Task column, then the
+// timeline; the slide is laid out the same way so a deck reads top-to-bottom
+// like the app instead of having each task's name chase its own bar around.
+// Both exporters take these from here, which is what keeps the two identical.
+//
+// Widths were measured, not guessed (see textMetrics.ts):
+//   - the widest status label, "in progress", is 0.678in at
+//     BAR_STATUS_FONT_SIZE_PT with STATUS_LETTER_SPACING_EM tracking. The chip
+//     around it needs 0.818in, so a 0.95in column clears it with slack.
+//   - a task name averages 0.110in per glyph at BAR_LABEL_FONT_SIZE_PT, so
+//     2.35in holds roughly 21 characters before the ellipsis (see
+//     labelWidth/truncateToWidth in timelineExportModel.ts).
+export const STATUS_COL_WIDTH_IN = 0.95;
+export const TASK_COL_WIDTH_IN = 2.35;
+// Left padding inside either column, so no text sits on a column edge and
+// every row starts at the same x — the "same indent on every row" the columns
+// exist to give.
+export const COLUMN_TEXT_INSET_IN = 0.08;
+// Clear space around the divider, split evenly either side of it.
+export const TIMELINE_GUTTER_IN = 0.14;
+export const TIMELINE_X_IN =
+  CONTENT_X_IN + STATUS_COL_WIDTH_IN + TASK_COL_WIDTH_IN + TIMELINE_GUTTER_IN;
+export const TIMELINE_WIDTH_IN = CONTENT_X_IN + CONTENT_WIDTH_IN - TIMELINE_X_IN;
+// The vertical rule between the columns and the timeline, centred in the
+// gutter. Runs from the top of the header row to the bottom of the content
+// area, as the equivalent border does on screen.
+export const COLUMN_DIVIDER_X_IN = TIMELINE_X_IN - TIMELINE_GUTTER_IN / 2;
+export const COLUMN_DIVIDER_WIDTH_PT = 0.75;
+// Column headings ("Status", "Task") sit on the same line as the month
+// captions and at the same size, so the three read as one header row. Sans
+// rather than the mono the dates use — they are words, not dates.
+export const COLUMN_HEADER_FONT_SIZE_PT = AXIS_MONTH_FONT_SIZE_PT;
+// The status chip: spans its column (minus the inset either side) exactly as
+// the on-screen chip fills its own, with the label inset from the left edge.
+// No dropdown chevron — nothing on a slide is interactive.
+export const STATUS_CHIP_HEIGHT_IN = 0.18;
+export const STATUS_CHIP_RADIUS_IN = 0.03;
+export const STATUS_CHIP_TEXT_INSET_IN = 0.07;
+export const STATUS_CHIP_BORDER_WIDTH_PT = 0.5;
+
 // Status names in the summary slide's status-breakdown legend, a notch
 // under the count/percentage they sit next to (10pt) for the same reason as
 // BAR_STATUS_FONT_SIZE_PT.

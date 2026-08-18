@@ -3,6 +3,7 @@ import type { Person } from '../store/peopleStore';
 import {
   getTaskStatus,
   TASK_STATUS_COLORS,
+  TASK_STATUS_SCALE,
   TASK_STATUS_LABELS,
   type TaskComment,
   type TimelineItem,
@@ -35,11 +36,8 @@ import { COLORS } from './theme';
 import {
   BAR_HEIGHT_IN,
   BAR_LABEL_FONT_SIZE_PT,
-  BAR_LABEL_PADDING_IN,
-  BAR_LABEL_ZONE_MIN_IN,
   BAR_PROGRESS_FONT_SIZE_PT,
   BAR_PROGRESS_PADDING_IN,
-  BAR_STATUS_FONT_SIZE_PT,
   AXIS_LABEL_GAP_IN,
   AXIS_MONTH_FONT_SIZE_PT,
   AXIS_WEEK_FONT_SIZE_PT,
@@ -58,16 +56,23 @@ import {
   COMMENT_TABLE_ROW_HEIGHT_IN,
   CONTENT_HEIGHT_IN,
   CONTENT_TOP_IN,
+  CONTENT_BOTTOM_IN,
   CONTENT_X_IN,
   CONTENT_WIDTH_IN,
   DEPENDENCY_JOG_IN,
   DETAIL_ROW_INDENT_IN,
   GROUP_HEADER_HEIGHT_IN,
-  LABEL_STATUS_GAP_IN,
   LABEL_TAG_GAP_IN,
   LIST_ROW_HEIGHT_IN,
   MAX_OVERVIEW_BARS_PER_SLIDE,
   MIN_TRACK_WIDTH_IN,
+  TIMELINE_X_IN,
+  TIMELINE_WIDTH_IN,
+  STATUS_COL_WIDTH_IN,
+  TASK_COL_WIDTH_IN,
+  COLUMN_TEXT_INSET_IN,
+  COLUMN_DIVIDER_X_IN,
+  STATUS_CHIP_HEIGHT_IN,
   PARENT_SECTION_GAP_IN,
   ROW_GAP_IN,
   ROW_HEIGHT_IN,
@@ -112,18 +117,32 @@ export interface OverviewBarTagModel {
   width: number;
 }
 
+export interface OverviewColumnHeaderModel {
+  text: string;
+  x: number;
+  width: number;
+}
 export interface OverviewBarModel {
   id: string;
   label: string;
-  // Where the label starts and how much room it gets — normally just past
-  // the track, but pushed further right when a progress text drawn outside a
-  // narrow fill ends past the track's own right edge.
+  // Where the label starts and how much room it gets. Fixed: the left edge of
+  // the Task column plus its inset, on every row, however the bar moves.
   labelX: number;
   labelWidth: number;
   tags: OverviewBarTagModel[];
   color: string;
+  // The status chip in the Status column: the same pale-surface / dark-text /
+  // hairline-border chip the app draws, minus the dropdown chevron, which
+  // would imply an interaction a slide cannot offer. `statusColor` is its
+  // text; the two chip colours are the other two steps of the same scale.
   statusText: string;
   statusColor: string;
+  statusChipX: number;
+  statusChipY: number;
+  statusChipWidth: number;
+  statusChipHeight: number;
+  statusChipBg: string;
+  statusChipBorder: string;
   // The row's top edge. Everything drawn on the bar's *line* — its label,
   // status, progress, tag pills — is positioned against this and a full
   // BAR_HEIGHT_IN box, so those stay put whatever height the bar itself is.
@@ -196,6 +215,16 @@ export interface OverviewSlideModel {
   // day line at the same x.
   gridLines: OverviewGridLineModel[];
   axisLabels: OverviewAxisLabelModel[];
+  // The "Status" / "Task" headings, on the same line and at the same size as
+  // the month captions so the three read as one header row. Empty when the
+  // slide has no bars — an empty export gets no column scaffolding.
+  columnHeaders: OverviewColumnHeaderModel[];
+  // The hairline under the whole header row, and the vertical rule between the
+  // two columns and the timeline. Both null on an empty slide.
+  headerRuleY: number | null;
+  dividerX: number | null;
+  dividerTop: number;
+  dividerBottom: number;
   bars: OverviewBarModel[];
   // Empty when exportOptions.showDependencies is off, or for any dependency
   // whose predecessor/successor didn't make it onto this slide (excluded
@@ -459,15 +488,22 @@ function buildOverviewSlide(
   const dateAxisY = CONTENT_TOP_IN;
   let gridLines: OverviewGridLineModel[] = [];
   let axisLabels: OverviewAxisLabelModel[] = [];
+  let columnHeaders: OverviewColumnHeaderModel[] = [];
+  let headerRuleY: number | null = null;
+  let dividerX: number | null = null;
 
   if (dateWindow && items.length > 0) {
     const { minDate, maxDate } = dateWindow;
     const totalDays = daysBetween(minDate, maxDate) + 1;
     const totalWidthPx = totalDays * BASE_PX_PER_DAY;
-    const scale = CONTENT_WIDTH_IN / totalWidthPx;
+    // The date scale now spans the timeline zone only, not the whole content
+    // width — everything derived from `toX` (grid lines, axis captions, bar
+    // positions, and through those the dependency connectors) moves
+    // with it, so nothing can land back over the columns.
+    const scale = TIMELINE_WIDTH_IN / totalWidthPx;
 
     const grid = buildDateGrid(minDate, maxDate);
-    const toX = (mark: DateGridMark) => CONTENT_X_IN + mark.dayOffset * BASE_PX_PER_DAY * scale;
+    const toX = (mark: DateGridMark) => TIMELINE_X_IN + mark.dayOffset * BASE_PX_PER_DAY * scale;
     gridLines = DATE_GRID_LEVELS.flatMap((level) =>
       grid[level].map((mark) => ({ level, x: toX(mark) })),
     );
@@ -477,6 +513,20 @@ function buildOverviewSlide(
     // range is.
     axisLabels = buildAxisLabels(grid, toX, totalDays > MAX_VISIBLE_DAYS_FOR_WEEK_LINES);
 
+    // The two column headings sit on the axis row, so "Status", "Task" and the
+    // month captions all share one line; the hairline under that row and the
+    // vertical rule before the timeline are the same two lines the app draws.
+    columnHeaders = [
+      { text: 'Status', x: CONTENT_X_IN + COLUMN_TEXT_INSET_IN, width: STATUS_COL_WIDTH_IN },
+      {
+        text: 'Task',
+        x: CONTENT_X_IN + STATUS_COL_WIDTH_IN + COLUMN_TEXT_INSET_IN,
+        width: TASK_COL_WIDTH_IN,
+      },
+    ];
+    headerRuleY = dateAxisY + GROUP_HEADER_HEIGHT_IN;
+    dividerX = COLUMN_DIVIDER_X_IN;
+
     let y = CONTENT_TOP_IN + GROUP_HEADER_HEIGHT_IN;
 
     items.forEach((item) => {
@@ -484,30 +534,28 @@ function buildOverviewSlide(
       const progress = clampProgress(item.progress ?? 0);
       const status = getTaskStatus(item);
 
-      // Raw (unclamped) horizontal extent, in inches from CONTENT_X_IN — used
+      // Raw (unclamped) horizontal extent, in inches from TIMELINE_X_IN — used
       // only to detect whether the real task dates spill outside the window;
       // never used directly to draw, since it can be negative or exceed
-      // CONTENT_WIDTH_IN.
+      // TIMELINE_WIDTH_IN.
       const rawLeftIn = left * scale;
       const rawRightIn = (left + width) * scale;
       const chevronLeft = rawLeftIn < -0.001;
-      const chevronRight = rawRightIn > CONTENT_WIDTH_IN + 0.001;
+      const chevronRight = rawRightIn > TIMELINE_WIDTH_IN + 0.001;
 
       const clippedLeftIn = Math.max(rawLeftIn, 0);
-      const clippedRightIn = Math.min(rawRightIn, CONTENT_WIDTH_IN);
+      const clippedRightIn = Math.min(rawRightIn, TIMELINE_WIDTH_IN);
 
-      // Cap how far right the bar can even *start*, so its label + status
-      // always have BAR_LABEL_ZONE_MIN_IN of room after it — otherwise a
-      // task clipped to a sliver right at the timeframe window's edge would
-      // leave its track's own left edge with no room for a label at all.
-      const maxLeftIn = Math.max(0, CONTENT_WIDTH_IN - BAR_LABEL_ZONE_MIN_IN - MIN_TRACK_WIDTH_IN);
-      const barX = CONTENT_X_IN + Math.min(clippedLeftIn, maxLeftIn);
+      // No label zone to reserve any more: the name and the status live in their
+      // own columns, so a bar is free to use the whole timeline zone and is
+      // clamped only by that zone's own right edge. A bar can still start at the
+      // very end of the window, in which case MIN_TRACK_WIDTH_IN keeps it
+      // visible — it just can't spill past TIMELINE_X_IN + TIMELINE_WIDTH_IN.
+      const maxLeftIn = Math.max(0, TIMELINE_WIDTH_IN - MIN_TRACK_WIDTH_IN);
+      const barX = TIMELINE_X_IN + Math.min(clippedLeftIn, maxLeftIn);
 
-      // Cap how far right the track can extend so its label + status always
-      // have BAR_LABEL_ZONE_MIN_IN of room after it, however late/long the
-      // task's real date span would otherwise make the bar.
-      const maxTrackWidth = Math.max(MIN_TRACK_WIDTH_IN, CONTENT_X_IN + CONTENT_WIDTH_IN - BAR_LABEL_ZONE_MIN_IN - barX);
-      const windowClippedWidth = Math.max(clippedRightIn - (barX - CONTENT_X_IN), 0);
+      const maxTrackWidth = Math.max(MIN_TRACK_WIDTH_IN, TIMELINE_X_IN + TIMELINE_WIDTH_IN - barX);
+      const windowClippedWidth = Math.max(clippedRightIn - (barX - TIMELINE_X_IN), 0);
       const trackWidth = Math.min(Math.max(windowClippedWidth, MIN_TRACK_WIDTH_IN), maxTrackWidth);
       const fillWidth = progress > 0 ? Math.max((trackWidth * progress) / 100, 0.05) : 0;
       const barColor = resolveBarColor(item);
@@ -529,25 +577,18 @@ function buildOverviewSlide(
       const progressX = progressInsideFill ? barX : barX + fillWidth + BAR_PROGRESS_PADDING_IN;
       const progressWidth = progressInsideFill ? fillWidth : progressTextWidth;
 
-      const labelX = Math.max(barX + trackWidth, progressX + progressWidth) + BAR_LABEL_PADDING_IN;
+      // The name lives in the Task column: same x on every row, whatever the
+      // bar is doing. Nothing about the bar feeds into this any more.
+      const labelX = CONTENT_X_IN + STATUS_COL_WIDTH_IN + COLUMN_TEXT_INSET_IN;
+      const labelBoxWidth = TASK_COL_WIDTH_IN - COLUMN_TEXT_INSET_IN * 2;
 
-      // The label, the tag pills and the status text are all independently-
-      // positioned, sharing one row. Reserve the status's own measured width
-      // (plus a small gap) and every tag pill's width (each measured the
-      // same way) out of the label's box first, so a label long enough to
-      // reach that far is truncated with an ellipsis instead of visually
-      // overlapping either — which both stay untouched and fully readable
-      // either way, same reasoning as truncateToWidth below.
       const statusText = TASK_STATUS_LABELS[status];
-      // Tracking included: it's real drawn width that neither engine reports
-      // back through its own metrics, so leaving it out would under-reserve
-      // the status column and let a long label run into it.
-      const statusTextWidth =
-        measureTextWidthIn(statusText, BAR_STATUS_FONT_SIZE_PT) +
-        measureLetterSpacingWidthIn(
-          statusText,
-          letterSpacingPt(BAR_STATUS_FONT_SIZE_PT, STATUS_LETTER_SPACING_EM),
-        );
+      const statusScale = TASK_STATUS_SCALE[status];
+
+      // Tag pills share the Task column with the name, so their measured total
+      // is reserved out of the name's box first and the name truncates against
+      // what's left — the same rule as before, now against a fixed column
+      // instead of whatever space a bar happened to leave.
       const tagTexts = item.tags ?? [];
       const tagPillWidths = tagTexts.map(
         (tag) => measureTextWidthIn(tag, TAG_PILL_FONT_SIZE_PT) + TAG_PILL_PADDING_IN * 2,
@@ -558,16 +599,13 @@ function buildOverviewSlide(
             TAG_PILL_GAP_IN * (tagPillWidths.length - 1) +
             LABEL_TAG_GAP_IN
           : 0;
-      const labelWidth = Math.max(
-        CONTENT_X_IN +
-          CONTENT_WIDTH_IN -
-          STATUS_RIGHT_PADDING_IN -
-          labelX -
-          statusTextWidth -
-          LABEL_STATUS_GAP_IN -
-          tagsReservedWidth,
-        0,
-      );
+
+      // One truncation rule, in one place: the name is cut to the Task
+      // column's own width with an ellipsis. At BAR_LABEL_FONT_SIZE_PT a glyph
+      // averages 0.110in, so an untagged row holds roughly 20 characters
+      // (2.35in of column, less 0.08in of inset either side) before the
+      // ellipsis appears; a row carrying tags holds correspondingly fewer.
+      const labelWidth = Math.max(labelBoxWidth - tagsReservedWidth, 0);
       const label = truncateToWidth(item.label, BAR_LABEL_FONT_SIZE_PT, labelWidth);
 
       // Tag pills start right after the label's own actual (already
@@ -590,6 +628,12 @@ function buildOverviewSlide(
         color: barColor,
         statusText,
         statusColor: TASK_STATUS_COLORS[status],
+        statusChipX: CONTENT_X_IN + COLUMN_TEXT_INSET_IN,
+        statusChipY: y + (BAR_HEIGHT_IN - STATUS_CHIP_HEIGHT_IN) / 2,
+        statusChipWidth: STATUS_COL_WIDTH_IN - COLUMN_TEXT_INSET_IN * 2,
+        statusChipHeight: STATUS_CHIP_HEIGHT_IN,
+        statusChipBg: statusScale.surface.replace('#', ''),
+        statusChipBorder: statusScale.border.replace('#', ''),
         y,
         barX,
         barY: y + barOffsetY,
@@ -618,7 +662,21 @@ function buildOverviewSlide(
 
   const dependencyConnectors = showDependencies ? buildDependencyConnectors(items, bars) : [];
 
-  return { kind: 'overview', title, dateAxisY, gridLines, axisLabels, bars, dependencyConnectors, omittedCount };
+  return {
+    kind: 'overview',
+    title,
+    dateAxisY,
+    gridLines,
+    axisLabels,
+    columnHeaders,
+    headerRuleY,
+    dividerX,
+    dividerTop: dateAxisY,
+    dividerBottom: CONTENT_BOTTOM_IN,
+    bars,
+    dependencyConnectors,
+    omittedCount,
+  };
 }
 
 /** The overview slides for an export: one truncated slide in 'compact' mode
@@ -686,7 +744,7 @@ function buildOverviewSlides(
  * Which edge of the successor the line arrives at depends on where that bar
  * sits, since a successor's bar is very often *not* to the right of its
  * predecessor's (overlapping date spans are normal, and any bar can be
- * clipped to the timeframe window or held back by BAR_LABEL_ZONE_MIN_IN):
+ * clipped to the timeframe window, or a sliver at its right edge):
  * approach the left edge when there's room to drop in front of it, and the
  * right edge otherwise — never a point in between. */
 function buildDependencyConnectors(items: TimelineItem[], bars: OverviewBarModel[]): OverviewConnectorModel[] {

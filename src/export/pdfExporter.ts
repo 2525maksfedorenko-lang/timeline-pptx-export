@@ -61,6 +61,11 @@ import {
   SUMMARY_LEGEND_STATUS_FONT_SIZE_PT,
   SUBTASK_TEXT_FONT_SIZE_PT,
   STATUS_LETTER_SPACING_EM,
+  COLUMN_HEADER_FONT_SIZE_PT,
+  COLUMN_DIVIDER_WIDTH_PT,
+  STATUS_CHIP_RADIUS_IN,
+  STATUS_CHIP_TEXT_INSET_IN,
+  STATUS_CHIP_BORDER_WIDTH_PT,
   DATE_LETTER_SPACING_EM,
   letterSpacingPt,
   TAG_PILL_FONT_SIZE_PT,
@@ -214,10 +219,36 @@ function drawOverviewSlide(doc: jsPDF, model: OverviewSlideModel, links: SlideLi
 
   const axisLineY = model.dateAxisY + GROUP_HEADER_HEIGHT_IN;
 
+  // "Status" and "Task" on the axis row, sharing its line and its size with the
+  // month captions — sans rather than the dates' mono, since they are words.
+  if (model.columnHeaders.length > 0) {
+    doc.setFont(PDF_FONT_FACE, 'bold');
+    doc.setFontSize(COLUMN_HEADER_FONT_SIZE_PT);
+    doc.setTextColor(withHash(COLORS.footerText));
+    model.columnHeaders.forEach((header) => {
+      drawText(doc, header.text, header.x, rowCenterY(model.dateAxisY, GROUP_HEADER_HEIGHT_IN), {
+        baseline: 'middle',
+      });
+    });
+  }
+
+  // The vertical rule before the timeline, and the hairline under the whole
+  // header row — the same two lines the on-screen chart draws.
+  if (model.dividerX !== null) {
+    doc.setDrawColor(withHash(COLORS.border));
+    doc.setLineWidth(COLUMN_DIVIDER_WIDTH_PT * PT_TO_IN);
+    doc.line(model.dividerX, model.dividerTop, model.dividerX, model.dividerBottom);
+  }
+
+  if (model.headerRuleY !== null) {
+    doc.setDrawColor(withHash(COLORS.border));
+    doc.setLineWidth(0.01);
+    doc.line(CONTENT_X_IN, model.headerRuleY, CONTENT_X_IN + CONTENT_WIDTH_IN, model.headerRuleY);
+  }
+
   if (model.gridLines.length > 0) {
     doc.setDrawColor(withHash(COLORS.border));
     doc.setLineWidth(0.01);
-    doc.line(CONTENT_X_IN, axisLineY, CONTENT_X_IN + CONTENT_WIDTH_IN, axisLineY);
 
     // Day/week/month lines, all full height through the bar area and all
     // drawn from the one shared style table — only the weight and color
@@ -279,18 +310,13 @@ function drawOverviewSlide(doc: jsPDF, model: OverviewSlideModel, links: SlideLi
     const centerY = bar.y + BAR_HEIGHT_IN / 2;
 
     // A bar is clickable exactly when its task has an appendix slide to open.
-    // One rectangle covers the track and its label: they're contiguous
-    // (labelX starts just past whichever of the track/progress text ends
-    // furthest right), so the row the PPTX makes clickable across three
-    // separate objects is a single annotation here.
-    linkToPage(
-      doc,
-      links.detailSlideNumberByTaskId.get(bar.id),
-      bar.barX,
-      bar.y,
-      bar.labelX + bar.labelWidth - bar.barX,
-      BAR_HEIGHT_IN,
-    );
+    // The name and the track are no longer contiguous — the name sits in its
+    // column, the track past the divider — so this is two annotations covering
+    // the same two handles the PPTX makes clickable, rather than one spanning
+    // the gap (which would also swallow clicks on the empty gutter).
+    const detailPage = links.detailSlideNumberByTaskId.get(bar.id);
+    linkToPage(doc, detailPage, bar.labelX, bar.y, bar.labelWidth, BAR_HEIGHT_IN);
+    linkToPage(doc, detailPage, bar.barX, bar.y, bar.trackWidth, BAR_HEIGHT_IN);
 
     // Progress rides on the bar itself: centered in the fill when it fits
     // there, otherwise just past the fill on the gray track (see
@@ -303,12 +329,10 @@ function drawOverviewSlide(doc: jsPDF, model: OverviewSlideModel, links: SlideLi
       align: bar.progressInsideFill ? 'center' : 'left',
     });
 
-    // Label sits outside the track, immediately to its right — never on top
-    // of it — so it never gets split across the filled/unfilled boundary.
-    // The model has already truncated it (with an ellipsis) to leave room
-    // for the status text below, so no `maxWidth` here — jsPDF's own
-    // wrapping would otherwise push a measurement-approximation edge case
-    // onto a second line landing on top of the status text's row.
+    // The name sits in the Task column, at the same x on every row — it no
+    // longer tracks the bar. The model has already truncated it to the column's
+    // width, so no `maxWidth` here: jsPDF's own wrapping would otherwise push a
+    // measurement-approximation edge case onto a second line.
     doc.setFontSize(BAR_LABEL_FONT_SIZE_PT);
     doc.setTextColor(withHash(COLORS.navy));
     drawText(doc, bar.label, bar.labelX, centerY, { baseline: 'middle' });
@@ -334,15 +358,31 @@ function drawOverviewSlide(doc: jsPDF, model: OverviewSlideModel, links: SlideLi
       drawText(doc, tag.text, tag.x + tag.width / 2, centerY, { baseline: 'middle', align: 'center' });
     });
 
+    // The status chip in the Status column: the app's own chip — pale surface,
+    // hairline border, dark text, lowercase — and no dropdown chevron, which
+    // would promise an interaction a slide can't honour.
+    doc.setFillColor(withHash(bar.statusChipBg));
+    doc.setDrawColor(withHash(bar.statusChipBorder));
+    doc.setLineWidth(STATUS_CHIP_BORDER_WIDTH_PT * PT_TO_IN);
+    doc.roundedRect(
+      bar.statusChipX,
+      bar.statusChipY,
+      bar.statusChipWidth,
+      bar.statusChipHeight,
+      STATUS_CHIP_RADIUS_IN,
+      STATUS_CHIP_RADIUS_IN,
+      'FD',
+    );
+    doc.setFont(PDF_FONT_FACE, 'bold');
     doc.setFontSize(BAR_STATUS_FONT_SIZE_PT);
     doc.setTextColor(withHash(bar.statusColor));
     drawTrackedText(
       doc,
       bar.statusText,
-      CONTENT_X_IN + CONTENT_WIDTH_IN - STATUS_RIGHT_PADDING_IN,
+      bar.statusChipX + STATUS_CHIP_TEXT_INSET_IN,
       centerY,
       letterSpacingPt(BAR_STATUS_FONT_SIZE_PT, STATUS_LETTER_SPACING_EM),
-      { baseline: 'middle', align: 'right' },
+      { baseline: 'middle' },
     );
 
     // Chevrons mark a bar clipped by the export timeframe window: "starts

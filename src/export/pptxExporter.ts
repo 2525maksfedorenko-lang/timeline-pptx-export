@@ -43,7 +43,6 @@ import {
   CONTENT_WIDTH_IN,
   CONTENT_X_IN,
   DASHBOARD_TABLE_TOP_IN,
-  STATUS_RIGHT_PADDING_IN,
   DEPENDENCY_LINE_WIDTH_PT,
   DETAIL_ROW_INDENT_IN,
   FOOTER_HEIGHT_IN,
@@ -58,6 +57,12 @@ import {
   SUBTASK_TEXT_FONT_SIZE_PT,
   SUMMARY_LEGEND_STATUS_FONT_SIZE_PT,
   STATUS_LETTER_SPACING_EM,
+  STATUS_RIGHT_PADDING_IN,
+  COLUMN_HEADER_FONT_SIZE_PT,
+  COLUMN_DIVIDER_WIDTH_PT,
+  STATUS_CHIP_RADIUS_IN,
+  STATUS_CHIP_TEXT_INSET_IN,
+  STATUS_CHIP_BORDER_WIDTH_PT,
   DATE_LETTER_SPACING_EM,
   letterSpacingPt,
   TAG_PILL_FONT_SIZE_PT,
@@ -204,14 +209,50 @@ function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel, links: S
 
   const axisLineY = model.dateAxisY + GROUP_HEADER_HEIGHT_IN;
 
-  if (model.gridLines.length > 0) {
+  // "Status" and "Task", on the axis row so they share one line with the month
+  // captions, at the same size (COLUMN_HEADER_FONT_SIZE_PT) in the same muted
+  // colour — sans rather than the dates' mono, since they are words.
+  model.columnHeaders.forEach((header) => {
+    slide.addText(header.text, {
+      x: header.x,
+      y: model.dateAxisY,
+      w: header.width,
+      h: GROUP_HEADER_HEIGHT_IN,
+      fontSize: COLUMN_HEADER_FONT_SIZE_PT,
+      bold: true,
+      color: COLORS.footerText,
+      fontFace: PPTX_FONT_FACE,
+      valign: 'middle',
+      margin: 0,
+      wrap: false,
+    });
+  });
+
+  // The vertical rule between the columns and the timeline, matching the
+  // border the on-screen chart draws in the same place.
+  if (model.dividerX !== null) {
+    slide.addShape('line', {
+      x: model.dividerX,
+      y: model.dividerTop,
+      w: 0,
+      h: model.dividerBottom - model.dividerTop,
+      line: { color: COLORS.border, width: COLUMN_DIVIDER_WIDTH_PT },
+    });
+  }
+
+  // The hairline under the whole header row — both columns and the axis, not
+  // just the timeline zone.
+  if (model.headerRuleY !== null) {
     slide.addShape('line', {
       x: CONTENT_X_IN,
-      y: axisLineY,
+      y: model.headerRuleY,
       w: CONTENT_WIDTH_IN,
       h: 0,
       line: { color: COLORS.border, width: 0.75 },
     });
+  }
+
+  if (model.gridLines.length > 0) {
 
     // Day/week/month lines, all full height through the bar area and all
     // drawn from the one shared style table — only the weight and color
@@ -313,13 +354,11 @@ function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel, links: S
       wrap: false,
     });
 
-    // Label sits outside the track, immediately to its right — never on top
-    // of it — so it never gets split across the filled/unfilled boundary.
-    // The model has already truncated it (with an ellipsis) to leave room
-    // for the status text below, so `wrap: false` keeps it on the one line
-    // that room was measured against instead of PowerPoint auto-wrapping a
-    // measurement-approximation edge case onto a second line that would
-    // land on top of the status text's own row.
+    // The name sits in the Task column, at the same x on every row — it no
+    // longer tracks the bar at all. The model has already truncated it to the
+    // column's width, so `wrap: false` keeps it on the one line that width was
+    // measured against instead of PowerPoint wrapping a measurement-
+    // approximation edge case onto a second line.
     slide.addText(bar.label, {
       x: bar.labelX,
       y: bar.y,
@@ -363,10 +402,22 @@ function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel, links: S
       });
     });
 
+    // The status chip in the Status column: the app's own chip — pale surface,
+    // hairline border, dark text, lowercase — and no dropdown chevron, which
+    // would promise an interaction a slide can't honour.
+    slide.addShape('roundRect', {
+      x: bar.statusChipX,
+      y: bar.statusChipY,
+      w: bar.statusChipWidth,
+      h: bar.statusChipHeight,
+      rectRadius: STATUS_CHIP_RADIUS_IN,
+      fill: { color: bar.statusChipBg },
+      line: { color: bar.statusChipBorder, width: STATUS_CHIP_BORDER_WIDTH_PT },
+    });
     slide.addText(bar.statusText, {
-      x: CONTENT_X_IN,
+      x: bar.statusChipX + STATUS_CHIP_TEXT_INSET_IN,
       y: bar.y,
-      w: CONTENT_WIDTH_IN - STATUS_RIGHT_PADDING_IN,
+      w: bar.statusChipWidth - STATUS_CHIP_TEXT_INSET_IN * 2,
       h: BAR_HEIGHT_IN,
       margin: 0,
       fontSize: BAR_STATUS_FONT_SIZE_PT,
@@ -374,8 +425,9 @@ function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel, links: S
       bold: true,
       color: bar.statusColor,
       fontFace: PPTX_FONT_FACE,
-      align: 'right',
+      align: 'left',
       valign: 'middle',
+      wrap: false,
     });
 
     // Chevrons mark a bar clipped by the export timeframe window: "starts
