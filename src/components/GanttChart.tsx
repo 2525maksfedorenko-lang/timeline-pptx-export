@@ -295,11 +295,12 @@ export function GanttChart() {
                   onRequestClosePopup={closeTaskPopup}
                   isDimmed={highlightedIds !== null && !highlightedIds.has(item.id)}
                   isHighlighted={highlightedIds !== null && highlightedIds.has(item.id)}
-                  onRowHoverChange={(isHovered) =>
-                    // Clearing only when this row is still the hovered one:
-                    // moving between two adjacent rows can deliver the new
-                    // row's mouseenter before the old row's mouseleave, and
-                    // an unconditional reset would drop the fresh hover.
+                  onBarHoverChange={(isHovered) =>
+                    // Clearing only when this bar is still the hovered one:
+                    // crossing diagonally from one bar to another can deliver
+                    // the new bar's mouseenter before the old bar's
+                    // mouseleave, and an unconditional reset would drop the
+                    // fresh hover and leave nothing highlighted.
                     setHoveredTaskId((current) =>
                       isHovered ? item.id : current === item.id ? null : current,
                     )

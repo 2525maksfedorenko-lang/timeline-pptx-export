@@ -69,12 +69,20 @@ interface GanttRowProps {
   // is screen-only.
   isDimmed: boolean;
   isHighlighted: boolean;
-  // Fired for the whole row, not just its bar: a bar can be scrolled far out
-  // of view horizontally while its label is always in reach (the label
-  // column is sticky), so binding hover to the bar alone made deep branches
-  // impossible to inspect — you had to find the bar before you could hover
-  // it.
-  onRowHoverChange: (isHovered: boolean) => void;
+  // Fired by the bar itself, and by nothing else on the row.
+  //
+  // It used to be the whole row, on the reasoning that a bar scrolled out of
+  // view horizontally leaves its (sticky) label as the only thing still in
+  // reach. The cost of that was a hit area bearing no relation to what the
+  // pointer is actually over: the empty track either side of a bar, the gap
+  // above and below it, the label column and the action icons all lit a
+  // branch up, so the highlight fired long before the pointer reached the
+  // thing it describes — and reading it as "this bar's branch" was then
+  // guesswork.
+  //
+  // The trade-off is real and deliberate: a bar scrolled off-screen can no
+  // longer be hovered at all. Bounds you can see beat reach you cannot.
+  onBarHoverChange: (isHovered: boolean) => void;
 }
 
 // One drag state shape for all three bar interactions (move + resize each
@@ -182,7 +190,7 @@ export function GanttRow({
   onRequestClosePopup,
   isDimmed,
   isHighlighted,
-  onRowHoverChange,
+  onBarHoverChange,
 }: GanttRowProps) {
   const items = useTimelineStore((state) => state.items);
   const updateItem = useTimelineStore((state) => state.updateItem);
@@ -446,12 +454,7 @@ export function GanttRow({
   const handleResizeEndMouseDown = (event: React.MouseEvent) => beginBarInteraction(event, 'resize-end');
 
   return (
-    <div
-      className="flex h-10 border-b border-border"
-      style={{ opacity: included ? 1 : 0.5 }}
-      onMouseEnter={() => onRowHoverChange(true)}
-      onMouseLeave={() => onRowHoverChange(false)}
-    >
+    <div className="flex h-10 border-b border-border" style={{ opacity: included ? 1 : 0.5 }}>
       {/* Zone 1: status dot + label (+ tags, if any). Fixed width,
           independent of the bar — a label is exactly as visible on a 1-day
           task as a 3-month one. overflow-hidden is the hard guarantee that
@@ -543,6 +546,20 @@ export function GanttRow({
         <div
           ref={barRef}
           onMouseDown={handleMouseDown}
+          // The branch highlight's only trigger. This element *is* the drawn
+          // bar — left/width from the task's dates, top/height from
+          // resolveBarGeometry — so the hit area equals the visible bounds on
+          // both axes without a hit layer of its own, at every nesting depth.
+          // Deliberately unpadded: padding out a 24px subtask bar to an
+          // easier target would reintroduce, smaller, exactly the gap between
+          // what lights up and what you are pointing at.
+          //
+          // enter/leave rather than over/out: they don't fire again when the
+          // pointer crosses onto the bar's own children (the track, the
+          // progress text, the two resize strips), so moving along a bar
+          // can't flicker the highlight off and on.
+          onMouseEnter={() => onBarHoverChange(true)}
+          onMouseLeave={() => onBarHoverChange(false)}
           className={`absolute cursor-grab select-none transition-opacity active:cursor-grabbing ${
             isDimmed ? 'opacity-30' : ''
           }`}
