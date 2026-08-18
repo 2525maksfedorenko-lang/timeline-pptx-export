@@ -33,7 +33,7 @@ export function AssigneeSelect({
         id={`${idPrefix}-assignee`}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="rounded-md border border-[#E5E5E1] bg-white px-2 py-1 text-sm text-[#1E2B38] focus:border-[#2A9D90] focus:outline-none"
+        className="rounded-md border border-border bg-popover px-2 py-1 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
       >
         <option value="">{placeholderLabel}</option>
         {people.map((person) => (
@@ -50,7 +50,7 @@ export function AssigneeSelect({
           value={newPersonName}
           onChange={(event) => onNewPersonNameChange(event.target.value)}
           placeholder="e.g. Max Fedorenko"
-          className="rounded-md border border-[#E5E5E1] px-2 py-1 text-sm text-[#1E2B38] focus:border-[#2A9D90] focus:outline-none"
+          className="rounded-md border border-border px-2 py-1 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
         />
       )}
     </div>

@@ -53,14 +53,14 @@ export function PlanSwitcher() {
   };
 
   return (
-    <div className="mb-4 flex flex-wrap items-center gap-2 border-b border-[#E5E5E1] pb-3">
+    <div className="mb-4 flex flex-wrap items-center gap-2 border-b border-border pb-3">
       {savedPlans.map((plan) => (
         <div
           key={plan.id}
           className={`group flex items-center gap-2 rounded-t-md border border-b-0 px-3 py-1.5 text-sm transition-colors ${
             plan.id === activePlanId
-              ? 'border-[#E5E5E1] bg-white font-medium text-[#1E2B38]'
-              : 'border-transparent bg-slate-100 text-slate-500 hover:bg-slate-200'
+              ? 'border-border bg-card font-medium text-foreground'
+              : 'border-transparent bg-muted text-muted-foreground hover:bg-border'
           }`}
         >
           <button
@@ -74,7 +74,7 @@ export function PlanSwitcher() {
           <button
             type="button"
             onClick={() => handleDelete(plan.id, plan.name)}
-            className="text-slate-400 opacity-0 transition-opacity hover:text-red-600 group-hover:opacity-100 max-md:opacity-100"
+            className="text-muted-foreground/70 opacity-0 transition-opacity hover:text-red-600 group-hover:opacity-100 max-md:opacity-100"
             aria-label={`Delete plan ${plan.name}`}
           >
             ×
@@ -97,12 +97,12 @@ export function PlanSwitcher() {
               }
             }}
             placeholder="Plan name"
-            className="rounded-md border border-[#E5E5E1] px-2 py-1 text-sm text-[#1E2B38] focus:border-[#2A9D90] focus:outline-none"
+            className="rounded-md border border-border px-2 py-1 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           />
           <button
             type="button"
             onClick={() => void handleCreate()}
-            className="rounded-md bg-[#2A9D90] px-2 py-1 text-xs font-medium text-white hover:bg-[#238277]"
+            className="rounded-md bg-primary px-2 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90"
           >
             Save
           </button>
@@ -112,7 +112,7 @@ export function PlanSwitcher() {
               setIsCreating(false);
               setNewPlanName('');
             }}
-            className="rounded-md px-2 py-1 text-xs font-medium text-slate-500 hover:bg-slate-100"
+            className="rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted"
           >
             Cancel
           </button>
@@ -121,7 +121,7 @@ export function PlanSwitcher() {
         <button
           type="button"
           onClick={() => setIsCreating(true)}
-          className="rounded-md border border-dashed border-[#E5E5E1] px-3 py-1.5 text-sm text-slate-500 transition-colors hover:border-[#2A9D90] hover:text-[#2A9D90]"
+          className="rounded-md border border-dashed border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
         >
           + New plan
         </button>
@@ -141,7 +141,7 @@ export function PlanSwitcher() {
           disabled={!activePlan}
           title="Save current plan as JSON"
           aria-label="Save current plan as JSON"
-          className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-[#2A9D90] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent max-md:p-3"
+          className="rounded-md p-1.5 text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent max-md:p-3"
         >
           <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4" aria-hidden="true">
             <path
@@ -165,7 +165,7 @@ export function PlanSwitcher() {
           onClick={handleLoadSheetClick}
           title="Import tasks from Excel or CSV (columns: Label, Start, End, Progress, Status, Assignee, Parent)"
           aria-label="Import tasks from Excel or CSV"
-          className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-[#2A9D90] max-md:p-3"
+          className="rounded-md p-1.5 text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground max-md:p-3"
         >
           {/* A grid, to read as "spreadsheet" beside the two plain
               file arrows either side of it. */}
@@ -184,7 +184,7 @@ export function PlanSwitcher() {
           onClick={handleLoadJsonClick}
           title="Load plan from JSON"
           aria-label="Load plan from JSON"
-          className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-[#2A9D90] max-md:p-3"
+          className="rounded-md p-1.5 text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground max-md:p-3"
         >
           <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4" aria-hidden="true">
             <path

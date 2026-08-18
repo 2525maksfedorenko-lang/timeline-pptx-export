@@ -27,8 +27,8 @@ const MENU_MAX_HEIGHT_PX = 340;
 const VIEWPORT_MARGIN_PX = 8;
 
 const FIELD_CLASS =
-  'rounded-md border border-[#E5E5E1] px-2 py-1 text-sm text-[#1E2B38] focus:border-[#2A9D90] focus:outline-none';
-const FIELD_LABEL_CLASS = 'text-xs font-medium text-slate-500';
+  'rounded-md border border-border px-2 py-1 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring';
+const FIELD_LABEL_CLASS = 'text-xs font-medium text-muted-foreground';
 
 /** The small menu a click on a task's bar opens: change the status right
  * there, or add a subtask under it.
@@ -91,7 +91,7 @@ export function BarActionMenu({ item, anchor, onChangeStatus, onAddSubtask, onCl
       ref={menuRef}
       role="dialog"
       aria-label={`Actions for ${item.label}`}
-      className="fixed z-50 overflow-y-auto rounded-md border border-[#E5E5E1] bg-white p-3 shadow-lg"
+      className="fixed z-50 overflow-y-auto rounded-md border border-border bg-popover p-3 shadow-lg"
       style={{
         left: Math.max(VIEWPORT_MARGIN_PX, left),
         top: Math.max(VIEWPORT_MARGIN_PX, top),
@@ -99,7 +99,7 @@ export function BarActionMenu({ item, anchor, onChangeStatus, onAddSubtask, onCl
         maxHeight: MENU_MAX_HEIGHT_PX,
       }}
     >
-      <p className="mb-2 truncate text-xs font-semibold uppercase tracking-wide text-slate-500">{item.label}</p>
+      <p className="mb-2 truncate text-xs font-semibold uppercase tracking-wide text-muted-foreground">{item.label}</p>
 
       <div className="flex flex-col gap-1">
         <span className={FIELD_LABEL_CLASS}>Change status</span>
@@ -109,7 +109,7 @@ export function BarActionMenu({ item, anchor, onChangeStatus, onAddSubtask, onCl
       </div>
 
       {isAddingSubtask ? (
-        <div className="mt-3 flex flex-col gap-2 border-t border-[#E5E5E1] pt-3">
+        <div className="mt-3 flex flex-col gap-2 border-t border-border pt-3">
           <div className="flex flex-col gap-1">
             <label htmlFor={`subtask-label-${item.id}`} className={FIELD_LABEL_CLASS}>
               Label *
@@ -166,14 +166,14 @@ export function BarActionMenu({ item, anchor, onChangeStatus, onAddSubtask, onCl
               type="button"
               onClick={handleAdd}
               disabled={!isCompleteTask(draft)}
-              className="rounded-md bg-[#2A9D90] px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[#238277] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-[#2A9D90]"
+              className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-primary"
             >
               Add
             </button>
             <button
               type="button"
               onClick={onClose}
-              className="rounded-md px-3 py-1.5 text-sm font-medium text-slate-500 transition-colors hover:bg-slate-100"
+              className="rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted"
             >
               Cancel
             </button>
@@ -183,7 +183,7 @@ export function BarActionMenu({ item, anchor, onChangeStatus, onAddSubtask, onCl
         <button
           type="button"
           onClick={() => setIsAddingSubtask(true)}
-          className="mt-3 w-full rounded-md border border-dashed border-[#E5E5E1] px-3 py-1.5 text-sm text-slate-500 transition-colors hover:border-[#2A9D90] hover:text-[#2A9D90]"
+          className="mt-3 w-full rounded-md border border-dashed border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
         >
           + Add subtask
         </button>

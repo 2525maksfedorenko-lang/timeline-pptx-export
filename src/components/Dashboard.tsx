@@ -20,14 +20,14 @@ interface DashboardProps {
   highlightSection?: DashboardSection | null;
 }
 
-const CARD_CLASSES = 'rounded-lg border border-[#E5E5E1] bg-white p-4';
-const HIGHLIGHT_CLASSES = 'ring-2 ring-[#2A9D90] ring-offset-2';
+const CARD_CLASSES = 'rounded-lg border border-border bg-card p-4';
+const HIGHLIGHT_CLASSES = 'ring-2 ring-ring ring-offset-2';
 
 function KpiCard({ label, value, accent }: { label: string; value: string; accent?: string }) {
   return (
     <div className={CARD_CLASSES}>
-      <div className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</div>
-      <div className="mt-1 text-3xl font-bold tracking-tight" style={{ color: accent ?? '#1E2B38' }}>
+      <div className="text-sm font-medium">{label}</div>
+      <div className="mt-1 text-2xl font-bold tracking-tight" style={accent ? { color: accent } : undefined}>
         {value}
       </div>
     </div>
@@ -55,7 +55,7 @@ function StatusDonut({ segments }: { segments: StatusSegment[] }) {
               cy={DONUT_SIZE / 2}
               r={DONUT_RADIUS}
               fill="none"
-              stroke="#E5E5E1"
+              stroke="hsl(var(--border))"
               strokeWidth={DONUT_STROKE}
             />
             {total > 0 &&
@@ -82,8 +82,8 @@ function StatusDonut({ segments }: { segments: StatusSegment[] }) {
           </g>
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-2xl font-bold tracking-tight text-[#1E2B38]">{total}</span>
-          <span className="text-xs text-slate-500">tasks</span>
+          <span className="text-2xl font-bold tracking-tight text-foreground">{total}</span>
+          <span className="text-xs text-muted-foreground">tasks</span>
         </div>
       </div>
 
@@ -100,10 +100,10 @@ function StatusDonut({ segments }: { segments: StatusSegment[] }) {
                 status is rendered as real text on screen (elsewhere it's a
                 colored dot's tooltip or a native <select> option, neither of
                 which can carry this styling). */}
-            <span className="text-xs font-medium uppercase tracking-[0.06em] text-[#1E2B38]">
+            <span className="text-xs font-medium uppercase tracking-[0.06em] text-foreground">
               {segment.label}
             </span>
-            <span className="text-slate-500">
+            <span className="text-muted-foreground">
               {segment.count} ({segment.percent}%)
             </span>
           </li>
@@ -119,14 +119,14 @@ function assigneeText(item: TimelineItem): string {
 
 function DelayedTable({ items, today }: { items: TimelineItem[]; today: Date }) {
   if (items.length === 0) {
-    return <p className="text-sm text-slate-500">No delayed tasks.</p>;
+    return <p className="text-sm text-muted-foreground">No delayed tasks.</p>;
   }
 
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-left text-sm">
         <thead>
-          <tr className="border-b border-[#E5E5E1] text-xs font-medium uppercase tracking-wide text-slate-500">
+          <tr className="border-b border-border text-xs font-medium uppercase tracking-wide text-muted-foreground">
             <th className="py-2 pr-3 font-medium">Task</th>
             <th className="py-2 pr-3 font-medium">End date</th>
             <th className="py-2 pr-3 font-medium">Days overdue</th>
@@ -135,11 +135,11 @@ function DelayedTable({ items, today }: { items: TimelineItem[]; today: Date }) 
         </thead>
         <tbody>
           {items.map((item) => (
-            <tr key={item.id} className="border-b border-[#E5E5E1] last:border-0">
-              <td className="py-2 pr-3 font-medium text-[#1E2B38]">{item.label}</td>
-              <td className="py-2 pr-3 font-mono text-xs tracking-[0.02em] text-slate-500">{formatShortDate(new Date(item.end))}</td>
-              <td className="py-2 pr-3 font-medium text-[#E76E50]">{getDaysOverdue(item, today)}</td>
-              <td className="py-2 text-slate-500">{assigneeText(item)}</td>
+            <tr key={item.id} className="border-b border-border last:border-0">
+              <td className="py-2 pr-3 font-medium text-foreground">{item.label}</td>
+              <td className="py-2 pr-3 font-mono text-xs tracking-[0.02em] text-muted-foreground">{formatShortDate(new Date(item.end))}</td>
+              <td className="py-2 pr-3 font-medium text-destructive">{getDaysOverdue(item, today)}</td>
+              <td className="py-2 text-muted-foreground">{assigneeText(item)}</td>
             </tr>
           ))}
         </tbody>
@@ -150,14 +150,14 @@ function DelayedTable({ items, today }: { items: TimelineItem[]; today: Date }) 
 
 function AtRiskTable({ items }: { items: TimelineItem[] }) {
   if (items.length === 0) {
-    return <p className="text-sm text-slate-500">No at-risk tasks.</p>;
+    return <p className="text-sm text-muted-foreground">No at-risk tasks.</p>;
   }
 
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-left text-sm">
         <thead>
-          <tr className="border-b border-[#E5E5E1] text-xs font-medium uppercase tracking-wide text-slate-500">
+          <tr className="border-b border-border text-xs font-medium uppercase tracking-wide text-muted-foreground">
             <th className="py-2 pr-3 font-medium">Task</th>
             <th className="py-2 pr-3 font-medium">End date</th>
             <th className="py-2 font-medium">Assignee</th>
@@ -165,10 +165,10 @@ function AtRiskTable({ items }: { items: TimelineItem[] }) {
         </thead>
         <tbody>
           {items.map((item) => (
-            <tr key={item.id} className="border-b border-[#E5E5E1] last:border-0">
-              <td className="py-2 pr-3 font-medium text-[#1E2B38]">{item.label}</td>
-              <td className="py-2 pr-3 font-mono text-xs tracking-[0.02em] text-slate-500">{formatShortDate(new Date(item.end))}</td>
-              <td className="py-2 text-slate-500">{assigneeText(item)}</td>
+            <tr key={item.id} className="border-b border-border last:border-0">
+              <td className="py-2 pr-3 font-medium text-foreground">{item.label}</td>
+              <td className="py-2 pr-3 font-mono text-xs tracking-[0.02em] text-muted-foreground">{formatShortDate(new Date(item.end))}</td>
+              <td className="py-2 text-muted-foreground">{assigneeText(item)}</td>
             </tr>
           ))}
         </tbody>
@@ -198,20 +198,20 @@ export function Dashboard({ highlightSection }: DashboardProps) {
 
   return (
     <div>
-      <h2 className="mb-3 text-lg font-semibold tracking-tight text-[#1E2B38]">Dashboard</h2>
+      <h2 className="mb-3 text-lg font-semibold tracking-tight text-foreground">Dashboard</h2>
 
       <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
         <KpiCard label="Total tasks" value={`${kpis.total}`} />
-        <KpiCard label="Completed" value={`${kpis.completed} (${kpis.completedPercent}%)`} accent="#2A9D90" />
-        <KpiCard label="Delayed" value={`${kpis.delayed}`} accent={kpis.delayed > 0 ? '#E76E50' : undefined} />
-        <KpiCard label="At risk" value={`${kpis.atRisk}`} accent={kpis.atRisk > 0 ? '#E76E50' : undefined} />
+        <KpiCard label="Completed" value={`${kpis.completed} (${kpis.completedPercent}%)`}  />
+        <KpiCard label="Delayed" value={`${kpis.delayed}`} accent={kpis.delayed > 0 ? 'hsl(var(--destructive))' : undefined} />
+        <KpiCard label="At risk" value={`${kpis.atRisk}`} accent={kpis.atRisk > 0 ? 'hsl(var(--destructive))' : undefined} />
       </div>
 
       <div
         ref={statusRef}
         className={`${CARD_CLASSES} mb-6 transition-shadow ${highlightSection === 'status' ? HIGHLIGHT_CLASSES : ''}`}
       >
-        <h3 className="mb-4 text-sm font-semibold tracking-tight text-[#1E2B38]">Status breakdown</h3>
+        <h3 className="mb-4 text-sm font-semibold tracking-tight text-foreground">Status breakdown</h3>
         <StatusDonut segments={segments} />
       </div>
 
@@ -220,7 +220,7 @@ export function Dashboard({ highlightSection }: DashboardProps) {
           ref={delayedRef}
           className={`${CARD_CLASSES} transition-shadow ${highlightSection === 'delayed' ? HIGHLIGHT_CLASSES : ''}`}
         >
-          <h3 className="mb-3 text-sm font-semibold tracking-tight text-[#1E2B38]">Delayed tasks</h3>
+          <h3 className="mb-3 text-sm font-semibold tracking-tight text-foreground">Delayed tasks</h3>
           <DelayedTable items={delayedTasks} today={today} />
         </div>
 
@@ -228,7 +228,7 @@ export function Dashboard({ highlightSection }: DashboardProps) {
           ref={atRiskRef}
           className={`${CARD_CLASSES} transition-shadow ${highlightSection === 'atrisk' ? HIGHLIGHT_CLASSES : ''}`}
         >
-          <h3 className="mb-3 text-sm font-semibold tracking-tight text-[#1E2B38]">At risk tasks</h3>
+          <h3 className="mb-3 text-sm font-semibold tracking-tight text-foreground">At risk tasks</h3>
           <AtRiskTable items={atRiskTasks} />
         </div>
       </div>

@@ -4,20 +4,38 @@ export type SortMode = 'date' | 'status' | 'parent' | 'progress';
 
 export const DEFAULT_TASK_STATUS: TaskStatus = 'todo';
 
-// Hex values are stored without a leading '#' to match pptxgenjs's expected
+// Bar and marker fills. Hex without a leading '#' to match pptxgenjs's expected
 // format (see export/theme.ts's COLORS); prefix with '#' for CSS/jsPDF use.
+//
+// Every value is a literal aicoo design-system token, so a bar means the same
+// thing here as it does in the product: grey for not-started (--status-neutral),
+// blue for in-flight (--kind-task), green for done (--status-active-dot), red
+// for blocked (--status-inactive-dot). These read with white text on top; the
+// chip palette below is the pale counterpart for text on a tinted background.
 export const TASK_STATUS_COLORS: Record<TaskStatus, string> = {
-  todo: '94A3B8',
-  in_progress: 'F2C14E',
-  done: '2A9D90',
-  blocked: 'E76E50',
+  todo: '9CA3AF',
+  in_progress: '3B82F6',
+  done: '22C55E',
+  blocked: 'EF4444',
 };
 
+/** The pale chip each status wears in the UI — the product's own Kanban chip
+ * colours (tokens/status-palette.css), where a status is a tinted background
+ * with dark text and a 1px border, never a saturated pill. */
+export const TASK_STATUS_CHIP: Record<TaskStatus, { bg: string; fg: string; border: string }> = {
+  todo: { bg: '#f3f4f6', fg: '#1f2937', border: '#e5e7eb' },
+  in_progress: { bg: '#dbeafe', fg: '#1e40af', border: '#bfdbfe' },
+  done: { bg: '#dcfce7', fg: '#166534', border: '#bbf7d0' },
+  blocked: { bg: '#fee2e2', fg: '#991b1b', border: '#fecaca' },
+};
+
+// Status words are lowercase throughout the product ("on track", "delayed",
+// "done") — deliberately, unlike first-class object labels which are Title Case.
 export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
-  todo: 'To do',
-  in_progress: 'In progress',
-  done: 'Done',
-  blocked: 'Blocked',
+  todo: 'to do',
+  in_progress: 'in progress',
+  done: 'done',
+  blocked: 'blocked',
 };
 
 /** Every status, in the order they're offered in a picker — one list, so a

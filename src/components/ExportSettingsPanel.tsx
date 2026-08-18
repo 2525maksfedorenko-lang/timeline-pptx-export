@@ -6,13 +6,14 @@ import { getTaskStatus, TASK_STATUS_LABELS, type SortMode, type TaskStatus } fro
 import { toHtml } from '../utils/renderMarkdown';
 import { buildTaskHierarchy } from '../utils/taskHierarchy';
 import { firstDayOfMonthIso, getDateRange, lastDayOfMonthIso } from '../export/dateScale';
+import { ChevronDown, ChevronRight, Pin } from 'lucide-react';
 
 const COMMENT_BODY_CLASSES =
   '[&_p]:mb-2 [&_p:last-child]:mb-0 [&_strong]:font-semibold [&_em]:italic ' +
   '[&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:mb-0.5 ' +
   '[&_h1]:text-base [&_h1]:font-semibold [&_h2]:text-sm [&_h2]:font-semibold [&_h3]:text-sm [&_h3]:font-semibold ' +
-  '[&_code]:rounded [&_code]:bg-slate-100 [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-xs ' +
-  '[&_a]:text-[#2A9D90] [&_a]:underline';
+  '[&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-xs ' +
+  '[&_a]:text-primary [&_a]:underline';
 
 const COMMENT_MODE_OPTIONS: { value: ExportOptions['commentMode']; label: string }[] = [
   { value: 'latest', label: 'Latest comment only' },
@@ -50,7 +51,7 @@ const MOBILE_SECTION_DEFAULTS: Record<MobileSection, boolean> = {
   comments: false,
 };
 
-/** The ▸/▾ control that collapses one section. Rendered only below the
+/** The chevron control that collapses one section. Rendered only below the
  * breakpoint — a desktop header has no such element at all, rather than a
  * hidden one — and as its own button rather than a click handler on the
  * header row, which would swallow the taps meant for the action button
@@ -62,9 +63,9 @@ function SectionToggle({ isOpen, label, onToggle }: { isOpen: boolean; label: st
       onClick={onToggle}
       aria-expanded={isOpen}
       aria-label={`${isOpen ? 'Collapse' : 'Expand'} ${label}`}
-      className="-my-2 flex h-11 w-11 items-center justify-center rounded-md text-xs text-[#1E2B38]"
+      className="-my-2 flex h-11 w-11 items-center justify-center rounded-md text-xs text-foreground"
     >
-      {isOpen ? '▾' : '▸'}
+      {isOpen ? <ChevronDown size={16} strokeWidth={2} /> : <ChevronRight size={16} strokeWidth={2} />}
     </button>
   );
 }
@@ -148,14 +149,14 @@ export function ExportSettingsPanel() {
   return (
     <div>
       <div className="mb-4 flex items-center justify-between gap-2">
-          <label htmlFor="sort-mode-select" className="text-xs font-medium uppercase tracking-wide text-slate-500">
+          <label htmlFor="sort-mode-select" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Sort by
           </label>
           <select
             id="sort-mode-select"
             value={sortMode}
             onChange={(event) => updateExportOptions({ sortMode: event.target.value as SortMode })}
-            className="rounded-md border border-[#E5E5E1] px-2 py-1 text-sm text-[#1E2B38] focus:border-[#2A9D90] focus:outline-none max-md:min-h-11 max-md:flex-1"
+            className="rounded-md border border-border px-2 py-1 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-md:min-h-11 max-md:flex-1"
           >
             {SORT_MODE_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
@@ -167,7 +168,7 @@ export function ExportSettingsPanel() {
 
       <div>
           <div className="mb-3 flex items-center justify-between">
-            <span className="flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-slate-500">
+            <span className="flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Tasks included in export
               {isMobile && (
                 <SectionToggle
@@ -180,7 +181,7 @@ export function ExportSettingsPanel() {
             <button
               type="button"
               onClick={handleToggleAll}
-              className="rounded-md border border-[#2A9D90] px-3 py-1 text-xs font-medium text-[#2A9D90] transition-colors hover:bg-[#2A9D90]/10 max-md:min-h-11"
+              className="rounded-md border border-primary px-3 py-1 text-xs font-medium text-primary transition-colors hover:bg-muted/50 max-md:min-h-11"
             >
               {allIncluded ? 'Deselect all' : 'Select all'}
             </button>
@@ -192,7 +193,7 @@ export function ExportSettingsPanel() {
                 aria-label="Set status for checked tasks"
                 value={bulkStatus}
                 onChange={(event) => setBulkStatus(event.target.value as TaskStatus | '')}
-                className="min-w-0 flex-1 rounded-md border border-[#E5E5E1] px-2 py-1.5 text-sm text-[#1E2B38] focus:border-[#2A9D90] focus:outline-none max-md:min-h-11"
+                className="min-w-0 flex-1 rounded-md border border-border px-2 py-1.5 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-md:min-h-11"
               >
                 <option value="">Set status to…</option>
                 {TASK_STATUS_OPTIONS.map((option) => (
@@ -206,7 +207,7 @@ export function ExportSettingsPanel() {
                 onClick={applyBulkStatus}
                 disabled={bulkStatus === '' || includedItems.length === 0}
                 title="Applies to every task checked below"
-                className="flex-shrink-0 rounded-md bg-[#2A9D90] px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[#238277] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-[#2A9D90] max-md:min-h-11"
+                className="flex-shrink-0 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-primary max-md:min-h-11"
               >
                 Apply to {includedItems.length}
               </button>
@@ -227,9 +228,9 @@ export function ExportSettingsPanel() {
                     onChange={(event) =>
                       updateItem(item.id, { includeInExport: event.target.checked })
                     }
-                    className="h-4 w-4 rounded border-[#E5E5E1] text-[#2A9D90] focus:ring-[#2A9D90] max-md:h-5 max-md:w-5"
+                    className="h-4 w-4 rounded border-border text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-md:h-5 max-md:w-5"
                   />
-                  <span className="flex-1 truncate text-sm font-medium text-[#1E2B38]">{item.label}</span>
+                  <span className="flex-1 truncate text-sm font-medium text-foreground">{item.label}</span>
                   {/* The same chip as the chart's status column, not a
                       second control that means the same thing. */}
                   <div className="w-[104px] flex-shrink-0">
@@ -246,7 +247,7 @@ export function ExportSettingsPanel() {
 
           <label
             htmlFor="comment-mode-select"
-            className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500"
+            className="mb-1 block text-xs font-medium uppercase tracking-wide text-muted-foreground"
           >
             Comments in export
           </label>
@@ -256,7 +257,7 @@ export function ExportSettingsPanel() {
             onChange={(event) =>
               updateExportOptions({ commentMode: event.target.value as ExportOptions['commentMode'] })
             }
-            className="w-full rounded-md border border-[#E5E5E1] px-3 py-2 text-sm text-[#1E2B38] focus:border-[#2A9D90] focus:outline-none max-md:min-h-11"
+            className="w-full rounded-md border border-border px-3 py-2 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-md:min-h-11"
           >
             {COMMENT_MODE_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
@@ -265,29 +266,29 @@ export function ExportSettingsPanel() {
             ))}
           </select>
 
-          <label className="mt-3 flex items-center gap-2 text-sm text-[#1E2B38] max-md:min-h-11">
+          <label className="mt-3 flex items-center gap-2 text-sm text-foreground max-md:min-h-11">
             <input
               type="checkbox"
               checked={showDependencies}
               onChange={(event) => updateExportOptions({ showDependencies: event.target.checked })}
-              className="h-4 w-4 rounded border-[#E5E5E1] text-[#2A9D90] focus:ring-[#2A9D90] max-md:h-5 max-md:w-5"
+              className="h-4 w-4 rounded border-border text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-md:h-5 max-md:w-5"
             />
             Show dependencies
           </label>
 
-          <label className="mt-2 flex items-center gap-2 text-sm text-[#1E2B38] max-md:min-h-11">
+          <label className="mt-2 flex items-center gap-2 text-sm text-foreground max-md:min-h-11">
             <input
               type="checkbox"
               checked={showHierarchyLines}
               onChange={(event) => updateExportOptions({ showHierarchyLines: event.target.checked })}
-              className="h-4 w-4 rounded border-[#E5E5E1] text-[#2A9D90] focus:ring-[#2A9D90] max-md:h-5 max-md:w-5"
+              className="h-4 w-4 rounded border-border text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-md:h-5 max-md:w-5"
             />
             Show hierarchy lines
           </label>
 
-          <div className="mt-4 border-t border-[#E5E5E1] pt-4">
+          <div className="mt-4 border-t border-border pt-4">
             <div className="mb-1 flex items-center justify-between">
-              <span className="flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-slate-500">
+              <span className="flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Export timeframe (optional)
                 {isMobile && (
                   <SectionToggle
@@ -301,7 +302,7 @@ export function ExportSettingsPanel() {
                 <button
                   type="button"
                   onClick={() => updateExportOptions({ exportTimeframe: null })}
-                  className="text-xs font-medium text-[#2A9D90] hover:underline max-md:min-h-11 max-md:px-2"
+                  className="text-xs font-medium text-primary hover:underline max-md:min-h-11 max-md:px-2"
                 >
                   Clear
                 </button>
@@ -317,7 +318,7 @@ export function ExportSettingsPanel() {
                   aria-label="From month"
                   value={fromMonth}
                   onChange={(event) => setTimeframe(Number(event.target.value), fromYear, toMonth, toYear)}
-                  className="min-w-0 flex-1 rounded-md border border-[#E5E5E1] px-2 py-1.5 text-sm text-[#1E2B38] focus:border-[#2A9D90] focus:outline-none max-md:min-h-11"
+                  className="min-w-0 flex-1 rounded-md border border-border px-2 py-1.5 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-md:min-h-11"
                 >
                   {MONTH_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -329,7 +330,7 @@ export function ExportSettingsPanel() {
                   aria-label="From year"
                   value={fromYear}
                   onChange={(event) => setTimeframe(fromMonth, Number(event.target.value), toMonth, toYear)}
-                  className="w-20 flex-shrink-0 rounded-md border border-[#E5E5E1] px-2 py-1.5 text-sm text-[#1E2B38] focus:border-[#2A9D90] focus:outline-none max-md:min-h-11"
+                  className="w-20 flex-shrink-0 rounded-md border border-border px-2 py-1.5 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-md:min-h-11"
                 >
                   {yearOptions.map((year) => (
                     <option key={year} value={year}>
@@ -338,13 +339,13 @@ export function ExportSettingsPanel() {
                   ))}
                 </select>
               </div>
-              <span className="text-xs text-slate-400">to</span>
+              <span className="text-xs text-muted-foreground/70">to</span>
               <div className="flex flex-1 gap-1">
                 <select
                   aria-label="To month"
                   value={toMonth}
                   onChange={(event) => setTimeframe(fromMonth, fromYear, Number(event.target.value), toYear)}
-                  className="min-w-0 flex-1 rounded-md border border-[#E5E5E1] px-2 py-1.5 text-sm text-[#1E2B38] focus:border-[#2A9D90] focus:outline-none max-md:min-h-11"
+                  className="min-w-0 flex-1 rounded-md border border-border px-2 py-1.5 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-md:min-h-11"
                 >
                   {MONTH_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -356,7 +357,7 @@ export function ExportSettingsPanel() {
                   aria-label="To year"
                   value={toYear}
                   onChange={(event) => setTimeframe(fromMonth, fromYear, toMonth, Number(event.target.value))}
-                  className="w-20 flex-shrink-0 rounded-md border border-[#E5E5E1] px-2 py-1.5 text-sm text-[#1E2B38] focus:border-[#2A9D90] focus:outline-none max-md:min-h-11"
+                  className="w-20 flex-shrink-0 rounded-md border border-border px-2 py-1.5 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-md:min-h-11"
                 >
                   {yearOptions.map((year) => (
                     <option key={year} value={year}>
@@ -370,8 +371,8 @@ export function ExportSettingsPanel() {
           </div>
 
           {comments.length > 0 && (
-            <div className="mt-4 border-t border-[#E5E5E1] pt-4">
-              <span className="mb-2 flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-slate-500">
+            <div className="mt-4 border-t border-border pt-4">
+              <span className="mb-2 flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Comments
                 {isMobile && (
                   <SectionToggle
@@ -386,18 +387,18 @@ export function ExportSettingsPanel() {
                 {comments.map((comment) => {
                   const task = items.find((item) => item.id === comment.taskId);
                   return (
-                    <li key={comment.id} className="rounded-md border border-[#E5E5E1] p-3">
-                      <div className="mb-1 flex items-center justify-between text-xs text-slate-500">
-                        <span className="font-medium text-[#1E2B38]">
+                    <li key={comment.id} className="rounded-md border border-border p-3">
+                      <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
+                        <span className="font-medium text-foreground">
                           {task?.label ?? 'Unknown task'}
                         </span>
                         <span className="font-mono text-[11px] tracking-[0.02em]">
-                          {comment.isPinned ? '📌 ' : ''}
+                          {comment.isPinned ? <Pin size={11} strokeWidth={2} className="inline align-[-1px]" aria-label="Pinned" /> : null}
                           {new Date(comment.createdAt).toLocaleDateString()}
                         </span>
                       </div>
                       <div
-                        className={`text-sm text-[#1E2B38] ${COMMENT_BODY_CLASSES}`}
+                        className={`text-sm text-foreground ${COMMENT_BODY_CLASSES}`}
                         dangerouslySetInnerHTML={{ __html: toHtml(comment.body) }}
                       />
                     </li>

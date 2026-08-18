@@ -1,10 +1,10 @@
+import { ChevronDown } from 'lucide-react';
 import {
-  TASK_STATUS_COLORS,
+  TASK_STATUS_CHIP,
   TASK_STATUS_LABELS,
   TASK_STATUS_VALUES,
   type TaskStatus,
 } from '../types/timeline';
-import { needsDarkText } from '../utils/colorContrast';
 
 interface StatusSelectProps {
   status: TaskStatus;
@@ -14,9 +14,9 @@ interface StatusSelectProps {
   label?: string;
 }
 
-/** A task's status as the control that changes it: a chip filled with the
- * status's own color, opening the four options on click and committing the
- * pick immediately.
+/** A task's status as the control that changes it: the product's status chip —
+ * a tinted background with dark text and a hairline border — opening the four
+ * options on click and committing the pick immediately.
  *
  * A native select rather than a hand-built menu — it opens on click, is
  * keyboard- and touch-operable for free, and needs no outside-click
@@ -24,34 +24,33 @@ interface StatusSelectProps {
  * flyout's task list, so the two can't drift into looking like different
  * controls for the same thing. */
 export function StatusSelect({ status, onChange, label }: StatusSelectProps) {
-  const chipColor = `#${TASK_STATUS_COLORS[status]}`;
-  const textColor = needsDarkText(chipColor) ? '#1E2B38' : '#FFFFFF';
+  const chip = TASK_STATUS_CHIP[status];
 
   return (
     <div className="relative w-full">
       <select
         value={status}
         onChange={(event) => onChange(event.target.value as TaskStatus)}
-        className="w-full cursor-pointer appearance-none rounded-full py-1 pl-2 pr-4 text-left text-[11px] font-semibold focus:outline-none focus:ring-2 focus:ring-[#2A9D90]/40"
-        style={{ backgroundColor: chipColor, color: textColor }}
+        className="w-full cursor-pointer appearance-none rounded-md border py-1 pl-2 pr-6 text-left text-xs font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        style={{ backgroundColor: chip.bg, color: chip.fg, borderColor: chip.border }}
         aria-label={label ? `Status: ${label}` : `Status: ${TASK_STATUS_LABELS[status]}`}
       >
         {TASK_STATUS_VALUES.map((value) => (
           // Options are painted by the OS menu, which inherits the select's
-          // own colors — a chip-colored dropdown would leave three of the
-          // four unreadable, so each option resets them.
-          <option key={value} value={value} style={{ backgroundColor: '#FFFFFF', color: '#1E2B38' }}>
+          // own colors — a tinted dropdown would leave three of the four
+          // looking mislabelled, so each option resets them.
+          <option key={value} value={value} style={{ backgroundColor: '#FFFFFF', color: '#0A0A0A' }}>
             {TASK_STATUS_LABELS[value]}
           </option>
         ))}
       </select>
-      <span
-        className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px]"
-        style={{ color: textColor }}
+      <ChevronDown
+        size={14}
+        strokeWidth={2}
+        className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 opacity-50"
+        style={{ color: chip.fg }}
         aria-hidden="true"
-      >
-        ▾
-      </span>
+      />
     </div>
   );
 }

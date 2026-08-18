@@ -24,10 +24,10 @@ function ModeOption({
     <button
       type="button"
       onClick={onClick}
-      className="w-full rounded-md border border-[#E5E5E1] px-4 py-3 text-left transition-colors hover:border-[#2A9D90] hover:bg-[#2A9D90]/5"
+      className="w-full rounded-md border border-border px-4 py-3 text-left transition-colors hover:bg-accent hover:bg-muted/50"
     >
-      <span className="block text-sm font-medium text-[#1E2B38]">{title}</span>
-      <span className="mt-0.5 block text-xs text-slate-500">{description}</span>
+      <span className="block text-sm font-medium text-foreground">{title}</span>
+      <span className="mt-0.5 block text-xs text-muted-foreground">{description}</span>
     </button>
   );
 }
@@ -46,7 +46,7 @@ export function ExportOverflowModal({ totalTasks, capacity, onSelect, onCancel }
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[#1E2B38]/40 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
       onClick={onCancel}
     >
       <div
@@ -54,12 +54,12 @@ export function ExportOverflowModal({ totalTasks, capacity, onSelect, onCancel }
         aria-modal="true"
         aria-labelledby="export-overflow-title"
         onClick={(event) => event.stopPropagation()}
-        className="w-full max-w-md rounded-lg border border-[#E5E5E1] bg-white p-6 shadow-xl"
+        className="w-full max-w-md rounded-lg border border-border bg-background p-6 shadow-xl"
       >
-        <h2 id="export-overflow-title" className="text-base font-semibold tracking-tight text-[#1E2B38]">
+        <h2 id="export-overflow-title" className="text-base font-semibold tracking-tight text-foreground">
           More tasks than fit on one slide
         </h2>
-        <p className="mt-1.5 text-sm text-slate-500">
+        <p className="mt-1.5 text-sm text-muted-foreground">
           Your plan has {totalTasks} tasks, only {capacity} fit on a single slide.
         </p>
 
@@ -80,7 +80,7 @@ export function ExportOverflowModal({ totalTasks, capacity, onSelect, onCancel }
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-md px-3 py-1.5 text-sm font-medium text-slate-500 transition-colors hover:bg-slate-100"
+            className="rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted"
           >
             Cancel
           </button>

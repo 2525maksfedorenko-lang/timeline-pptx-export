@@ -56,7 +56,7 @@ export function AddTaskForm() {
       <button
         type="button"
         onClick={() => setIsOpen(true)}
-        className="rounded-md border border-dashed border-[#E5E5E1] px-3 py-1.5 text-sm text-slate-500 transition-colors hover:border-[#2A9D90] hover:text-[#2A9D90] max-md:min-h-11 max-md:px-4"
+        className="rounded-md border border-dashed border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground max-md:min-h-11 max-md:px-4"
       >
         + Add task
       </button>
@@ -64,9 +64,9 @@ export function AddTaskForm() {
   }
 
   return (
-    <div className="flex flex-wrap items-end gap-3 rounded-md border border-[#E5E5E1] bg-white p-3 max-md:w-full max-md:flex-col max-md:items-stretch">
+    <div className="flex flex-wrap items-end gap-3 rounded-md border border-border bg-card p-3 max-md:w-full max-md:flex-col max-md:items-stretch">
       <div className="flex flex-col gap-1">
-        <label htmlFor="add-task-label" className="text-xs font-medium text-slate-500">
+        <label htmlFor="add-task-label" className="text-xs font-medium text-muted-foreground">
           Label *
         </label>
         <input
@@ -76,12 +76,12 @@ export function AddTaskForm() {
           value={label}
           onChange={(event) => setLabel(event.target.value)}
           placeholder="Task name"
-          className="rounded-md border border-[#E5E5E1] px-2 py-1 text-sm text-[#1E2B38] focus:border-[#2A9D90] focus:outline-none"
+          className="rounded-md border border-border px-2 py-1 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
         />
       </div>
 
       <div className="flex flex-col gap-1">
-        <label htmlFor="add-task-start" className="text-xs font-medium text-slate-500">
+        <label htmlFor="add-task-start" className="text-xs font-medium text-muted-foreground">
           Start *
         </label>
         <input
@@ -89,12 +89,12 @@ export function AddTaskForm() {
           type="date"
           value={start}
           onChange={(event) => setStart(event.target.value)}
-          className="rounded-md border border-[#E5E5E1] px-2 py-1 text-sm text-[#1E2B38] focus:border-[#2A9D90] focus:outline-none"
+          className="rounded-md border border-border px-2 py-1 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
         />
       </div>
 
       <div className="flex flex-col gap-1">
-        <label htmlFor="add-task-end" className="text-xs font-medium text-slate-500">
+        <label htmlFor="add-task-end" className="text-xs font-medium text-muted-foreground">
           End *
         </label>
         <input
@@ -102,19 +102,19 @@ export function AddTaskForm() {
           type="date"
           value={end}
           onChange={(event) => setEnd(event.target.value)}
-          className="rounded-md border border-[#E5E5E1] px-2 py-1 text-sm text-[#1E2B38] focus:border-[#2A9D90] focus:outline-none"
+          className="rounded-md border border-border px-2 py-1 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
         />
       </div>
 
       <div className="flex flex-col gap-1">
-        <label htmlFor="add-task-status" className="text-xs font-medium text-slate-500">
+        <label htmlFor="add-task-status" className="text-xs font-medium text-muted-foreground">
           Status *
         </label>
         <select
           id="add-task-status"
           value={status}
           onChange={(event) => setStatus(event.target.value as TaskStatus)}
-          className="rounded-md border border-[#E5E5E1] px-2 py-1 text-sm text-[#1E2B38] focus:border-[#2A9D90] focus:outline-none"
+          className="rounded-md border border-border px-2 py-1 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
         >
           {TASK_STATUS_OPTIONS.map((option) => (
             <option key={option.value} value={option.value}>
@@ -125,7 +125,7 @@ export function AddTaskForm() {
       </div>
 
       <div className="flex flex-col gap-1">
-        <label htmlFor="add-task-assignee" className="text-xs font-medium text-slate-500">
+        <label htmlFor="add-task-assignee" className="text-xs font-medium text-muted-foreground">
           Assignee
         </label>
         <AssigneeSelect
@@ -143,14 +143,14 @@ export function AddTaskForm() {
           type="button"
           onClick={() => void handleAdd()}
           disabled={!canAdd}
-          className="rounded-md bg-[#2A9D90] px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[#238277] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-[#2A9D90]"
+          className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-primary"
         >
           Add
         </button>
         <button
           type="button"
           onClick={handleCancel}
-          className="rounded-md px-3 py-1.5 text-sm font-medium text-slate-500 hover:bg-slate-100"
+          className="rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-muted"
         >
           Cancel
         </button>

@@ -27,7 +27,7 @@ export const DEV_SEED_ITEMS: TimelineItem[] = [
     progress: 60,
     status: 'in_progress',
     group: 'Phase 1',
-    color: '#8b5cf6',
+    color: '#a855f7',
     dependencies: ['1'],
   },
   {
@@ -38,7 +38,7 @@ export const DEV_SEED_ITEMS: TimelineItem[] = [
     progress: 30,
     status: 'in_progress',
     group: 'Phase 2',
-    color: '#f59e0b',
+    color: '#d97706',
     dependencies: ['2'],
   },
   {
@@ -60,7 +60,7 @@ export const DEV_SEED_ITEMS: TimelineItem[] = [
     progress: 50,
     status: 'blocked',
     group: 'Phase 2',
-    color: '#f59e0b',
+    color: '#d97706',
     parentId: '3',
   },
   {
@@ -71,7 +71,7 @@ export const DEV_SEED_ITEMS: TimelineItem[] = [
     progress: 20,
     status: 'in_progress',
     group: 'Phase 2',
-    color: '#f59e0b',
+    color: '#d97706',
     parentId: '3',
   },
   {
@@ -82,7 +82,7 @@ export const DEV_SEED_ITEMS: TimelineItem[] = [
     progress: 100,
     status: 'done',
     group: 'Internal',
-    color: '#94a3b8',
+    color: '#9ca3af',
     includeInExport: false,
   },
 ];

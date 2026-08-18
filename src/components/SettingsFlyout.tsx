@@ -24,7 +24,7 @@ export function SettingsFlyout({ onClose }: SettingsFlyoutProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex justify-end bg-[#1E2B38]/40"
+      className="fixed inset-0 z-50 flex justify-end bg-black/80"
       onClick={onClose}
       role="presentation"
     >
@@ -35,14 +35,14 @@ export function SettingsFlyout({ onClose }: SettingsFlyoutProps) {
         role="dialog"
         aria-modal="true"
         aria-label="Export settings"
-        className="flex h-full w-full max-w-md animate-[flyout-in_180ms_ease-out] flex-col border-l border-[#E5E5E1] bg-white shadow-xl"
+        className="flex h-full w-full max-w-md animate-[flyout-in_180ms_ease-out] flex-col border-l border-border bg-background shadow-xl"
       >
-        <div className="flex flex-shrink-0 items-center justify-between border-b border-[#E5E5E1] px-4 py-3">
-          <h2 className="text-sm font-semibold tracking-tight text-[#1E2B38]">Settings</h2>
+        <div className="flex flex-shrink-0 items-center justify-between border-b border-border px-4 py-3">
+          <h2 className="text-sm font-semibold tracking-tight text-foreground">Settings</h2>
           <button
             type="button"
             onClick={onClose}
-            className="flex h-9 w-9 items-center justify-center rounded-md text-xl leading-none text-slate-400 transition-colors hover:bg-slate-100 hover:text-[#1E2B38] max-md:h-11 max-md:w-11"
+            className="flex h-9 w-9 items-center justify-center rounded-md text-xl leading-none text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground max-md:h-11 max-md:w-11"
             aria-label="Close settings"
           >
             ×

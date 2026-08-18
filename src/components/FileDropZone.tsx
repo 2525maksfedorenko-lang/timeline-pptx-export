@@ -63,10 +63,10 @@ export function FileDropZone({ children }: { children: ReactNode }) {
         // pointer-events-none matters: an overlay that could itself become
         // the drag target would swallow the drop and leave the highlight
         // stuck on.
-        <div className="pointer-events-none fixed inset-0 z-40 flex items-center justify-center border-4 border-dashed border-[#2A9D90]/50 bg-[#2A9D90]/10 p-6">
-          <div className="rounded-lg border border-[#2A9D90] bg-white px-6 py-4 text-center shadow-lg">
-            <p className="text-sm font-semibold tracking-tight text-[#1E2B38]">Drop to import</p>
-            <p className="mt-1 text-xs text-slate-500">{IMPORTABLE_EXTENSIONS.join(', ')}</p>
+        <div className="pointer-events-none fixed inset-0 z-40 flex items-center justify-center border-4 border-dashed border-primary/50 bg-primary/10 p-6">
+          <div className="rounded-lg border border-primary bg-background px-6 py-4 text-center shadow-lg">
+            <p className="text-sm font-semibold tracking-tight text-foreground">Drop to import</p>
+            <p className="mt-1 text-xs text-muted-foreground">{IMPORTABLE_EXTENSIONS.join(', ')}</p>
           </div>
         </div>
       )}

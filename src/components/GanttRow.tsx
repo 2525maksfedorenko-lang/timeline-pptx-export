@@ -146,7 +146,7 @@ const ICON_BUTTON_CLASS = 'flex h-4 w-4 flex-shrink-0 items-center justify-cente
 const FALLBACK_ASSIGNEE_COLOR = '94A3B8';
 // Solid, fully opaque so the date grid lines (drawn behind the bar in
 // z-order) can never bleed through the unfilled part of the bar — an
-// inline color, not the bg-slate-200 utility class, so opacity is never at
+// inline color, not the bg-border utility class, so opacity is never at
 // the mercy of an inherited Tailwind CSS variable.
 const BAR_TRACK_COLOR = '#E2E8F0';
 // Must match how the progress text on the bar is actually styled below
@@ -176,7 +176,7 @@ const ROW_DIM_CLASS = 'opacity-40';
 // wash across the sticky columns. This is the half of the treatment the bars
 // can't provide — a related bar is often scrolled out of view, and then the
 // label column is the only place the branch can be seen at all.
-const branchTintClass = (isHighlighted: boolean) => (isHighlighted ? 'bg-[#F1F8F7]' : 'bg-white');
+const branchTintClass = (isHighlighted: boolean) => (isHighlighted ? 'bg-muted/50' : 'bg-card');
 
 export function GanttRow({
   item,
@@ -266,7 +266,7 @@ export function GanttRow({
         left: 0,
         width: fillWidth,
         justifyContent: 'center',
-        color: needsDarkText(barColor) ? '#1E2B38' : '#FFFFFF',
+        color: needsDarkText(barColor) ? '#0A0A0A' : '#FFFFFF',
       }
     : { left: fillWidth + PROGRESS_PADDING_PX, color: '#334155' };
 
@@ -467,7 +467,7 @@ export function GanttRow({
 
   return (
     <div
-      className="flex h-10 border-b border-slate-100"
+      className="flex h-10 border-b border-border"
       style={{ opacity: included ? 1 : 0.5 }}
       onMouseEnter={() => onRowHoverChange(true)}
       onMouseLeave={() => onRowHoverChange(false)}
@@ -486,7 +486,7 @@ export function GanttRow({
           `sticky left-0`, so on a horizontally scrolled chart the bars slide
           underneath it, and with both zones at the same z-index the tie
           would break on DOM order and paint the bars *over* the labels. The
-          opaque bg-white is the other half of that: sticky only reserves the
+          opaque bg-card is the other half of that: sticky only reserves the
           space, it doesn't hide what scrolls beneath it. */}
       {/* Zone 0: the task's status, as the chip you change it with. Its own
           sticky column ahead of the label so a row reads status-first, the
@@ -494,7 +494,7 @@ export function GanttRow({
           the same size whatever the task. Hidden on a phone (see
           statusZoneWidth); the status dot in zone 1 takes over there. */}
       <div
-        className={`sticky left-0 z-20 flex flex-shrink-0 items-center border-r border-slate-100 px-2 max-md:hidden ${branchTintClass(
+        className={`sticky left-0 z-20 flex flex-shrink-0 items-center border-r border-border px-2 max-md:hidden ${branchTintClass(
           isHighlighted,
         )}`}
         style={{ width: statusZoneWidth }}
@@ -509,7 +509,7 @@ export function GanttRow({
       </div>
 
       <div
-        className={`sticky z-20 flex flex-shrink-0 items-center gap-1.5 overflow-hidden border-r border-slate-100 px-2 ${branchTintClass(isHighlighted)}`}
+        className={`sticky z-20 flex flex-shrink-0 items-center gap-1.5 overflow-hidden border-r border-border px-2 ${branchTintClass(isHighlighted)}`}
         style={{ width: zone1Width, left: statusZoneWidth }}
       >
         <span
@@ -527,13 +527,13 @@ export function GanttRow({
             isDimmed ? ROW_DIM_CLASS : ''
           }`}
         >
-          <span className="whitespace-nowrap text-xs font-medium text-slate-900 max-md:min-w-0 max-md:truncate">
+          <span className="whitespace-nowrap text-xs font-medium text-foreground max-md:min-w-0 max-md:truncate">
             {item.label}
           </span>
           {item.tags?.map((tag) => (
             <span
               key={tag}
-              className="whitespace-nowrap rounded bg-slate-100 px-1 text-[9px] font-medium leading-[14px] text-slate-600 max-md:hidden"
+              className="whitespace-nowrap rounded bg-muted px-1 text-[9px] font-medium leading-[14px] text-muted-foreground max-md:hidden"
             >
               {tag}
             </span>
@@ -617,7 +617,7 @@ export function GanttRow({
           modal rather than disappearing — four 16px icons in a 104px column
           is a mouse-only proposition. */}
       <div
-        className={`sticky right-0 z-20 flex flex-shrink-0 items-center gap-1.5 border-l border-slate-100 px-2 max-md:justify-center max-md:px-1.5 ${branchTintClass(isHighlighted)}`}
+        className={`sticky right-0 z-20 flex flex-shrink-0 items-center gap-1.5 border-l border-border px-2 max-md:justify-center max-md:px-1.5 ${branchTintClass(isHighlighted)}`}
         style={{ width: zone3Width }}
       >
         <button
@@ -625,7 +625,7 @@ export function GanttRow({
           data-popup-trigger
           onMouseDown={(event) => event.stopPropagation()}
           onClick={handleTriggerClick}
-          className={`${iconButtonClass} rounded-full max-md:h-10 max-md:w-10 ${item.assignee ? '' : 'text-slate-400 hover:text-slate-600'}`}
+          className={`${iconButtonClass} rounded-full max-md:h-10 max-md:w-10 ${item.assignee ? '' : 'text-muted-foreground/70 hover:text-muted-foreground'}`}
           style={assigneeColor ? { backgroundColor: assigneeColor } : undefined}
           title={item.assignee ? item.assignee.name : 'Set assignee'}
           aria-label={item.assignee ? `Assignee: ${item.assignee.name}` : 'Set assignee'}
@@ -633,7 +633,7 @@ export function GanttRow({
           {item.assignee && assigneeColor ? (
             <span
               className="text-[9px] font-semibold max-md:text-xs"
-              style={{ color: needsDarkText(assigneeColor) ? '#1E2B38' : '#FFFFFF' }}
+              style={{ color: needsDarkText(assigneeColor) ? '#0A0A0A' : '#FFFFFF' }}
             >
               {getInitials(item.assignee.name)}
             </span>
@@ -647,7 +647,7 @@ export function GanttRow({
           data-popup-trigger
           onMouseDown={(event) => event.stopPropagation()}
           onClick={handleTriggerClick}
-          className={`${iconButtonClass} text-slate-700/70 hover:text-slate-900 max-md:hidden`}
+          className={`${iconButtonClass} text-foreground/70 hover:text-foreground max-md:hidden`}
           title="Add comment / assignee"
           aria-label="Add comment / assignee"
         >
@@ -658,7 +658,7 @@ export function GanttRow({
           type="button"
           onMouseDown={(event) => event.stopPropagation()}
           onClick={handleToggleVisibility}
-          className={`${iconButtonClass} text-slate-700/70 hover:text-slate-900 max-md:hidden`}
+          className={`${iconButtonClass} text-foreground/70 hover:text-foreground max-md:hidden`}
           title={included ? 'Exclude from export' : 'Include in export'}
           aria-label={included ? 'Exclude from export' : 'Include in export'}
         >
@@ -670,7 +670,7 @@ export function GanttRow({
             type="button"
             onMouseDown={(event) => event.stopPropagation()}
             onClick={handleDelete}
-            className={`${iconButtonClass} text-slate-700/70 hover:text-red-600 max-md:hidden`}
+            className={`${iconButtonClass} text-foreground/70 hover:text-red-600 max-md:hidden`}
             title="Delete task and subtasks"
             aria-label="Delete task and subtasks"
           >

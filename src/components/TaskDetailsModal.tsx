@@ -78,16 +78,16 @@ export function TaskDetailsModal({
     // 512px dialog on a desktop — one rule, two shapes. The height cap and
     // the shorter textarea keep it inside a 667px screen once the on-screen
     // keyboard has taken its half.
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1E2B38]/40 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
       <div
         ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="w-full max-w-lg rounded-lg border border-[#E5E5E1] bg-white p-6 text-left shadow-xl max-md:max-h-[85vh] max-md:overflow-y-auto max-md:p-4"
+        className="w-full max-w-lg rounded-lg border border-border bg-background p-6 text-left shadow-xl max-md:max-h-[85vh] max-md:overflow-y-auto max-md:p-4"
       >
         <div className="flex items-center justify-between gap-3">
-          <h2 id={titleId} className="min-w-0 truncate text-base font-semibold tracking-tight text-[#1E2B38]">
+          <h2 id={titleId} className="min-w-0 truncate text-base font-semibold tracking-tight text-foreground">
             {item.label}
           </h2>
           {/* Phone-only: a desktop pointer has both the Cancel button and
@@ -96,7 +96,7 @@ export function TaskDetailsModal({
           <button
             type="button"
             onClick={onClose}
-            className="hidden h-11 w-11 flex-shrink-0 items-center justify-center rounded-md text-2xl leading-none text-slate-400 max-md:flex"
+            className="hidden h-11 w-11 flex-shrink-0 items-center justify-center rounded-md text-2xl leading-none text-muted-foreground/70 max-md:flex"
             aria-label="Close"
           >
             ×
@@ -104,7 +104,7 @@ export function TaskDetailsModal({
         </div>
 
         <div className="mt-5 flex flex-col gap-1.5 max-md:mt-4">
-          <label htmlFor={`comment-${item.id}`} className="text-sm font-medium text-slate-500">
+          <label htmlFor={`comment-${item.id}`} className="text-sm font-medium text-muted-foreground">
             Comment *
           </label>
           <textarea
@@ -114,12 +114,12 @@ export function TaskDetailsModal({
             value={commentText}
             onChange={(event) => onCommentTextChange(event.target.value)}
             placeholder="Add a note about this task…"
-            className="resize-none rounded-md border border-[#E5E5E1] px-3 py-2 text-base leading-relaxed text-[#1E2B38] focus:border-[#2A9D90] focus:outline-none max-md:h-24"
+            className="resize-none rounded-md border border-border px-3 py-2 text-base leading-relaxed text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-md:h-24"
           />
         </div>
 
         <div className="mt-4 flex flex-col gap-1.5">
-          <label htmlFor={`row-${item.id}-assignee`} className="text-sm font-medium text-slate-500">
+          <label htmlFor={`row-${item.id}-assignee`} className="text-sm font-medium text-muted-foreground">
             Assignee
           </label>
           <AssigneeSelect
@@ -133,7 +133,7 @@ export function TaskDetailsModal({
         </div>
 
         <div className="mt-4 flex flex-col gap-1.5">
-          <label htmlFor={`tag-${item.id}`} className="text-sm font-medium text-slate-500">
+          <label htmlFor={`tag-${item.id}`} className="text-sm font-medium text-muted-foreground">
             Tags
           </label>
           {item.tags && item.tags.length > 0 && (
@@ -141,13 +141,13 @@ export function TaskDetailsModal({
               {item.tags.map((tag) => (
                 <span
                   key={tag}
-                  className="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-0.5 text-sm text-slate-700"
+                  className="inline-flex items-center gap-1 rounded bg-muted px-2 py-0.5 text-sm text-foreground"
                 >
                   {tag}
                   <button
                     type="button"
                     onClick={() => onRemoveTag(tag)}
-                    className="leading-none text-slate-400 hover:text-slate-600"
+                    className="leading-none text-muted-foreground/70 hover:text-muted-foreground"
                     aria-label={`Remove tag ${tag}`}
                   >
                     ×
@@ -163,18 +163,18 @@ export function TaskDetailsModal({
             onChange={(event) => onTagInputChange(event.target.value)}
             onKeyDown={onTagInputKeyDown}
             placeholder="Add a tag, press Enter…"
-            className="rounded-md border border-[#E5E5E1] px-3 py-2 text-base text-[#1E2B38] focus:border-[#2A9D90] focus:outline-none"
+            className="rounded-md border border-border px-3 py-2 text-base text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           />
         </div>
 
         {/* The row actions that zone 3 gives up on a phone (see GanttRow):
             present in the DOM at every width but only displayed below the
             breakpoint, so the desktop dialog renders exactly as it did. */}
-        <div className="mt-5 hidden flex-col gap-2 border-t border-[#E5E5E1] pt-4 max-md:flex">
+        <div className="mt-5 hidden flex-col gap-2 border-t border-border pt-4 max-md:flex">
           <button
             type="button"
             onClick={onToggleIncludeInExport}
-            className="min-h-11 rounded-md border border-[#E5E5E1] px-4 text-sm font-medium text-[#1E2B38] transition-colors hover:bg-slate-50"
+            className="min-h-11 rounded-md border border-border px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted/50"
           >
             {includedInExport ? 'Exclude from export' : 'Include in export'}
           </button>
@@ -182,7 +182,7 @@ export function TaskDetailsModal({
             <button
               type="button"
               onClick={onDelete}
-              className="min-h-11 rounded-md border border-[#E76E50] px-4 text-sm font-medium text-[#E76E50] transition-colors hover:bg-[#E76E50]/10"
+              className="min-h-11 rounded-md border border-destructive px-4 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10"
             >
               Delete task and subtasks
             </button>
@@ -193,7 +193,7 @@ export function TaskDetailsModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md px-3 py-1.5 text-sm font-medium text-slate-500 transition-colors hover:bg-slate-100 max-md:min-h-11 max-md:flex-1"
+            className="rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted max-md:min-h-11 max-md:flex-1"
           >
             Cancel
           </button>
@@ -201,7 +201,7 @@ export function TaskDetailsModal({
             type="button"
             onClick={onSave}
             disabled={!canSave}
-            className="rounded-md bg-[#2A9D90] px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[#238277] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-[#2A9D90] max-md:min-h-11 max-md:flex-1"
+            className="rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-primary max-md:min-h-11 max-md:flex-1"
           >
             Save
           </button>

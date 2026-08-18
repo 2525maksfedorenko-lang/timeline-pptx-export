@@ -201,25 +201,25 @@ export function GanttChart() {
           which is also what gives the zoom buttons and the add-task form
           room to grow to thumb size. */}
       <div className="mb-3 flex items-center justify-between max-md:flex-col max-md:items-stretch max-md:gap-2">
-        <h2 className="text-lg font-semibold tracking-tight text-[#1E2B38]">Timeline</h2>
+        <h2 className="text-lg font-semibold tracking-tight text-foreground">Timeline</h2>
         <div className="flex items-center gap-3 max-md:flex-wrap max-md:justify-between">
           <ZoomControl />
           <AddTaskForm />
         </div>
       </div>
-      <div ref={scrollRef} className="w-full overflow-x-auto rounded-lg border border-slate-200 bg-white">
+      <div ref={scrollRef} className="w-full overflow-x-auto rounded-lg border border-border bg-card">
         <div style={{ width: rowWidth }}>
-          <div className="flex border-b border-slate-200 bg-slate-50">
+          <div className="flex border-b border-border bg-muted/50">
             {!isMobile && (
               <div
-                className="sticky left-0 z-20 flex-shrink-0 border-r border-slate-200 bg-slate-50 px-2 py-2 text-xs font-medium text-slate-500"
+                className="sticky left-0 z-20 flex-shrink-0 border-r border-border bg-muted/50 px-2 py-2 text-xs font-medium text-muted-foreground"
                 style={{ width: statusZoneWidth }}
               >
                 Status
               </div>
             )}
             <div
-              className="sticky z-20 flex-shrink-0 border-r border-slate-200 bg-slate-50 px-2 py-2 text-xs font-medium text-slate-500"
+              className="sticky z-20 flex-shrink-0 border-r border-border bg-muted/50 px-2 py-2 text-xs font-medium text-muted-foreground"
               style={{ width: zone1Width, left: statusZoneWidth }}
             >
               Task
@@ -233,8 +233,8 @@ export function GanttChart() {
                   // wraps to "Aug" / "01" inside the fixed pxPerDay column
                   // exactly as it did before, since both halves are narrower
                   // than the column even at the tightest zoom.
-                  className={`flex-shrink-0 py-2 text-center font-mono text-[10px] tracking-[0.02em] text-slate-500 ${
-                    showDayCellBorders ? 'border-r border-slate-100' : ''
+                  className={`flex-shrink-0 py-2 text-center font-mono text-[10px] tracking-[0.02em] text-muted-foreground ${
+                    showDayCellBorders ? 'border-r border-border' : ''
                   }`}
                   style={{ width: pxPerDay }}
                 >
@@ -243,7 +243,7 @@ export function GanttChart() {
               ))}
             </div>
             <div
-              className="sticky right-0 z-20 flex-shrink-0 border-l border-slate-200 bg-slate-50"
+              className="sticky right-0 z-20 flex-shrink-0 border-l border-border bg-muted/50"
               style={{ width: zone3Width }}
             />
           </div>
