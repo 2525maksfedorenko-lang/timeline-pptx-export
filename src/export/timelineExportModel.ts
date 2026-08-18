@@ -12,7 +12,7 @@ import { parseMarkdownBlocks, type MarkdownBlock } from '../utils/renderMarkdown
 import { getStatusSegments, type StatusSegment } from '../utils/dashboardMetrics';
 import { clampProgress } from '../utils/clampProgress';
 import { resolveBarColor } from '../utils/barColor';
-import { isNestedTask, resolveBarGeometry } from '../utils/barNesting';
+import { buildDepthMap, labelIndent, resolveBarGeometry } from '../utils/barNesting';
 import { readableTextOn } from '../utils/colorContrast';
 import { buildTaskHierarchy } from '../utils/taskHierarchy';
 import {
@@ -492,6 +492,11 @@ function buildOverviewSlide(
   let headerRuleY: number | null = null;
   let dividerX: number | null = null;
 
+  // Depth per task for the set actually drawn on this slide, resolved once from
+  // the tree. Judged against *these* items, so a task whose parent isn't on the
+  // slide is a root here and is drawn like one.
+  const depthById = buildDepthMap(items);
+
   if (dateWindow && items.length > 0) {
     const { minDate, maxDate } = dateWindow;
     const totalDays = daysBetween(minDate, maxDate) + 1;
@@ -562,10 +567,8 @@ function buildOverviewSlide(
       // Nesting is judged against the items actually drawn on this slide:
       // a task whose parent isn't among them is a root here, and is drawn
       // full height like one.
-      const { height: barHeight, offset: barOffsetY } = resolveBarGeometry(
-        BAR_HEIGHT_IN,
-        isNestedTask(items, item),
-      );
+      const depth = depthById.get(item.id) ?? 0;
+      const { height: barHeight, offset: barOffsetY } = resolveBarGeometry(BAR_HEIGHT_IN, depth);
 
       // The progress text goes inside the fill only when the fill measurably
       // holds it at the size it's actually drawn — not at some percentage of
@@ -579,8 +582,13 @@ function buildOverviewSlide(
 
       // The name lives in the Task column: same x on every row, whatever the
       // bar is doing. Nothing about the bar feeds into this any more.
-      const labelX = CONTENT_X_IN + STATUS_COL_WIDTH_IN + COLUMN_TEXT_INSET_IN;
-      const labelBoxWidth = TASK_COL_WIDTH_IN - COLUMN_TEXT_INSET_IN * 2;
+      // Indented by depth from the column's fixed left edge, by the same rule the
+      // on-screen label column uses — and the box the name truncates against
+      // shrinks by exactly that indent, so an indented name is cut earlier rather
+      // than pushed past the column.
+      const labelIndentIn = labelIndent(BAR_HEIGHT_IN, depth);
+      const labelX = CONTENT_X_IN + STATUS_COL_WIDTH_IN + COLUMN_TEXT_INSET_IN + labelIndentIn;
+      const labelBoxWidth = TASK_COL_WIDTH_IN - COLUMN_TEXT_INSET_IN * 2 - labelIndentIn;
 
       const statusText = TASK_STATUS_LABELS[status];
       const statusScale = TASK_STATUS_SCALE[status];

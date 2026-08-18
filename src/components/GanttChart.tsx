@@ -16,6 +16,7 @@ import { ZoomControl } from './ZoomControl';
 import { BASE_PX_PER_DAY, MS_PER_DAY, formatShortDate, getDateRange } from '../export/dateScale';
 import { MAX_VISIBLE_DAYS_FOR_DAY_LINES } from '../export/dateGrid';
 import { sortItems } from '../utils/sortItems';
+import { buildDepthMap } from '../utils/barNesting';
 import { getRelatedTreeIds } from '../utils/taskHierarchy';
 import { useElementWidth } from '../utils/useElementWidth';
 import { useIsMobile } from '../utils/useIsMobile';
@@ -142,7 +143,7 @@ export function GanttChart() {
   const isMobile = useIsMobile();
   const pxPerDay = BASE_PX_PER_DAY * zoomLevel;
   const zone1Width = useMemo(
-    () => computeZone1Width(items, isMobile ? MOBILE_ZONE1_MAX_WIDTH_PX : undefined),
+    () => computeZone1Width(items, buildDepthMap(items), isMobile ? MOBILE_ZONE1_MAX_WIDTH_PX : undefined),
     [items, isMobile],
   );
   const zone3Width = isMobile ? MOBILE_ZONE3_WIDTH_PX : ZONE3_WIDTH_PX;
@@ -155,6 +156,10 @@ export function GanttChart() {
   // the rows, the day header and all three SVG overlays can't disagree.
   const timelineStartX = statusZoneWidth + zone1Width;
   const sortedItems = useMemo(() => sortItems(items, sortMode), [items, sortMode]);
+  // Depth per task, resolved once from the tree and handed to the rows. A row
+  // asking "am I nested?" for itself would both scan the whole list per row and
+  // collapse every level below the first into one.
+  const depthById = useMemo(() => buildDepthMap(items), [items]);
 
   const { minDate, days } = useMemo(() => {
     const { minDate: min, totalDays } = getDateRange(items);
@@ -269,6 +274,7 @@ export function GanttChart() {
                 <GanttRow
                   key={item.id}
                   item={item}
+                  depth={depthById.get(item.id) ?? 0}
                   minDate={minDate}
                   pxPerDay={pxPerDay}
                   timelineWidth={timelineWidth}

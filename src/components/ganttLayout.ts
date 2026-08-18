@@ -1,4 +1,5 @@
 import type { TimelineItem } from '../types/timeline';
+import { labelIndent } from '../utils/barNesting';
 import { measureTextWidthPx } from '../utils/measureTextWidth';
 
 // Shared column geometry for the Gantt chart's 3-zone row layout (see
@@ -45,9 +46,21 @@ const ZONE1_CHROME_PX = 34;
  * `maxWidthPx` caps that — the phone layout passes
  * MOBILE_ZONE1_MAX_WIDTH_PX, trading full labels (they ellipsize instead,
  * see GanttRow's `max-md:truncate`) for a timeline wide enough to read. */
-export function computeZone1Width(items: TimelineItem[], maxWidthPx = Infinity): number {
+export function computeZone1Width(
+  items: TimelineItem[],
+  depthById: Map<string, number>,
+  maxWidthPx = Infinity,
+): number {
+  // A nested label starts further in, so what has to fit is its indent plus its
+  // text — measuring the text alone would let an indented label clip on desktop,
+  // where the column is supposed to grow rather than ellipsize.
   const maxLabelWidth = items.reduce(
-    (max, item) => Math.max(max, measureTextWidthPx(item.label, ZONE1_LABEL_FONT)),
+    (max, item) =>
+      Math.max(
+        max,
+        labelIndent(BAR_HEIGHT_PX, depthById.get(item.id) ?? 0) +
+          measureTextWidthPx(item.label, ZONE1_LABEL_FONT),
+      ),
     0,
   );
   return Math.min(Math.max(MIN_ZONE1_WIDTH_PX, Math.ceil(maxLabelWidth) + ZONE1_CHROME_PX), maxWidthPx);

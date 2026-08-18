@@ -13,7 +13,7 @@ import { COLORS, withHash } from '../export/theme';
 import { getInitials } from '../utils/initials';
 import { measureTextWidthPx } from '../utils/measureTextWidth';
 import { resolveBarColor } from '../utils/barColor';
-import { isNestedTask, resolveBarGeometry } from '../utils/barNesting';
+import { labelIndent, resolveBarGeometry } from '../utils/barNesting';
 import { getDescendantIds } from '../utils/taskHierarchy';
 import { BAR_HEIGHT_PX } from './ganttLayout';
 import { Eye, EyeOff, MessageSquare, Trash2, UserRound } from 'lucide-react';
@@ -30,6 +30,9 @@ interface GanttRowProps {
   // across all rows, so it's the same for every row and every row's label
   // fits on one line with no ellipsis (capped on a phone, where labels
   // ellipsize instead).
+  /** Nesting depth from the built tree (0 = root), resolved once by
+   * GanttChart rather than per row. */
+  depth: number;
   zone1Width: number;
   // Zone 0's width (the status column), and 0 on a phone, where the column
   // isn't rendered at all — 112px of extra chrome would leave a 375px screen
@@ -161,6 +164,7 @@ export function GanttRow({
   minDate,
   pxPerDay,
   timelineWidth,
+  depth,
   zone1Width,
   statusZoneWidth,
   zone3Width,
@@ -202,13 +206,11 @@ export function GanttRow({
   const iconButtonClass = `${ICON_BUTTON_CLASS}${isDimmed ? ` ${ROW_DIM_CLASS}` : ''}`;
 
   // A subtask's bar is drawn shorter than a top-level task's and centered on
-  // the same line, so nesting reads from the bar itself and not only from
-  // the label column. The row's own height is untouched — see
-  // resolveBarGeometry.
-  const { height: barHeight, offset: barOffsetY } = resolveBarGeometry(
-    BAR_HEIGHT_PX,
-    isNestedTask(items, item),
-  );
+  // the same line, so nesting reads from the bar itself and not only from the
+  // label column. Shortened by depth, not by a nested-or-not flag, so the
+  // second level is distinguishable from the third. The row's own height is
+  // untouched — see resolveBarGeometry.
+  const { height: barHeight, offset: barOffsetY } = resolveBarGeometry(BAR_HEIGHT_PX, depth);
 
   const { left, width: barWidth } = getItemBar(item, minDate, pxPerDay);
   const progress = clampProgress(item.progress ?? 0);
@@ -504,6 +506,10 @@ export function GanttRow({
           className={`flex min-w-0 flex-1 flex-wrap content-center items-center gap-x-1.5 gap-y-0.5 transition-opacity ${
             isDimmed ? ROW_DIM_CLASS : ''
           }`}
+          // The second nesting signal, from the same shared rule the bar height
+          // uses: the label steps right one notch per level. Height alone is a
+          // few pixels' difference and too easy to miss on a busy chart.
+          style={{ paddingLeft: labelIndent(BAR_HEIGHT_PX, depth) }}
         >
           <span className="whitespace-nowrap text-xs font-medium text-foreground max-md:min-w-0 max-md:truncate">
             {item.label}
