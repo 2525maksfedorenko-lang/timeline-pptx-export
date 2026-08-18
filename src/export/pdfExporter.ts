@@ -40,6 +40,8 @@ import {
   AXIS_MONTH_FONT_SIZE_PT,
   AXIS_WEEK_FONT_SIZE_PT,
   COMMENT_BODY_FONT_SIZE_PT,
+  COMMENT_TABLE_CELL_PADDING_IN,
+  COMMENT_TABLE_FONT_SIZE_PT,
   COMMENT_LINE_HEIGHT_IN,
   CONTENT_BOTTOM_IN,
   CONTENT_TOP_IN,
@@ -82,7 +84,7 @@ const CHEVRON_WIDTH_IN = 0.14;
 const COMMENT_BODY_X_IN = CONTENT_X_IN + 0.2;
 const COMMENT_BODY_WIDTH_IN = CONTENT_WIDTH_IN - 0.2;
 const COMMENT_HEADING_FONT_SIZE: Record<1 | 2 | 3, number> = { 1: 16, 2: 14, 3: 12 };
-const COMMENT_TABLE_FONT_SIZE = 9;
+
 const COMMENT_LIST_BULLET_INDENT_IN = 0.2;
 
 // jsPDF's built-in standard fonts (helvetica/times/courier) only support the
@@ -183,16 +185,17 @@ function drawChrome(doc: jsPDF, title: string) {
   });
 }
 
-function drawOmittedTasksWarning(doc: jsPDF, omittedCount: number) {
-  if (omittedCount <= 0) return;
+/** The model's own "not shown" note (see buildOmittedNote) — both exporters
+ * draw the same sentence, so neither writes it. */
+function drawOmittedNote(doc: jsPDF, note: string | null) {
+  if (!note) return;
 
   const footerY = PAGE_HEIGHT_IN - FOOTER_HEIGHT_IN;
-  const taskWord = omittedCount === 1 ? 'task' : 'tasks';
 
   doc.setFont(PDF_FONT_FACE, 'bold');
   doc.setFontSize(8);
   doc.setTextColor(withHash(COLORS.warning));
-  drawText(doc, `+${omittedCount} ${taskWord} not shown - narrow the export timeframe to see them`, CONTENT_X_IN, footerY + FOOTER_HEIGHT_IN / 2, {
+  drawText(doc, note, CONTENT_X_IN, footerY + FOOTER_HEIGHT_IN / 2, {
     baseline: 'middle',
     align: 'left',
   });
@@ -215,7 +218,7 @@ function drawOmittedTasksWarning(doc: jsPDF, omittedCount: number) {
  * under the later bars again. Mirrors pptxExporter.ts's identical ordering. */
 function drawOverviewSlide(doc: jsPDF, model: OverviewSlideModel, links: SlideLinks) {
   drawChrome(doc, model.title);
-  drawOmittedTasksWarning(doc, model.omittedCount);
+  drawOmittedNote(doc, model.omittedNote);
 
   const axisLineY = model.dateAxisY + GROUP_HEADER_HEIGHT_IN;
 
@@ -404,22 +407,44 @@ function drawOverviewSlide(doc: jsPDF, model: OverviewSlideModel, links: SlideLi
   });
 }
 
+/** Runs `draw` with `doc.addPage` disabled.
+ *
+ * This file owns its own pagination: it walks a pre-built slide model and adds
+ * exactly one page per slide, and every draw call after that assumes the
+ * current page is the one the model computed coordinates for. A plugin that
+ * inserts a page of its own puts a chrome-less, model-less sheet into the deck
+ * and shifts every slide after it — which also silently invalidates every
+ * internal hyperlink, since those address slides by number.
+ *
+ * jspdf-autotable does exactly that: `pageBreak: 'avoid'` means "move the whole
+ * table to a fresh page if it doesn't fit here", not "never break". Both table
+ * callers are wrapped, so a table that outgrows its reserved space is at worst
+ * a local visual overflow on the right slide, never a stray page. */
+function withoutPageBreaks(doc: jsPDF, draw: () => void) {
+  const addPage = doc.addPage.bind(doc);
+  doc.addPage = (() => doc) as typeof doc.addPage;
+  try {
+    draw();
+  } finally {
+    doc.addPage = addPage;
+  }
+}
+
 /** Draws a real jspdf-autotable table (borders, columns, a bold header row)
  * at an arbitrary position/width — shared by a comment's markdown table
  * blocks and the dashboard's delayed/at-risk task tables, so there's exactly
- * one table renderer instead of one per caller. `pageBreak: 'avoid'` still
- * means autoTable *can* insert its own page if the table doesn't fit in the
- * remaining space — callers whose surrounding layout doesn't already
- * guarantee a fit (see drawCommentBlock's caller, which does) should guard
- * against that corrupting this file's own page bookkeeping (see
- * drawDashboardTableSlide). */
+ * one table renderer instead of one per caller.
+ *
+ * Cell padding and font size come from slideLayout rather than from
+ * autoTable's defaults, so a row is exactly as tall as the model reserved for
+ * it (COMMENT_TABLE_ROW_HEIGHT_IN) instead of ~18% taller. */
 function drawTableBlock(
   doc: jsPDF,
   table: DashboardTable,
   x: number,
   y: number,
   width: number,
-  fontSize: number = COMMENT_TABLE_FONT_SIZE,
+  fontSize: number = COMMENT_TABLE_FONT_SIZE_PT,
 ) {
   autoTable(doc, {
     startY: y,
@@ -431,6 +456,7 @@ function drawTableBlock(
     styles: {
       font: PDF_FONT_FACE,
       fontSize,
+      cellPadding: COMMENT_TABLE_CELL_PADDING_IN,
       textColor: withHash(COLORS.navy),
       lineColor: withHash(COLORS.border),
       lineWidth: 0.01,
@@ -496,11 +522,13 @@ function drawCommentBlock(doc: jsPDF, block: CommentBlockRowModel) {
     return;
   }
 
-  // The shared slide model already decided what fits where (see
-  // expandCandidateToChunks in timelineExportModel.ts), guaranteeing this
-  // table always fits in the remaining space — so drawTableBlock's own
-  // pageBreak:'avoid' never actually triggers a page insert here.
-  drawTableBlock(doc, block, COMMENT_BODY_X_IN, block.y, COMMENT_BODY_WIDTH_IN);
+  // The shared slide model reserves this table's measured height (see
+  // estimateBlockHeight in timelineExportModel.ts), so it fits where it is
+  // drawn. withoutPageBreaks is the belt to that braces: a mis-measured table
+  // must not be able to insert a page and desync the rest of the deck.
+  withoutPageBreaks(doc, () => {
+    drawTableBlock(doc, block, COMMENT_BODY_X_IN, block.y, COMMENT_BODY_WIDTH_IN);
+  });
 }
 
 function drawDetailSlide(doc: jsPDF, model: DetailSlideModel, links: SlideLinks) {
@@ -765,23 +793,13 @@ function drawDashboardTableSlide(doc: jsPDF, model: DashboardTableSlideModel, qr
   const tableWidth = CONTENT_WIDTH_IN - DASHBOARD_TABLE_QR_COLUMN_WIDTH_IN - DASHBOARD_TABLE_GAP_IN;
 
   if (model.table) {
-    // Defense in depth: the realistic data volumes this dashboard targets
-    // (a handful of delayed/at-risk tasks, see dashboardSlides.ts) always
-    // fit in one page's content height, so drawTableBlock's own
-    // pageBreak:'avoid' should never actually need to insert a page here —
-    // but unlike the comment-table case, nothing upstream *guarantees* that
-    // for an arbitrarily large task list. Neutralizing addPage for the
-    // duration of the call means that even if it tried, this file's own
-    // page count (and every subsequent slide's chrome) stays correct; the
-    // worst case is visual overflow within this one page, never a stray
-    // blank page.
-    const originalAddPage = doc.addPage.bind(doc);
-    doc.addPage = (() => doc) as typeof doc.addPage;
-    try {
-      drawTableBlock(doc, model.table, CONTENT_X_IN, DASHBOARD_TABLE_TOP_IN, tableWidth);
-    } finally {
-      doc.addPage = originalAddPage;
-    }
+    // Nothing upstream caps how many delayed/at-risk tasks a plan can have, so
+    // this table can genuinely outgrow a slide — and if it does, it overflows
+    // this one page rather than inserting others (see withoutPageBreaks).
+    const table = model.table;
+    withoutPageBreaks(doc, () => {
+      drawTableBlock(doc, table, CONTENT_X_IN, DASHBOARD_TABLE_TOP_IN, tableWidth);
+    });
   } else {
     doc.setFont(PDF_FONT_FACE, 'normal');
     doc.setFontSize(13);
