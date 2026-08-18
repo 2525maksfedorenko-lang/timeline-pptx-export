@@ -44,7 +44,6 @@ import {
   CONTENT_X_IN,
   DASHBOARD_TABLE_TOP_IN,
   DEPENDENCY_LINE_WIDTH_PT,
-  DETAIL_ROW_INDENT_IN,
   FOOTER_HEIGHT_IN,
   GROUP_HEADER_HEIGHT_IN,
   HEADER_HEIGHT_IN,
@@ -127,13 +126,14 @@ function drawChrome(slide: PptxSlide, title: string) {
   });
 }
 
-function drawOmittedTasksWarning(slide: PptxSlide, omittedCount: number) {
-  if (omittedCount <= 0) return;
+/** The model's own "not shown" note (see buildOmittedNote) — both exporters
+ * draw the same sentence, so neither writes it. */
+function drawOmittedNote(slide: PptxSlide, note: string | null) {
+  if (!note) return;
 
   const footerY = PAGE_HEIGHT_IN - FOOTER_HEIGHT_IN;
-  const taskWord = omittedCount === 1 ? 'task' : 'tasks';
 
-  slide.addText(`+${omittedCount} ${taskWord} not shown — narrow the export timeframe to see them`, {
+  slide.addText(note, {
     x: CONTENT_X_IN,
     y: footerY,
     w: CONTENT_WIDTH_IN - 1.8,
@@ -205,7 +205,7 @@ function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel, links: S
     slideJump(links.detailSlideNumberByTaskId.get(bar.id), 'Open subtasks & comments');
 
   drawChrome(slide, model.title);
-  drawOmittedTasksWarning(slide, model.omittedCount);
+  drawOmittedNote(slide, model.omittedNote);
 
   const axisLineY = model.dateAxisY + GROUP_HEADER_HEIGHT_IN;
 
@@ -622,7 +622,7 @@ function drawDetailSlide(slide: PptxSlide, model: DetailSlideModel, links: Slide
         ...rowText(SUBTASK_TEXT_FONT_SIZE_PT, LIST_ROW_HEIGHT_IN),
         x: row.labelX,
         y: row.y,
-        w: CONTENT_WIDTH_IN - DETAIL_ROW_INDENT_IN,
+        w: CONTENT_X_IN + CONTENT_WIDTH_IN - row.labelX,
         bold: true,
         color: COLORS.navy,
         wrap: false,
@@ -632,7 +632,7 @@ function drawDetailSlide(slide: PptxSlide, model: DetailSlideModel, links: Slide
         ...rowText(SUBTASK_DATE_FONT_SIZE_PT, LIST_ROW_HEIGHT_IN),
         x: row.dateX,
         y: row.y,
-        w: CONTENT_WIDTH_IN - DETAIL_ROW_INDENT_IN,
+        w: CONTENT_X_IN + CONTENT_WIDTH_IN - row.dateX,
         charSpacing: letterSpacingPt(SUBTASK_DATE_FONT_SIZE_PT, DATE_LETTER_SPACING_EM),
         color: COLORS.footerText,
         fontFace: PPTX_MONO_FONT_FACE,
@@ -643,7 +643,7 @@ function drawDetailSlide(slide: PptxSlide, model: DetailSlideModel, links: Slide
         ...rowText(SUBTASK_TEXT_FONT_SIZE_PT, LIST_ROW_HEIGHT_IN),
         x: row.progressX,
         y: row.y,
-        w: CONTENT_WIDTH_IN - DETAIL_ROW_INDENT_IN,
+        w: CONTENT_X_IN + CONTENT_WIDTH_IN - row.progressX,
         color: COLORS.navy,
         wrap: false,
       });

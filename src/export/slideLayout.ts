@@ -1,3 +1,5 @@
+import { labelIndent } from '../utils/barNesting';
+
 // Shared page geometry (inches) for both the PPTX (LAYOUT_16x9) and PDF
 // exporters, so a "slide" looks identical in either format.
 
@@ -204,10 +206,29 @@ export const TAG_PILL_HEIGHT_IN = 0.16;
 export const TAG_PILL_RADIUS_IN = 0.03;
 export const TAG_PILL_GAP_IN = 0.05;
 export const LABEL_TAG_GAP_IN = 0.08;
-// Left indent of a detail slide's subtask rows from the content edge —
-// shared with the model so it can size the row's available text width the
-// same way the exporters position it.
+// The whole subtask block's inset from a detail slide's content edge: what
+// separates the rows from the section title above them, before any nesting is
+// taken into account. Every row gets it whatever its depth — the levels are
+// told apart by subtaskRowIndent() below.
 export const DETAIL_ROW_INDENT_IN = 0.2;
+
+/** A subtask row's left indent, for a `depth` measured *within its section*
+ * (0 = a direct child of the section's parent).
+ *
+ * The block's own inset, plus the shared depth ladder from barNesting rebased
+ * so that first level sits exactly at that inset. Rebasing — rather than
+ * starting the ladder at rung 0 — is what makes the *step* between two levels
+ * identical to the on-screen label column's at every depth, the cap included:
+ * on screen an indent stops growing after MAX_LABEL_INDENT_STEPS, and a ladder
+ * that started a rung late would still be stepping once the screen had stopped,
+ * so five-level trees would read differently on the two surfaces.
+ *
+ * Lives here rather than in either exporter because the model needs it to place
+ * the row and to size the text that truncates against what's left, and the
+ * coverage check needs it to verify neither drifted. */
+export function subtaskRowIndent(depth: number): number {
+  return DETAIL_ROW_INDENT_IN + labelIndent(BAR_HEIGHT_IN, depth + 1) - labelIndent(BAR_HEIGHT_IN, 1);
+}
 // Space always reserved after the track for its label + status text, so a
 // bar positioned late in the date range (long duration or near the right
 // edge) never grows wide enough to push its label into the status column.
@@ -290,8 +311,26 @@ export function rowCenterY(rowY: number, rowHeightIn: number): number {
 export const COMMENT_META_ROW_HEIGHT_IN = 0.18;
 export const COMMENT_HEADING_ROW_HEIGHT_IN = ROW_LABEL_HEIGHT_IN;
 export const COMMENT_LINE_HEIGHT_IN = LIST_ROW_HEIGHT_IN;
-export const COMMENT_TABLE_HEADER_ROW_HEIGHT_IN = 0.26;
-export const COMMENT_TABLE_ROW_HEIGHT_IN = 0.24;
+// A markdown table inside a comment. These are *derived* rather than picked,
+// because jspdf-autotable will draw whatever height its own metrics say and the
+// model has to predict it exactly: a table estimated shorter than it draws runs
+// past the bottom of the content area, and autoTable answers that by inserting
+// a page of its own — a physical PDF page with no header, no footer and no
+// slide model behind it, which desyncs every slide after it (see
+// docs/export-coverage.md, and the note above drawTableBlock in pdfExporter).
+//
+// One text line plus padding above and below it, where the line height is the
+// font size times jsPDF's own 1.15 line-height factor. The padding is passed
+// *into* autoTable rather than read off it, so the renderer follows this number
+// instead of this number chasing the renderer's defaults.
+export const COMMENT_TABLE_FONT_SIZE_PT = 9;
+export const COMMENT_TABLE_CELL_PADDING_IN = 0.07;
+const PDF_LINE_HEIGHT_FACTOR = 1.15;
+export const COMMENT_TABLE_LINE_HEIGHT_IN = (COMMENT_TABLE_FONT_SIZE_PT * PDF_LINE_HEIGHT_FACTOR) / 72;
+export const COMMENT_TABLE_ROW_HEIGHT_IN =
+  COMMENT_TABLE_LINE_HEIGHT_IN + COMMENT_TABLE_CELL_PADDING_IN * 2;
+// The header row is the same box in a bold face, not a taller one.
+export const COMMENT_TABLE_HEADER_ROW_HEIGHT_IN = COMMENT_TABLE_ROW_HEIGHT_IN;
 // Small vertical breathing room between adjacent blocks within one comment,
 // and between one comment's blocks and the next comment's meta line.
 export const COMMENT_BLOCK_GAP_IN = 0.06;

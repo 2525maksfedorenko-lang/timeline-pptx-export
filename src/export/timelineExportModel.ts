@@ -14,7 +14,7 @@ import { clampProgress } from '../utils/clampProgress';
 import { resolveBarColor } from '../utils/barColor';
 import { buildDepthMap, labelIndent, resolveBarGeometry } from '../utils/barNesting';
 import { readableTextOn } from '../utils/colorContrast';
-import { buildTaskHierarchy } from '../utils/taskHierarchy';
+import { buildTaskHierarchy, type TaskNode } from '../utils/taskHierarchy';
 import {
   daysBetween,
   BASE_PX_PER_DAY,
@@ -52,15 +52,15 @@ import {
   COMMENT_HEADING_ROW_HEIGHT_IN,
   COMMENT_LINE_HEIGHT_IN,
   COMMENT_META_ROW_HEIGHT_IN,
-  COMMENT_TABLE_HEADER_ROW_HEIGHT_IN,
-  COMMENT_TABLE_ROW_HEIGHT_IN,
+  COMMENT_TABLE_CELL_PADDING_IN,
+  COMMENT_TABLE_FONT_SIZE_PT,
+  COMMENT_TABLE_LINE_HEIGHT_IN,
   CONTENT_HEIGHT_IN,
   CONTENT_TOP_IN,
   CONTENT_BOTTOM_IN,
   CONTENT_X_IN,
   CONTENT_WIDTH_IN,
   DEPENDENCY_JOG_IN,
-  DETAIL_ROW_INDENT_IN,
   GROUP_HEADER_HEIGHT_IN,
   LABEL_TAG_GAP_IN,
   LIST_ROW_HEIGHT_IN,
@@ -82,6 +82,7 @@ import {
   SUBTASK_META_STATUS_GAP_IN,
   SUBTASK_STATUS_FONT_SIZE_PT,
   SUBTASK_TEXT_FONT_SIZE_PT,
+  subtaskRowIndent,
   TAG_PILL_FONT_SIZE_PT,
   TAG_PILL_GAP_IN,
   TAG_PILL_PADDING_IN,
@@ -231,12 +232,26 @@ export interface OverviewSlideModel {
   // from export, outside the timeframe window, or truncated by overflow) —
   // silently omitted rather than drawn as a bracket to nowhere.
   dependencyConnectors: OverviewConnectorModel[];
-  // How many in-range parent tasks didn't fit on this slide and were left
-  // off entirely — surfaced in the footer so the omission is visible in the
-  // exported file itself, not just in the dialog shown before export (see
-  // ExportOverflowModal). Always 0 in 'full' mode, which pages the overflow
-  // onto further slides instead of dropping it.
-  omittedCount: number;
+  // --- what this overview leaves out ------------------------------------------
+  // Two different facts, kept apart because conflating them is what made the
+  // old single count unverifiable: a task can be missing from the *overview*
+  // (still in the appendix, so nothing is lost) or missing from the *file*
+  // (genuinely gone). All three fields are carried on the last overview slide
+  // only — 'full' mode's pages each draw a subset, so a per-page count would
+  // count the same task once per page it isn't on instead of once per deck.
+  //
+  // Exportable roots the overview draws no bar for, whatever the reason: past
+  // a 'compact' slide's capacity, or outside the export timeframe.
+  omittedFromOverviewCount: number;
+  // Of those, the ones that appear nowhere in the deck at all — no bar, no
+  // appendix section, no subtask row. The number that actually matters, and
+  // the one the coverage check holds to zero-or-announced: see
+  // docs/export-coverage.md and src/export/exportCoverage.ts.
+  absentTaskCount: number;
+  // The footer sentence built from the two, or null when the overview shows
+  // every root. Resolved here rather than in each exporter because both would
+  // otherwise build the same sentence from the same counts.
+  omittedNote: string | null;
 }
 
 /** One subtask line on a detail slide. The left side used to be a single
@@ -248,6 +263,16 @@ export interface OverviewSlideModel {
  * OverviewBarTagModel: the model resolves x for every piece so a renderer
  * only has to draw. */
 export interface SubtaskRowModel {
+  /** Which task this row *is*. Carried for exactly the reason
+   * DetailSectionModel.taskId is — nothing about the row is drawn from it —
+   * so a caller can resolve "did task X reach the file, and on which slide"
+   * from the finished models rather than by matching a truncated label. */
+  taskId: string;
+  /** Nesting depth *within this section*: 0 for a direct child of the
+   * section's parent, 1 for a grandchild, and so on. The row's indent is
+   * derived from it through the same barNesting ladder the screen uses, so a
+   * text row with no bar of its own still shows which level it belongs to. */
+  depth: number;
   /** Task name, already truncated to whatever room the rest of the row left. */
   label: string;
   labelX: number;
@@ -481,7 +506,7 @@ function buildOverviewSlide(
   items: TimelineItem[],
   dateWindow: OverviewWindow | null,
   title: string,
-  omittedCount: number,
+  omission: OverviewOmission,
   showDependencies: boolean,
 ): OverviewSlideModel {
   const bars: OverviewBarModel[] = [];
@@ -683,8 +708,52 @@ function buildOverviewSlide(
     dividerBottom: CONTENT_BOTTOM_IN,
     bars,
     dependencyConnectors,
-    omittedCount,
+    ...omission,
   };
+}
+
+/** The three "what's left out" fields of an overview slide, resolved together
+ * because the note is a sentence about the two counts. */
+type OverviewOmission = Pick<
+  OverviewSlideModel,
+  'omittedFromOverviewCount' | 'absentTaskCount' | 'omittedNote'
+>;
+
+/** An overview slide that leaves nothing out — every page but the last. */
+const NO_OMISSION: OverviewOmission = {
+  omittedFromOverviewCount: 0,
+  absentTaskCount: 0,
+  omittedNote: null,
+};
+
+/** What the footer says about the roots this overview didn't draw.
+ *
+ * The distinction the sentence carries is the whole point: a task past a
+ * compact slide's capacity is still in the Subtasks & Comments appendix, and
+ * saying so is more use to a reader than the old "narrow the export timeframe"
+ * advice, which pointed at the timeframe whatever the cause. A task with no
+ * appendix section either is genuinely not in the file, and that is the one the
+ * reader has to be told about — it is the last way a task can otherwise vanish
+ * without trace (see docs/export-coverage.md). */
+function resolveOmission(notDrawn: TimelineItem[], sectionedIds: ReadonlySet<string>): OverviewOmission {
+  const absent = notDrawn.filter((item) => !sectionedIds.has(item.id));
+  const omittedFromOverviewCount = notDrawn.length;
+  const absentTaskCount = absent.length;
+
+  if (omittedFromOverviewCount === 0) return NO_OMISSION;
+
+  const inAppendix = omittedFromOverviewCount - absentTaskCount;
+  const taskWord = omittedFromOverviewCount === 1 ? 'task' : 'tasks';
+  const absentWord = absentTaskCount === 1 ? 'task' : 'tasks';
+
+  const omittedNote =
+    absentTaskCount === 0
+      ? `+${omittedFromOverviewCount} ${taskWord} not on the overview - see the Subtasks & Comments appendix`
+      : inAppendix === 0
+        ? `+${absentTaskCount} ${absentWord} not in this export - outside the export timeframe`
+        : `+${omittedFromOverviewCount} ${taskWord} not on the overview: ${inAppendix} in the appendix, ${absentTaskCount} not in this export`;
+
+  return { omittedFromOverviewCount, absentTaskCount, omittedNote };
 }
 
 /** The overview slides for an export: one truncated slide in 'compact' mode
@@ -697,14 +766,23 @@ function buildOverviewSlides(
   timeframe: ExportTimeframe | null,
   exportMode: ExportMode,
   showDependencies: boolean,
+  parentItems: TimelineItem[],
+  sectionedIds: ReadonlySet<string>,
 ): OverviewSlideModel[] {
   const isPaged = exportMode === 'full' && plan.inRange.length > plan.capacity;
   const drawnItems = isPaged ? plan.inRange : plan.included;
   const dateWindow = getOverviewWindow(drawnItems, timeframe);
 
+  // Judged against every exportable root, not just the in-range ones, so a root
+  // the timeframe filtered out is counted the same as one that didn't fit.
+  const drawnIds = new Set(drawnItems.map((item) => item.id));
+  const omission = resolveOmission(
+    parentItems.filter((item) => !drawnIds.has(item.id)),
+    sectionedIds,
+  );
+
   if (!isPaged) {
-    const omittedCount = plan.inRange.length - plan.included.length;
-    return [buildOverviewSlide(drawnItems, dateWindow, 'Timeline Overview', omittedCount, showDependencies)];
+    return [buildOverviewSlide(drawnItems, dateWindow, 'Timeline Overview', omission, showDependencies)];
   }
 
   const pages: TimelineItem[][] = [];
@@ -717,7 +795,10 @@ function buildOverviewSlides(
       pageItems,
       dateWindow,
       `Timeline Overview (${index + 1}/${pages.length})`,
-      0,
+      // The note belongs on the last page — a closing footnote, not something
+      // repeated under every page — and the counts go with it so they stay
+      // summable across the deck.
+      index === pages.length - 1 ? omission : NO_OMISSION,
       showDependencies,
     ),
   );
@@ -833,10 +914,53 @@ function buildDependencyConnectors(items: TimelineItem[], bars: OverviewBarModel
   });
 }
 
+/** One task listed under a parent's "Subtasks" heading, with its nesting
+ * depth *relative to that parent* (0 = a direct child, 1 = a grandchild).
+ *
+ * The depth is read out of the export's depth map (buildDepthMap) rather than
+ * counted again while walking the tree: the screen, the overview bars and these
+ * rows then all answer "how deep is this task" from one place, which is the
+ * only way the three surfaces can be guaranteed to indent alike. */
+interface DetailDescendant {
+  item: TimelineItem;
+  depth: number;
+}
+
 interface DetailCandidate {
   parent: TimelineItem;
-  children: TimelineItem[];
+  /** The parent's *whole* subtree in pre-order, at any depth — not just its
+   * direct children. Only roots become candidates, so a grandchild has no
+   * section of its own: if it is not in here, it reaches no slide at all. */
+  descendants: DetailDescendant[];
   relevantComments: TaskComment[];
+  /** Every comment the task has, not just the ones commentMode kept — so a
+   * section showing a subset can say so in its heading rather than quietly
+   * showing fewer (see buildCommentsHeading). */
+  totalComments: number;
+}
+
+/** A parent node's whole subtree in pre-order: every descendant at any depth,
+ * each with its depth relative to that parent.
+ *
+ * Depth is read out of `depthById`, not counted while walking. That map is what
+ * the on-screen chart and the overview bars indent from as well
+ * (buildDepthMap), so using the walk's own counter here would be a second,
+ * independent answer to the same question — which is exactly the drift one
+ * shared map exists to prevent. */
+function collectSubtreeRows(node: TaskNode, depthById: Map<string, number>): DetailDescendant[] {
+  const parentDepth = depthById.get(node.item.id) ?? 0;
+  const rows: DetailDescendant[] = [];
+
+  const visit = (parent: TaskNode) => {
+    parent.children.forEach((child) => {
+      const absoluteDepth = depthById.get(child.item.id) ?? parentDepth + 1;
+      rows.push({ item: child.item, depth: absoluteDepth - parentDepth - 1 });
+      visit(child);
+    });
+  };
+  visit(node);
+
+  return rows;
 }
 
 /** One comment's meta line (shown only alongside its first fragment — see
@@ -849,17 +973,20 @@ interface CommentFragment {
   showMeta: boolean;
 }
 
-/** One self-contained chunk of a parent's detail content: subtasks +
- * assignee + a slice of its comments' fragments. Almost always one chunk per
- * parent — split into further "(continued)" chunks only when a parent's
- * comments are too long to fit on a single slide even alone (see
- * expandCandidateToChunks), splitting at block boundaries within a comment
- * if needed, so a block is never silently cut off instead of continuing on
- * a new slide. */
+/** One self-contained chunk of a parent's detail content: a slice of its
+ * subtree's rows + assignee + a slice of its comments' fragments. One chunk
+ * per parent whenever everything fits on a slide; otherwise the content
+ * spills into "(continued)" chunks that repeat the parent's title, so
+ * nothing is ever cut off instead of continuing on a new slide:
+ *   - subtree rows split at *branch* boundaries (see splitIntoBranches), so a
+ *     break never separates a task from its own descendants;
+ *   - comments split at markdown-block boundaries within a comment.
+ * A chunk is guaranteed to fit CONTENT_HEIGHT_IN on its own, which is what
+ * lets the exporters draw one without any pagination logic of their own. */
 interface DetailChunk {
   taskId: string;
   parentTitle: string;
-  children: TimelineItem[];
+  rows: DetailDescendant[];
   // Whether this chunk carries the parent's assignee row at all — true only
   // for a parent's first chunk, like its subtasks. Distinct from `assignee`
   // being undefined, which means the task genuinely has nobody assigned: a
@@ -910,7 +1037,18 @@ function estimateBlockHeight(block: MarkdownBlock): number {
     return Math.max(totalLines, 1) * COMMENT_LINE_HEIGHT_IN;
   }
 
-  return COMMENT_TABLE_HEADER_ROW_HEIGHT_IN + block.rows.length * COMMENT_TABLE_ROW_HEIGHT_IN;
+  // Every cell in a row is measured, and the tallest decides the row: a cell
+  // whose text wraps to two lines makes the whole row two lines tall in
+  // autoTable, and a row estimated at one line is exactly how a table ends up
+  // taller than the space reserved for it.
+  const columnWidth =
+    COMMENT_BODY_WIDTH_IN / Math.max(block.headers.length, 1) - COMMENT_TABLE_CELL_PADDING_IN * 2;
+  const rowHeight = (cells: string[]) =>
+    Math.max(...cells.map((cell) => estimateWrappedLines(cell, COMMENT_TABLE_FONT_SIZE_PT, columnWidth))) *
+      COMMENT_TABLE_LINE_HEIGHT_IN +
+    COMMENT_TABLE_CELL_PADDING_IN * 2;
+
+  return rowHeight(block.headers) + block.rows.reduce((total, row) => total + rowHeight(row), 0);
 }
 
 /** Lays out one comment fragment's blocks starting at `startY`, using the
@@ -949,11 +1087,11 @@ function buildDetailSection(
   const subtasks: SubtaskRowModel[] = [];
   let subtasksHeadingY: number | undefined;
 
-  if (chunk.children.length > 0) {
+  if (chunk.rows.length > 0) {
     subtasksHeadingY = y;
     y += ROW_LABEL_HEIGHT_IN + ROW_GAP_IN;
 
-    chunk.children.forEach((child) => {
+    chunk.rows.forEach(({ item: child, depth }) => {
       const progress = clampProgress(child.progress ?? 0);
       const status = getTaskStatus(child);
       const statusText = TASK_STATUS_LABELS[status];
@@ -974,6 +1112,12 @@ function buildDetailSection(
       const dateText = `${formatShortDate(new Date(child.start))} – ${formatShortDate(new Date(child.end))}`;
       const progressText = `${progress}%`;
 
+      // Depth is drawn as indent, from the same barNesting ladder the
+      // on-screen label column steps by (see subtaskRowIndent). These rows
+      // have no bar whose height could carry the nesting instead, so without
+      // the indent a three-level subtree reads as one flat list.
+      const rowIndentIn = subtaskRowIndent(depth);
+
       const dateWidth = measureMonoTextWidthIn(dateText, SUBTASK_DATE_FONT_SIZE_PT);
       const dateTrackingWidth = measureLetterSpacingWidthIn(
         dateText,
@@ -990,7 +1134,7 @@ function buildDetailSection(
       const availableWidth =
         CONTENT_WIDTH_IN -
         STATUS_RIGHT_PADDING_IN -
-        DETAIL_ROW_INDENT_IN -
+        rowIndentIn -
         statusTextWidth -
         SUBTASK_META_STATUS_GAP_IN -
         (dateWidth + dateTrackingWidth) -
@@ -1001,11 +1145,15 @@ function buildDetailSection(
       // Each piece follows the previous one's *actual* drawn width, not its
       // reserved box, so a short task name doesn't leave a gap before its
       // dates (same reasoning as the overview bar's tag pills).
-      const labelX = CONTENT_X_IN + DETAIL_ROW_INDENT_IN;
+      // An indented name is cut earlier rather than pushed past the content
+      // edge — the same rule as an indented overview bar label.
+      const labelX = CONTENT_X_IN + rowIndentIn;
       const dateX = labelX + measureTextWidthIn(label, SUBTASK_TEXT_FONT_SIZE_PT) + SUBTASK_META_GAP_IN;
       const progressX = dateX + dateWidth + dateTrackingWidth + SUBTASK_META_GAP_IN;
 
       subtasks.push({
+        taskId: child.id,
+        depth,
         label,
         labelX,
         dateText,
@@ -1087,11 +1235,47 @@ function buildDetailSection(
   };
 }
 
+/** One direct child of a parent, together with all of its own descendants —
+ * the unit a subtree is split at when it outgrows a slide.
+ *
+ * Splitting anywhere else is what makes a deep tree unreadable: a break in the
+ * middle of a branch strands children on a slide whose parent row sits on the
+ * previous one, and their indent then measures from nothing. Keeping branches
+ * whole means a row's parent is always either the section's own title or a row
+ * above it on the same slide. */
+function splitIntoBranches(rows: DetailDescendant[]): DetailDescendant[][] {
+  const branches: DetailDescendant[][] = [];
+
+  rows.forEach((row) => {
+    // A depth-0 row opens a branch; anything deeper belongs to the branch in
+    // progress. The length check only covers a malformed first row (depth > 0
+    // with no branch open) — buildTaskHierarchy shouldn't produce one, and if
+    // it somehow did, the row still has to land somewhere rather than vanish.
+    if (row.depth === 0 || branches.length === 0) branches.push([row]);
+    else branches[branches.length - 1].push(row);
+  });
+
+  return branches;
+}
+
+/** "Comments", plus a count when commentMode is showing fewer than the task
+ * actually has. The truncation is the user's own choice in the export panel,
+ * but the file never repeated it — which made a deck exported with
+ * "latest only" indistinguishable from a plan whose tasks have one comment
+ * each. Carried in the heading rather than on a line of its own so it costs
+ * no layout. */
+function buildCommentsHeading(shown: number, total: number): string {
+  return shown < total ? `Comments (${shown} of ${total})` : 'Comments';
+}
+
 /** Splits one parent's detail content into one or more chunks so nothing is
- * silently cut off: if the parent's subtasks/assignee/comments all fit
- * within one slide's content height, there's a single chunk as before;
- * otherwise comments spill into "(continued)" chunks that repeat the
- * parent's title. When even one comment's blocks don't fit in a fresh
+ * silently cut off: if the parent's whole subtree, assignee and comments fit
+ * within one slide's content height, there's a single chunk; otherwise the
+ * content spills into "(continued)" chunks that repeat the parent's title.
+ *
+ * Subtree rows spill at branch boundaries (see splitIntoBranches), so a slide
+ * break never separates a task from its own children. Only a single branch
+ * taller than an entire slide is broken further, row by row, as best effort. When even one comment's blocks don't fit in a fresh
  * chunk, it's split at block boundaries (e.g. a heading+paragraph+list on
  * one slide, a trailing table continuing on the next) rather than accepted
  * as a single oversized chunk — letting a block-level element like a table
@@ -1101,25 +1285,31 @@ function buildDetailSection(
  * packed onto slides by buildDetailSlides exactly like whole sections used
  * to be. */
 function expandCandidateToChunks(candidate: DetailCandidate, people: Person[]): DetailChunk[] {
-  const { parent, children, relevantComments } = candidate;
+  const { parent, descendants, relevantComments, totalComments } = candidate;
 
   const makeChunk = (isFirst: boolean): DetailChunk => ({
     taskId: parent.id,
     parentTitle: isFirst ? parent.label : `${parent.label} (continued)`,
-    children: isFirst ? children : [],
+    rows: [],
     showAssignee: isFirst,
     assignee: isFirst ? parent.assignee : undefined,
     commentFragments: [],
-    commentsHeadingText: isFirst ? 'Comments' : 'Comments (continued)',
+    commentsHeadingText: buildCommentsHeading(relevantComments.length, totalComments),
   });
-
-  if (relevantComments.length === 0) return [makeChunk(true)];
 
   const chunks: DetailChunk[] = [];
   let current = makeChunk(true);
 
   const fits = (chunk: DetailChunk) => buildDetailSection(chunk, 0, people).endY <= CONTENT_HEIGHT_IN;
-  const isEmpty = (chunk: DetailChunk) => chunk.commentFragments.length === 0;
+  // "Nothing on it yet", not "no comments yet": a chunk already carrying
+  // subtree rows has no room to spare, so the best-effort fallbacks below must
+  // not mistake it for a blank slate and let oversized content through.
+  const isEmpty = (chunk: DetailChunk) =>
+    chunk.rows.length === 0 && chunk.commentFragments.length === 0 && !chunk.showAssignee;
+  const withRows = (chunk: DetailChunk, rows: DetailDescendant[]): DetailChunk => ({
+    ...chunk,
+    rows: [...chunk.rows, ...rows],
+  });
   const withFragment = (chunk: DetailChunk, fragment: CommentFragment): DetailChunk => ({
     ...chunk,
     commentFragments: [...chunk.commentFragments, fragment],
@@ -1128,6 +1318,51 @@ function expandCandidateToChunks(candidate: DetailCandidate, people: Person[]): 
     chunks.push(current);
     current = makeChunk(false);
   };
+  /** Closes out the last chunk and labels the comment headings. "(continued)"
+   * belongs to the first chunk that actually *carries* comments, which needn't
+   * be the parent's first chunk any more: a wide subtree can fill that one with
+   * rows alone and push every comment onto the next. */
+  const finish = (): DetailChunk[] => {
+    chunks.push(current);
+
+    let seenComments = false;
+    return chunks.map((chunk) => {
+      if (chunk.commentFragments.length === 0) return chunk;
+      const commentsHeadingText = seenComments
+        ? `${chunk.commentsHeadingText} (continued)`
+        : chunk.commentsHeadingText;
+      seenComments = true;
+      return { ...chunk, commentsHeadingText };
+    });
+  };
+
+  splitIntoBranches(descendants).forEach((branch) => {
+    if (fits(withRows(current, branch))) {
+      current = withRows(current, branch);
+      return;
+    }
+
+    // Doesn't fit here — a chunk of its own may still hold it, since a
+    // continuation carries neither the assignee row nor a full-height title
+    // block. Worth retrying before resorting to breaking the branch up.
+    if (!isEmpty(current)) {
+      startNewChunk();
+      if (fits(withRows(current, branch))) {
+        current = withRows(current, branch);
+        return;
+      }
+    }
+
+    // One branch taller than a whole slide: the only case where a level is
+    // broken across slides. Rows keep their order and their depth, so the
+    // continuation still reads as an outline, and it repeats the parent title.
+    branch.forEach((row) => {
+      if (!isEmpty(current) && !fits(withRows(current, [row]))) startNewChunk();
+      current = withRows(current, [row]);
+    });
+  });
+
+  if (relevantComments.length === 0) return finish();
 
   relevantComments.forEach((comment) => {
     const blocks = parseMarkdownBlocks(comment.body);
@@ -1177,8 +1412,7 @@ function expandCandidateToChunks(candidate: DetailCandidate, people: Person[]): 
     }
   });
 
-  chunks.push(current);
-  return chunks;
+  return finish();
 }
 
 /** Packs parent chunks onto appendix slides by their actual measured height
@@ -1278,20 +1512,43 @@ export function buildExportSlides(
   const parentItems = roots.map((node) => node.item);
   const overviewPlan = planOverview(parentItems, exportTimeframe);
 
+  // One depth answer for the whole export, from the same helper the on-screen
+  // chart uses, handed down to the sections that indent by it.
+  const depthById = buildDepthMap(exportableItems);
+
   const detailCandidates: DetailCandidate[] = [];
   roots.forEach((parentNode) => {
     const parent = parentNode.item;
-    const children = parentNode.children.map((node) => node.item);
+    // The root's *entire* subtree, not its direct children: a grandchild never
+    // becomes a candidate of its own (only roots do), so anything missing from
+    // here would reach no slide in the deck.
+    const descendants = collectSubtreeRows(parentNode, depthById);
     const parentComments = comments.filter((comment) => comment.taskId === parent.id);
 
-    if (children.length === 0 && parentComments.length === 0) return;
+    if (descendants.length === 0 && parentComments.length === 0) return;
 
     const relevantComments = getCommentsForSlide(comments, parent.id, commentMode);
-    detailCandidates.push({ parent, children, relevantComments });
+    detailCandidates.push({
+      parent,
+      descendants,
+      relevantComments,
+      totalComments: parentComments.length,
+    });
   });
 
+  // Which roots have an appendix section is what tells a root the overview left
+  // off ("also in the appendix") from one that reaches no slide at all.
+  const sectionedIds = new Set(detailCandidates.map((candidate) => candidate.parent.id));
+
   const slides: ExportSlideModel[] = [
-    ...buildOverviewSlides(overviewPlan, exportTimeframe, exportMode, showDependencies),
+    ...buildOverviewSlides(
+      overviewPlan,
+      exportTimeframe,
+      exportMode,
+      showDependencies,
+      parentItems,
+      sectionedIds,
+    ),
     ...buildDetailSlides(detailCandidates, people),
   ];
 
