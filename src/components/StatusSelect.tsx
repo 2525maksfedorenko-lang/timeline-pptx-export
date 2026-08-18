@@ -1,10 +1,17 @@
 import { ChevronDown } from 'lucide-react';
+import { COLORS, withHash } from '../export/theme';
 import {
   TASK_STATUS_CHIP,
   TASK_STATUS_LABELS,
   TASK_STATUS_VALUES,
   type TaskStatus,
 } from '../types/timeline';
+
+// The OS paints the option list and inherits the select's own colours, so a
+// tinted dropdown would leave three of the four looking mislabelled. Both
+// come from the token file rather than being written inline.
+const OPTION_BG = withHash(COLORS.optionBg);
+const OPTION_FG = withHash(COLORS.textOnSurface);
 
 interface StatusSelectProps {
   status: TaskStatus;
@@ -39,7 +46,7 @@ export function StatusSelect({ status, onChange, label }: StatusSelectProps) {
           // Options are painted by the OS menu, which inherits the select's
           // own colors — a tinted dropdown would leave three of the four
           // looking mislabelled, so each option resets them.
-          <option key={value} value={value} style={{ backgroundColor: '#FFFFFF', color: '#0A0A0A' }}>
+          <option key={value} value={value} style={{ backgroundColor: OPTION_BG, color: OPTION_FG }}>
             {TASK_STATUS_LABELS[value]}
           </option>
         ))}

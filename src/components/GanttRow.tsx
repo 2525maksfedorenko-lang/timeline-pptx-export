@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import { getTaskStatus, TASK_STATUS_COLORS, TASK_STATUS_LABELS, type TimelineItem } from '../types/timeline';
+import { getTaskStatus, TASK_STATUS_DOT, TASK_STATUS_LABELS, type TimelineItem } from '../types/timeline';
 import { useTimelineStore } from '../store/timelineStore';
 import { usePeopleStore } from '../store/peopleStore';
 import { BarActionMenu, type MenuAnchor } from './BarActionMenu';
@@ -8,7 +8,8 @@ import { TaskDetailsModal } from './TaskDetailsModal';
 import { resolveAssignee } from './assigneeSelection';
 import { daysBetween, getItemBar, shiftIsoDate } from '../export/dateScale';
 import { clampProgress } from '../utils/clampProgress';
-import { needsDarkText } from '../utils/colorContrast';
+import { readableTextOn } from '../utils/colorContrast';
+import { COLORS, withHash } from '../export/theme';
 import { getInitials } from '../utils/initials';
 import { measureTextWidthPx } from '../utils/measureTextWidth';
 import { resolveBarColor } from '../utils/barColor';
@@ -120,12 +121,12 @@ const ICON_BUTTON_CLASS = 'flex h-4 w-4 flex-shrink-0 items-center justify-cente
 // Person (e.g. removed from peopleStore after the task was assigned) —
 // same value as theme.ts's COLORS.assigneeFallback, used for the same case
 // on the exported detail slide.
-const FALLBACK_ASSIGNEE_COLOR = '94A3B8';
+const FALLBACK_ASSIGNEE_COLOR = COLORS.assigneeFallback;
 // Solid, fully opaque so the date grid lines (drawn behind the bar in
 // z-order) can never bleed through the unfilled part of the bar — an
 // inline color, not the bg-border utility class, so opacity is never at
 // the mercy of an inherited Tailwind CSS variable.
-const BAR_TRACK_COLOR = '#E2E8F0';
+const BAR_TRACK_COLOR = withHash(COLORS.barTrack);
 // Must match how the progress text on the bar is actually styled below
 // (`text-[11px] font-semibold`, app font stack), since it's what the fit
 // measurement is made against.
@@ -243,9 +244,9 @@ export function GanttRow({
         left: 0,
         width: fillWidth,
         justifyContent: 'center',
-        color: needsDarkText(barColor) ? '#0A0A0A' : '#FFFFFF',
+        color: readableTextOn(barColor),
       }
-    : { left: fillWidth + PROGRESS_PADDING_PX, color: '#334155' };
+    : { left: fillWidth + PROGRESS_PADDING_PX, color: withHash(COLORS.textOnSurface) };
 
   const descendantIds = useMemo(() => getDescendantIds(items, item.id), [items, item.id]);
   const hasSubtasks = descendantIds.length > 0;
@@ -491,7 +492,7 @@ export function GanttRow({
       >
         <span
           className={`hidden h-2 w-2 flex-shrink-0 rounded-full max-md:block ${isDimmed ? ROW_DIM_CLASS : ''}`}
-          style={{ backgroundColor: `#${TASK_STATUS_COLORS[status]}` }}
+          style={{ backgroundColor: TASK_STATUS_DOT[status] }}
           title={TASK_STATUS_LABELS[status]}
         />
         {/* On a phone the label column is capped (MOBILE_ZONE1_MAX_WIDTH_PX),
@@ -610,7 +611,7 @@ export function GanttRow({
           {item.assignee && assigneeColor ? (
             <span
               className="text-[9px] font-semibold max-md:text-xs"
-              style={{ color: needsDarkText(assigneeColor) ? '#0A0A0A' : '#FFFFFF' }}
+              style={{ color: readableTextOn(assigneeColor) }}
             >
               {getInitials(item.assignee.name)}
             </span>

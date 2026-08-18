@@ -30,6 +30,26 @@ export const COLORS = {
   // assignee" placeholder) share it rather than drifting into two greys.
   footerText: '737373',
   mutedText: '737373',
+  // --kind-project / --kind-phase / --kind-task: the work-item kind colours.
+  // A bar may be coloured by kind instead of by status (TimelineItem.color),
+  // which is what the seeded demo plan does.
+  kindProject: 'A855F7',
+  kindPhase: 'D97706',
+  kindTask: '3B82F6',
+  // The unfilled remainder of a Gantt bar. --border, so the track reads as a
+  // neutral rail rather than the slate tint it used to carry.
+  barTrack: 'E5E5E5',
+  // --popover / --card: an opaque white surface, for a native <select>'s
+  // option list which the OS paints from the control's own colours.
+  optionBg: 'FFFFFF',
+  // Text drawn *on* a status fill (the percentage inside a bar):
+  // --primary-foreground, the token the product uses for text on its dark
+  // brand surfaces.
+  textOnFill: 'EBF0F5',
+  // Text drawn *beside* a bar, on the pale track, where a light colour would
+  // disappear: --foreground. --muted-foreground was measured first and only
+  // reaches 3.7:1 on the track, so it is deliberately not used here.
+  textOnSurface: '0A0A0A',
   // Vertical date grid lines behind the timeline bars, in four densities, each
   // paired with a stroke width in dateGrid.ts. No design-system counterpart —
   // the product's Gantt isn't part of the system — so these are derived: the
@@ -48,6 +68,16 @@ export const COLORS = {
   // where one year ends and the next begins.
   yearGridLine: 'B0B0B0',
   dayGridLine: 'E0E0E0',
+  // On-screen connector strokes. Relocated here unchanged so no hex lives
+  // outside this file; they have no design-system counterpart (the product's
+  // Gantt is outside the system) and deliberately keep their existing values,
+  // since retuning connectors is not part of the contrast work.
+  //
+  // Note they do not match `dependencyLine` below, which the export uses for
+  // the same relationship — a divergence that predates this and is left as a
+  // decision rather than silently unified.
+  screenDependencyLine: '8A94A0',
+  screenHierarchyLine: 'C7CDD4',
   // Dependency connector lines between overview bars. Also derived — secondary
   // to the bars it links, but readable on slideBg.
   dependencyLine: 'A3A3A3',

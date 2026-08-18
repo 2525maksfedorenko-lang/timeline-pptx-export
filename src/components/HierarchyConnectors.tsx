@@ -3,6 +3,7 @@ import { getItemBar } from '../export/dateScale';
 import type { TimelineItem } from '../types/timeline';
 import { BAR_CENTER_Y_PX, ROW_HEIGHT_PX } from './ganttLayout';
 import { buildConnectorPath } from './connectorGeometry';
+import { COLORS, withHash } from '../export/theme';
 
 interface HierarchyConnectorsProps {
   // In on-screen row order — same list GanttChart renders rows from, so a
@@ -17,7 +18,7 @@ interface HierarchyConnectorsProps {
   timelineStartX: number;
 }
 
-const CONNECTOR_COLOR = '#C7CDD4';
+const CONNECTOR_COLOR = withHash(COLORS.screenHierarchyLine);
 
 /** SVG overlay drawing bracket-style connectors from a parent task's bar to
  * each of its subtasks' bars — task *composition* ("what this task is made

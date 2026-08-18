@@ -1,4 +1,6 @@
 import type { TaskComment, TimelineItem } from '../types/timeline';
+import { COLORS, withHash } from '../export/theme';
+import { TASK_STATUS_SCALE } from '../types/timeline';
 
 /**
  * Example data for this prototype only — not part of the store's logic.
@@ -17,7 +19,7 @@ export const DEV_SEED_ITEMS: TimelineItem[] = [
     progress: 100,
     status: 'done',
     group: 'Phase 1',
-    color: '#3b82f6',
+    color: withHash(COLORS.kindTask),
   },
   {
     id: '2',
@@ -27,7 +29,7 @@ export const DEV_SEED_ITEMS: TimelineItem[] = [
     progress: 60,
     status: 'in_progress',
     group: 'Phase 1',
-    color: '#a855f7',
+    color: withHash(COLORS.kindProject),
     dependencies: ['1'],
   },
   {
@@ -38,7 +40,7 @@ export const DEV_SEED_ITEMS: TimelineItem[] = [
     progress: 30,
     status: 'in_progress',
     group: 'Phase 2',
-    color: '#d97706',
+    color: withHash(COLORS.kindPhase),
     dependencies: ['2'],
   },
   {
@@ -49,7 +51,7 @@ export const DEV_SEED_ITEMS: TimelineItem[] = [
     progress: 0,
     status: 'todo',
     group: 'Phase 2',
-    color: '#ef4444',
+    color: TASK_STATUS_SCALE.blocked.accent,
     dependencies: ['3'],
   },
   {
@@ -60,7 +62,7 @@ export const DEV_SEED_ITEMS: TimelineItem[] = [
     progress: 50,
     status: 'blocked',
     group: 'Phase 2',
-    color: '#d97706',
+    color: withHash(COLORS.kindPhase),
     parentId: '3',
   },
   {
@@ -71,7 +73,7 @@ export const DEV_SEED_ITEMS: TimelineItem[] = [
     progress: 20,
     status: 'in_progress',
     group: 'Phase 2',
-    color: '#d97706',
+    color: withHash(COLORS.kindPhase),
     parentId: '3',
   },
   {
@@ -82,7 +84,7 @@ export const DEV_SEED_ITEMS: TimelineItem[] = [
     progress: 100,
     status: 'done',
     group: 'Internal',
-    color: '#9ca3af',
+    color: TASK_STATUS_SCALE.todo.accent,
     includeInExport: false,
   },
 ];

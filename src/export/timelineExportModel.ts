@@ -12,7 +12,7 @@ import { getStatusSegments, type StatusSegment } from '../utils/dashboardMetrics
 import { clampProgress } from '../utils/clampProgress';
 import { resolveBarColor } from '../utils/barColor';
 import { isNestedTask, resolveBarGeometry } from '../utils/barNesting';
-import { needsDarkText } from '../utils/colorContrast';
+import { readableTextOn } from '../utils/colorContrast';
 import { buildTaskHierarchy } from '../utils/taskHierarchy';
 import {
   daysBetween,
@@ -600,10 +600,14 @@ function buildOverviewSlide(
         progressX,
         progressWidth,
         progressInsideFill,
-        // Light text only where it's readable: on the fill when that fill is
-        // dark enough, dark navy otherwise (including every outside label,
-        // which sits on the light gray track).
-        progressColor: progressInsideFill && !needsDarkText(barColor) ? COLORS.lightText : COLORS.navy,
+        // Inside the fill, whichever of the two text tokens actually measures
+        // more contrast against it (status fills clear 4.5:1 with the light one
+        // by construction; a user's own item.color might not, and then the dark
+        // one wins). Outside the fill the label sits on the pale track, where
+        // only the dark token is readable.
+        progressColor: progressInsideFill
+          ? readableTextOn(barColor).replace('#', '')
+          : COLORS.textOnSurface,
         chevronLeft,
         chevronRight,
       });

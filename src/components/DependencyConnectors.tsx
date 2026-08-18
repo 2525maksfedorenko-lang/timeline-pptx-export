@@ -3,6 +3,7 @@ import { getItemBar } from '../export/dateScale';
 import type { TimelineItem } from '../types/timeline';
 import { BAR_CENTER_Y_PX, ROW_HEIGHT_PX } from './ganttLayout';
 import { buildConnectorPath } from './connectorGeometry';
+import { COLORS, withHash } from '../export/theme';
 
 interface DependencyConnectorsProps {
   // In on-screen row order (i.e. already sorted the same way as the
@@ -17,7 +18,7 @@ interface DependencyConnectorsProps {
   timelineStartX: number;
 }
 
-const CONNECTOR_COLOR = '#8A94A0';
+const CONNECTOR_COLOR = withHash(COLORS.screenDependencyLine);
 
 /** SVG overlay drawing bracket-style dependency connectors ("┐" / "└" — a
  * structural link, not a directional arrow) between task bars, absolutely
