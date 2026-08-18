@@ -94,6 +94,30 @@ export function getTaskStatus(item: Pick<TimelineItem, 'status'>): TaskStatus {
   return item.status ?? DEFAULT_TASK_STATUS;
 }
 
+/** The export timeframe window: a task outside it is either clipped at the
+ * window's edge or dropped from the overview entirely. null = the full range of
+ * the included tasks. */
+export interface ExportTimeframe {
+  start: string; // ISO date
+  end: string; // ISO date
+}
+
+export interface ExportOptions {
+  theme: string;
+  scale: Timeline['scale'];
+  showProgress: boolean;
+  showDependencies: boolean;
+  // On-screen only (parent→subtask structure lines on the Gantt chart) —
+  // unlike the other fields here, this never reaches the PPTX/PDF exporters;
+  // it lives alongside them because the toggle sits in the same settings
+  // panel as showDependencies.
+  showHierarchyLines: boolean;
+  commentMode: 'latest' | 'pinned' | 'all' | 'none';
+  sortMode: SortMode;
+  // null = use the full date range of the included tasks (no windowing).
+  exportTimeframe: ExportTimeframe | null;
+}
+
 export interface TimelineItem {
   id: string;
   label: string;

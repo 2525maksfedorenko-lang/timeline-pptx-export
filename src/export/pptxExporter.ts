@@ -2,7 +2,7 @@ import pptxgen from 'pptxgenjs';
 import type { ExportOptions } from '../store/timelineStore';
 import type { Person } from '../store/peopleStore';
 import type { TaskComment, TimelineItem } from '../types/timeline';
-import { sortItems } from '../utils/sortItems';
+import { sortItemsForExport } from '../utils/sortItemsForExport';
 import {
   buildExportSlides,
   type CommentBlockRowModel,
@@ -914,7 +914,7 @@ export async function exportTimelineToPptx(
   fileName: string = 'timeline-export.pptx',
   exportMode: ExportMode = 'compact',
 ): Promise<void> {
-  const sortedItems = sortItems(items, exportOptions.sortMode);
+  const sortedItems = sortItemsForExport(items, exportOptions.sortMode);
   const slides = buildExportSlides(
     sortedItems,
     comments,

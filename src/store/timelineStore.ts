@@ -1,6 +1,11 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { SortMode, TaskComment, Timeline, TimelineItem } from '../types/timeline';
+import type {
+  ExportOptions,
+  ExportTimeframe,
+  TaskComment,
+  TimelineItem,
+} from '../types/timeline';
 import { getDescendantIds } from '../utils/taskHierarchy';
 import { DEV_SEED_COMMENTS, DEV_SEED_ITEMS, DEV_SEED_TITLE } from './devSeed';
 import {
@@ -11,27 +16,8 @@ import {
 } from './planStorage';
 
 export type { SavedPlan };
-
-export interface ExportTimeframe {
-  start: string; // ISO date
-  end: string; // ISO date
-}
-
-export interface ExportOptions {
-  theme: string;
-  scale: Timeline['scale'];
-  showProgress: boolean;
-  showDependencies: boolean;
-  // On-screen only (parent→subtask structure lines on the Gantt chart) —
-  // unlike the other fields here, this never reaches the PPTX/PDF exporters;
-  // it lives alongside them because the toggle sits in the same settings
-  // panel as showDependencies.
-  showHierarchyLines: boolean;
-  commentMode: 'latest' | 'pinned' | 'all' | 'none';
-  sortMode: SortMode;
-  // null = use the full date range of the included tasks (no windowing).
-  exportTimeframe: ExportTimeframe | null;
-}
+// Re-exported for convenience; they are declared in types/timeline.ts now.
+export type { ExportOptions, ExportTimeframe };
 
 export interface UiState {
   selectedItemId: string | null;

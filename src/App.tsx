@@ -10,7 +10,7 @@ import { exportTimelineToPptx } from './export/pptxExporter'
 import { exportTimelineToPdf } from './export/pdfExporter'
 import { getExportParentItems, planOverview, type ExportMode } from './export/timelineExportModel'
 import { buildExportFilename } from './export/dateScale'
-import { sortItems } from './utils/sortItems'
+import { sortItemsForExport } from './utils/sortItemsForExport'
 import { useTimelineStore } from './store/timelineStore'
 import { usePeopleStore } from './store/peopleStore'
 import aicooLogo from '../design-system/assets/aicoo-logo-orbit-darkblue-text.svg'
@@ -68,7 +68,7 @@ function App() {
   // so it goes to the user rather than being decided here. Everything fitting
   // exports straight away — the two modes would produce the same file.
   const handleExport = (format: ExportFormat) => {
-    const parentItems = getExportParentItems(sortItems(items, exportOptions.sortMode))
+    const parentItems = getExportParentItems(sortItemsForExport(items, exportOptions.sortMode))
     const plan = planOverview(parentItems, exportOptions.exportTimeframe)
 
     if (plan.inRange.length <= plan.capacity) {
