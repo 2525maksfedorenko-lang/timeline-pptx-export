@@ -31,7 +31,7 @@ interface ColumnIndex {
   parent?: number;
 }
 
-export interface ExcelImportResult {
+export interface SheetImportResult {
   /** The rows that parsed cleanly, ready to hand to addItem. */
   items: TimelineItem[];
   /** One message per rejected row, naming the spreadsheet row number. Rows
@@ -39,6 +39,11 @@ export interface ExcelImportResult {
    * throw away the good ones — which is the whole difference from the JSON
    * importer, where a malformed entry means the file itself is wrong. */
   errors: string[];
+  /** Things that were imported, but not necessarily as the file's author
+   * meant them — an ambiguous Parent above all. Unlike `errors` these cost no
+   * rows, so they are worth showing before the import is applied rather than
+   * after it. */
+  warnings: string[];
 }
 
 // Excel's day 0 in the 1900 date system, as a UTC timestamp. Serial numbers
@@ -147,20 +152,26 @@ function isBlankRow(row: unknown[]): boolean {
   return row.every((cell) => cell === undefined || cell === null || String(cell).trim() === '');
 }
 
-/** Reads `file` with FileReader and hands the bytes to SheetJS. */
-function readWorkbook(file: File): Promise<XLSX.WorkBook> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        resolve(XLSX.read(new Uint8Array(reader.result as ArrayBuffer), { type: 'array', cellDates: true }));
-      } catch {
-        reject(new Error('The file could not be read as a spreadsheet.'));
-      }
-    };
-    reader.onerror = () => reject(new Error('Failed to read the file.'));
-    reader.readAsArrayBuffer(file);
-  });
+/** Hands the already-read bytes to SheetJS.
+ *
+ * Bytes rather than a File because the caller has to read the file anyway to
+ * work out what it *is* (see detectImportFormat), and reading it twice would
+ * leave the sniffer and the parser looking at two separate reads of the same
+ * thing. It also keeps this module free of FileReader, so it can be exercised
+ * without a browser.
+ *
+ * SheetJS reads a CSV through the same entry point as a workbook, guessing
+ * the separator among comma/semicolon/tab/pipe, honouring RFC-4180 quoting
+ * (so a quoted field may contain the separator, or newlines — which is how a
+ * markdown comment survives a round trip through a spreadsheet), and
+ * accepting CRLF. The BOM Excel writes is the one thing it does not strip,
+ * which is why decodeImportText exists. */
+function readWorkbook(bytes: ArrayBuffer): XLSX.WorkBook {
+  try {
+    return XLSX.read(new Uint8Array(bytes), { type: 'array', cellDates: true });
+  } catch {
+    throw new Error('The file could not be read as a spreadsheet.');
+  }
 }
 
 /** Parses an .xlsx or .csv file of tasks — one row per task, the first row
@@ -174,9 +185,11 @@ function readWorkbook(file: File): Promise<XLSX.WorkBook> {
  *
  * `existingItems` is what a Parent column resolves against, by id or by
  * label; rows earlier in the same file count too, so a file can bring in a
- * parent and its subtasks together. */
-export async function parseExcelFile(file: File, existingItems: TimelineItem[] = []): Promise<ExcelImportResult> {
-  const workbook = await readWorkbook(file);
+ * parent and its subtasks together. Two tasks may share a label — nothing
+ * stops it, and a plan full of "Review" phases is normal — so an ambiguous
+ * Parent is resolved to the first of them and reported (see warnings). */
+export function parseSheet(bytes: ArrayBuffer, existingItems: TimelineItem[] = []): SheetImportResult {
+  const workbook = readWorkbook(bytes);
   const sheetName = workbook.SheetNames[0];
   if (sheetName === undefined) throw new Error('The file contains no sheets.');
 
@@ -209,14 +222,37 @@ export async function parseExcelFile(file: File, existingItems: TimelineItem[] =
 
   const items: TimelineItem[] = [];
   const errors: string[] = [];
+  const warnings: string[] = [];
   // Parent lookups: existing tasks first, then whatever this file has
-  // already produced.
+  // already produced. First registration wins, so which task a Parent names
+  // doesn't depend on how far down the file the row sits.
   const idByLabel = new Map<string, string>();
   const knownIds = new Set<string>();
+  const rememberLabel = (label: string, id: string) => {
+    const key = label.trim().toLowerCase();
+    if (!idByLabel.has(key)) idByLabel.set(key, id);
+  };
   existingItems.forEach((item) => {
-    idByLabel.set(item.label.trim().toLowerCase(), item.id);
+    rememberLabel(item.label, item.id);
     knownIds.add(item.id);
   });
+
+  // How many tasks each label names, counted across the open plan *and* every
+  // row of this file before a single Parent is resolved. Counting as we go
+  // would call a label unambiguous right up until its twin appears further
+  // down, so the same file would warn or not depending on row order.
+  const labelCount = new Map<string, number>();
+  const countLabel = (label: string) => {
+    const key = label.trim().toLowerCase();
+    if (key !== '') labelCount.set(key, (labelCount.get(key) ?? 0) + 1);
+  };
+  existingItems.forEach((item) => countLabel(item.label));
+  rows.slice(1).forEach((row) => {
+    const cells = Array.isArray(row) ? row : [];
+    const at = columns.label;
+    if (at !== undefined) countLabel(String(cells[at] ?? ''));
+  });
+  const ambiguousReported = new Set<string>();
 
   rows.slice(1).forEach((row, index) => {
     // +2: spreadsheets are 1-based and the first row is the headings, so
@@ -259,7 +295,20 @@ export async function parseExcelFile(file: File, existingItems: TimelineItem[] =
       const parentText = String(cell('parent') ?? '').trim();
       let parentId: string | undefined;
       if (parentText !== '') {
-        parentId = knownIds.has(parentText) ? parentText : idByLabel.get(parentText.toLowerCase());
+        const parentKey = parentText.toLowerCase();
+        parentId = knownIds.has(parentText) ? parentText : idByLabel.get(parentKey);
+
+        // Named a label that more than one task answers to. The link is kept
+        // — dropping it would flatten a hierarchy the file clearly describes
+        // — but which task it points at is a guess, so it is said out loud
+        // once per label rather than once per row.
+        const count = labelCount.get(parentKey) ?? 0;
+        if (parentId !== undefined && count > 1 && !ambiguousReported.has(parentKey)) {
+          ambiguousReported.add(parentKey);
+          warnings.push(
+            `"${parentText}" names ${count} tasks — rows with that Parent are attached to the first of them.`,
+          );
+        }
         // Reported rather than imported flat: dropping the link silently
         // would produce a different plan than the file describes, and the
         // row number says exactly where to fix it.
@@ -284,7 +333,7 @@ export async function parseExcelFile(file: File, existingItems: TimelineItem[] =
       );
 
       items.push(item);
-      idByLabel.set(item.label.toLowerCase(), item.id);
+      rememberLabel(item.label, item.id);
       knownIds.add(item.id);
     } catch (error) {
       errors.push(error instanceof Error ? error.message : `Row ${rowNumber} could not be read.`);
@@ -295,5 +344,5 @@ export async function parseExcelFile(file: File, existingItems: TimelineItem[] =
     throw new Error('The sheet has no task rows under its headings.');
   }
 
-  return { items, errors };
+  return { items, errors, warnings };
 }

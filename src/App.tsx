@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Calendar, LayoutDashboard, Settings } from 'lucide-react'
+import { Calendar, LayoutDashboard, Settings, Upload } from 'lucide-react'
 import { GanttChart } from './components/GanttChart'
 import { Dashboard, type DashboardSection } from './components/Dashboard'
-import { FileDropZone } from './components/FileDropZone'
 import { SettingsFlyout } from './components/SettingsFlyout'
 import { ExportOverflowModal } from './components/ExportOverflowModal'
+import { ImportModal } from './components/ImportModal'
 import { PlanSwitcher } from './components/PlanSwitcher'
 import { exportTimelineToPptx } from './export/pptxExporter'
 import { exportTimelineToPdf } from './export/pdfExporter'
@@ -48,6 +48,7 @@ function App() {
   const [activeTab, setActiveTab] = useState<Tab>(highlightSection ? 'dashboard' : 'timeline')
   const [overflow, setOverflow] = useState<PendingOverflowExport | null>(null)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [isImportOpen, setIsImportOpen] = useState(false)
 
   useEffect(() => {
     void loadPlans()
@@ -80,8 +81,7 @@ function App() {
   }
 
   return (
-    <FileDropZone>
-      <div className="flex min-h-screen flex-col bg-base-background">
+    <div className="flex min-h-screen flex-col bg-base-background">
       {/* The product's app header: 48px, hairline bottom border, white on the
           pale blue-grey page chrome. Actions sit on the right of the same row
           until there isn't one to share — on a phone they take their own row
@@ -100,7 +100,22 @@ function App() {
               {activeTab === 'timeline' ? 'Timeline' : 'Dashboard'}
             </h1>
           </div>
-          <div className="ml-auto flex items-center gap-2 max-md:ml-0">
+          {/* Four actions share this row on a desktop. On a phone they'd each
+              be squeezed to a third of the width they need, so below the
+              breakpoint they become a 2x2 grid instead — every button then
+              keeps a thumb-sized target and its label on one line. */}
+          <div className="ml-auto flex items-center gap-2 max-md:ml-0 max-md:grid max-md:w-full max-md:grid-cols-2">
+            {/* The single way in for a file, in the same row as the two
+                ways out. Outline rather than filled: importing is a step
+                towards the deck, not the thing this app is for. */}
+            <button
+              type="button"
+              onClick={() => setIsImportOpen(true)}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-input bg-background px-4 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-md:min-h-11 max-md:flex-1"
+            >
+              <Upload size={16} strokeWidth={2} aria-hidden="true" />
+              Import
+            </button>
             <button
               type="button"
               onClick={() => setIsSettingsOpen(true)}
@@ -155,6 +170,8 @@ function App() {
 
       {isSettingsOpen && <SettingsFlyout onClose={() => setIsSettingsOpen(false)} />}
 
+      {isImportOpen && <ImportModal onClose={() => setIsImportOpen(false)} />}
+
       {overflow && (
         <ExportOverflowModal
           totalTasks={overflow.totalTasks}
@@ -166,8 +183,7 @@ function App() {
           onCancel={() => setOverflow(null)}
         />
       )}
-      </div>
-    </FileDropZone>
+    </div>
   )
 }
 
