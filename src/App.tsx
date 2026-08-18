@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Settings } from 'lucide-react'
 import { GanttChart } from './components/GanttChart'
 import { Dashboard, type DashboardSection } from './components/Dashboard'
 import { FileDropZone } from './components/FileDropZone'
@@ -12,6 +13,7 @@ import { buildExportFilename } from './export/dateScale'
 import { sortItems } from './utils/sortItems'
 import { useTimelineStore } from './store/timelineStore'
 import { usePeopleStore } from './store/peopleStore'
+import aicooLogo from '../design-system/assets/aicoo-logo-orbit-darkblue-text.svg'
 
 type Tab = 'timeline' | 'dashboard'
 type ExportFormat = 'pptx' | 'pdf'
@@ -79,56 +81,70 @@ function App() {
 
   return (
     <FileDropZone>
-      <div className="min-h-screen bg-slate-50 p-8 max-md:p-4">
-      {/* Title and the two export buttons share a line until there isn't
-          one to share: on a phone the buttons take their own row and split
-          it evenly, which also gets them to a thumb-sized height. */}
-      <div className="mb-6 flex items-center justify-between max-md:flex-col max-md:items-stretch max-md:gap-3">
-        <h1 className="text-3xl font-semibold text-slate-800 max-md:text-2xl">
-          Timeline PPTX Export
-        </h1>
-        <div className="flex gap-3">
-          <button
-            type="button"
-            onClick={() => setIsSettingsOpen(true)}
-            className="rounded-md border border-[#E5E5E1] bg-white px-4 py-2 text-sm font-medium text-[#1E2B38] shadow-sm transition-colors hover:border-[#2A9D90] hover:text-[#2A9D90] max-md:min-h-11 max-md:flex-1"
-          >
-            ⚙ Settings
-          </button>
-          <button
-            type="button"
-            onClick={() => handleExport('pptx')}
-            className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700 max-md:min-h-11 max-md:flex-1"
-          >
-            Export to PowerPoint
-          </button>
-          <button
-            type="button"
-            onClick={() => handleExport('pdf')}
-            className="rounded-md bg-slate-700 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-slate-800 max-md:min-h-11 max-md:flex-1"
-          >
-            Export as PDF
-          </button>
+      <div className="flex min-h-screen flex-col bg-base-background">
+      {/* The product's app header: 48px, hairline bottom border, white on the
+          pale blue-grey page chrome. Actions sit on the right of the same row
+          until there isn't one to share — on a phone they take their own row
+          and split it evenly, which also gets them to a thumb-sized height. */}
+      <header className="flex-shrink-0 border-b border-border bg-background">
+        <div className="flex min-h-12 items-center gap-3 px-4 py-2 max-md:flex-col max-md:items-stretch max-md:gap-3">
+          <div className="flex items-center gap-3">
+            <img src={aicooLogo} alt="aicoo" className="h-8 w-auto" />
+            <span className="h-5 w-px bg-border max-md:hidden" />
+            <h1 className="text-lg font-semibold">Timeline Export</h1>
+          </div>
+          <div className="ml-auto flex items-center gap-2 max-md:ml-0">
+            <button
+              type="button"
+              onClick={() => setIsSettingsOpen(true)}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-transparent px-4 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground max-md:min-h-11 max-md:flex-1"
+            >
+              <Settings size={16} strokeWidth={2} />
+              Settings
+            </button>
+            <button
+              type="button"
+              onClick={() => handleExport('pdf')}
+              className="inline-flex h-10 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground max-md:min-h-11 max-md:flex-1"
+            >
+              Export as PDF
+            </button>
+            <button
+              type="button"
+              onClick={() => handleExport('pptx')}
+              className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 max-md:min-h-11 max-md:flex-1"
+            >
+              Export to PowerPoint
+            </button>
+          </div>
         </div>
-      </div>
+      </header>
+
+      <main className="min-h-0 flex-1 p-6 max-md:p-3">
       <PlanSwitcher />
 
-      <div className="mb-4 inline-flex rounded-md border border-[#E5E5E1] bg-white p-1 max-md:flex">
-        {(['timeline', 'dashboard'] as const).map((tab) => (
+      {/* Tabs, per the design system: a muted pill whose active item is a
+          white card. Labels are Title Case like every other first-class
+          object label in the product, so they are written out rather than
+          capitalised from the value. */}
+      <div className="mb-4 inline-flex h-10 items-center rounded-md bg-muted p-1 text-muted-foreground max-md:flex max-md:w-full">
+        {([['timeline', 'Timeline'], ['dashboard', 'Dashboard']] as const).map(([tab, label]) => (
           <button
             key={tab}
             type="button"
             onClick={() => setActiveTab(tab)}
-            className={`rounded px-3 py-1.5 text-sm font-medium capitalize transition-colors max-md:min-h-11 max-md:flex-1 ${
-              activeTab === tab ? 'bg-[#1E2B38] text-white' : 'text-slate-500 hover:text-[#1E2B38]'
+            className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-colors max-md:min-h-11 max-md:flex-1 ${
+              activeTab === tab ? 'bg-background text-foreground shadow-sm' : 'hover:text-foreground'
             }`}
           >
-            {tab}
+            {label}
           </button>
         ))}
       </div>
 
       {activeTab === 'timeline' ? <GanttChart /> : <Dashboard highlightSection={highlightSection} />}
+
+      </main>
 
       {isSettingsOpen && <SettingsFlyout onClose={() => setIsSettingsOpen(false)} />}
 

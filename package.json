@@ -13,6 +13,7 @@
     "idb": "^8.0.3",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
+    "lucide-react": "^0.436.0",
     "marked": "^18.0.9",
     "pptxgenjs": "^4.0.1",
     "qrcode": "^1.5.4",

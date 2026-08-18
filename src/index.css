@@ -1,8 +1,62 @@
 @import "tailwindcss";
 
+/* The aicoo Coordinator design system, consumed as-is. This is the single
+   source of truth for brand colour, type, spacing, radii, elevation and
+   motion — see design-system/readme.md. Its scales are Tailwind-derived, so
+   `p-6`, `text-lg`, `rounded-lg` and `shadow-sm` already resolve to the
+   product's values; only colour needs bridging into Tailwind's namespace. */
+@import "../design-system/styles.css";
+
+@theme {
+  /* Colour tokens stay as var() references rather than resolved values, so a
+     future `.dark` swap on <html> keeps working without touching utilities. */
+  --color-background: hsl(var(--background));
+  --color-base-background: hsl(var(--base-background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+
+  /* Meaning-carrying colours: work-item kinds and status chips. Flat hex
+     upstream (they mirror the Tailwind palette utilities the product uses). */
+  --color-kind-project: var(--kind-project);
+  --color-kind-phase: var(--kind-phase);
+  --color-kind-task: var(--kind-task);
+  --color-status-ontrack-bg: var(--status-ontrack-bg);
+  --color-status-ontrack-fg: var(--status-ontrack-fg);
+  --color-status-delayed-bg: var(--status-delayed-bg);
+  --color-status-delayed-fg: var(--status-delayed-fg);
+  --color-status-neutral-bg: var(--status-neutral-bg);
+  --color-status-neutral-fg: var(--status-neutral-fg);
+  --color-status-issue: var(--status-issue);
+  --color-status-active-dot: var(--status-active-dot);
+  --color-status-inactive-dot: var(--status-inactive-dot);
+
+  /* The one size the product uses that Tailwind's scale doesn't carry: the
+     10px micro badge. Deliberately not named --text-2xs — that key already
+     holds the raw value upstream, and reusing it here would make the
+     declaration reference itself. */
+  --text-micro: var(--text-2xs);
+}
+
 /* The settings flyout's entrance (see SettingsFlyout). Defined here rather
    than animated through React state because a keyframe needs no re-render
-   to run: the panel mounts already sliding. */
+   to run: the panel mounts already sliding. Duration and easing come from
+   the design system's sheet timings. */
 @keyframes flyout-in {
   from {
     transform: translateX(100%);
