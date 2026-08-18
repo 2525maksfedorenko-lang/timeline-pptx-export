@@ -88,7 +88,7 @@ export function TaskDetailsModal({
         className="w-full max-w-lg rounded-lg border border-border bg-background p-6 text-left shadow-xl max-md:max-h-[85vh] max-md:overflow-y-auto max-md:p-4"
       >
         <div className="flex items-center justify-between gap-3">
-          <h2 id={titleId} className="min-w-0 truncate text-base font-semibold tracking-tight text-foreground">
+          <h2 id={titleId} className="min-w-0 truncate text-lg font-semibold tracking-tight text-foreground">
             {item.label}
           </h2>
           {/* Phone-only: a desktop pointer has both the Cancel button and
@@ -115,7 +115,7 @@ export function TaskDetailsModal({
             value={commentText}
             onChange={(event) => onCommentTextChange(event.target.value)}
             placeholder="Add a note about this task…"
-            className="resize-none rounded-md border border-border px-3 py-2 text-base leading-relaxed text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-md:h-24"
+            className="resize-none rounded-md border border-border px-3 py-2 text-sm leading-relaxed text-foreground max-md:text-base focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-md:h-24"
           />
         </div>
 
@@ -164,7 +164,7 @@ export function TaskDetailsModal({
             onChange={(event) => onTagInputChange(event.target.value)}
             onKeyDown={onTagInputKeyDown}
             placeholder="Add a tag, press Enter…"
-            className="rounded-md border border-border px-3 py-2 text-base text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            className="rounded-md border border-border px-3 py-2 text-sm text-foreground max-md:text-base focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           />
         </div>
 
