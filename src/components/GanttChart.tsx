@@ -200,8 +200,7 @@ export function GanttChart() {
           on a phone the controls take their own full-width row underneath,
           which is also what gives the zoom buttons and the add-task form
           room to grow to thumb size. */}
-      <div className="mb-3 flex items-center justify-between max-md:flex-col max-md:items-stretch max-md:gap-2">
-        <h2 className="text-lg font-semibold tracking-tight text-foreground">Timeline</h2>
+      <div className="mb-3 flex items-center justify-end max-md:flex-col max-md:items-stretch max-md:gap-2">
         <div className="flex items-center gap-3 max-md:flex-wrap max-md:justify-between">
           <ZoomControl />
           <AddTaskForm />

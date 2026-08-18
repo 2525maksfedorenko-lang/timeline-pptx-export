@@ -1,42 +1,61 @@
-// aicoo brand palette. Hex values are stored without '#' (pptxgenjs's format);
-// call `withHash()` for APIs that expect a leading '#' (e.g. jsPDF).
+// aicoo brand palette for the PPTX/PDF exporters. Hex values are stored without
+// '#' (pptxgenjs's format); call `withHash()` for APIs that expect a leading
+// '#' (e.g. jsPDF).
+//
+// These are the aicoo Coordinator design-system tokens resolved to hex, because
+// neither exporter can read CSS custom properties. Where a token exists, its
+// name is given — keep the two in step (see design-system/tokens/).
 
 export const COLORS = {
-  navy: '1E2B38',
-  slideBg: 'F1F2F4',
-  lightText: 'E9EDF2',
-  teal: '2A9D90',
-  coral: 'E76E50',
-  amber: 'F2C14E',
-  border: 'E5E5E1',
-  // Not part of the brand palette itself, but needed for legible gray
-  // caption text on the light footer strip.
-  footerText: '6B7280',
-  // De-emphasized body text: present and readable, but visibly secondary to
-  // navy (e.g. a detail section's "No assignee" placeholder).
-  mutedText: '9AA2AC',
-  // Vertical date grid lines behind the timeline bars, in three densities
-  // (see dateGrid.ts, which pairs each with its stroke width). Monthly is
-  // the darkest and daily the palest, so the levels read as a hierarchy at
-  // a glance; the values are deliberately spread far enough apart to stay
-  // distinguishable after antialiasing at sub-pixel widths.
-  gridLine: 'D8D6CC',
-  weekGridLine: 'DCDBD2',
+  // --primary: the one navy the whole brand rests on.
+  navy: '1E2A38',
+  // --base-background: the product's pale blue-grey app chrome, so a slide
+  // reads as a Coordinator surface rather than plain white.
+  slideBg: 'EBF0F5',
+  // --primary-foreground: the pale blue-grey that sits *on* navy. Same value as
+  // slideBg upstream, which is safe here because it is only ever drawn on the
+  // navy header band or on a coloured bar fill, never on the slide background.
+  lightText: 'EBF0F5',
+  // Text links are the product's one deliberate exception to "navy plus
+  // neutrals": Tailwind blue-500, not --primary. See the Link note in
+  // design-system/components/core/Link.prompt.md.
+  link: '3B82F6',
+  // --status-issue: the orange the product reserves for issues and caveats,
+  // used here for the "some tasks aren't shown" warning.
+  warning: 'F97316',
+  // --border
+  border: 'E5E5E5',
+  // --muted-foreground. The product has exactly one muted grey, so footer
+  // captions and de-emphasised body text (e.g. a detail section's "No
+  // assignee" placeholder) share it rather than drifting into two greys.
+  footerText: '737373',
+  mutedText: '737373',
+  // Vertical date grid lines behind the timeline bars, in four densities, each
+  // paired with a stroke width in dateGrid.ts. No design-system counterpart —
+  // the product's Gantt isn't part of the system — so these are derived: the
+  // original khaki-tinted set retuned onto neutral greys, since aicoo has no
+  // warm greys anywhere. The spread is kept wide enough that the levels stay
+  // distinguishable after antialiasing at sub-pixel widths, and every one of
+  // them stays a clear step darker than slideBg or it would vanish.
+  //
+  // Monthly is the darkest of the three regular levels and daily the palest,
+  // so the levels read as a hierarchy at a glance.
+  gridLine: 'CFCFCF',
+  weekGridLine: 'D6D6D6',
   // Year boundaries, only drawn on ranges long enough that months are the
   // *fine* level (see getVisibleGridLevels). A clear step darker than the
   // monthly line, since on a multi-year range it's the one mark that says
   // where one year ends and the next begins.
-  yearGridLine: 'BDB9A9',
-  // Pale, but deliberately not *as* pale as the slide background it sits on
-  // (slideBg F1F2F4): a lighter daily line simply disappears in the export.
-  dayGridLine: 'E9EAE2',
-  // Dependency connector lines between overview bars.
-  dependencyLine: '8A94A0',
+  yearGridLine: 'B0B0B0',
+  dayGridLine: 'E0E0E0',
+  // Dependency connector lines between overview bars. Also derived — secondary
+  // to the bars it links, but readable on slideBg.
+  dependencyLine: 'A3A3A3',
   // Fallback swatch fill for a detail slide's "Assigned to" line when the
   // assignee's name no longer matches any saved Person (e.g. removed from
   // peopleStore after the task was assigned) — a neutral badge instead of
   // silently guessing a color that isn't really theirs.
-  assigneeFallback: '94A3B8',
+  assigneeFallback: '9CA3AF',
 } as const;
 
 export function withHash(hex: string) {
@@ -44,6 +63,9 @@ export function withHash(hex: string) {
 }
 
 // Closest built-in equivalents for a uniform sans-serif look in each engine.
+// The product itself ships no webfont and rides the platform UI stack, which
+// Office and jsPDF have no access to — Arial/Helvetica are the nearest
+// metric-neutral stand-ins.
 export const PPTX_FONT_FACE = 'Arial';
 export const PDF_FONT_FACE = 'helvetica';
 

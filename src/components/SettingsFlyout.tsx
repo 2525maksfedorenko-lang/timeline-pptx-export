@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { ExportSettingsPanel } from './ExportSettingsPanel';
+import { X } from 'lucide-react';
 
 interface SettingsFlyoutProps {
   onClose: () => void;
@@ -42,10 +43,10 @@ export function SettingsFlyout({ onClose }: SettingsFlyoutProps) {
           <button
             type="button"
             onClick={onClose}
-            className="flex h-9 w-9 items-center justify-center rounded-md text-xl leading-none text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground max-md:h-11 max-md:w-11"
+            className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground max-md:h-11 max-md:w-11"
             aria-label="Close settings"
           >
-            ×
+            <X size={16} strokeWidth={2} />
           </button>
         </div>
 

@@ -95,12 +95,12 @@ function StatusDonut({ segments }: { segments: StatusSegment[] }) {
               style={{ backgroundColor: withHash(segment.color) }}
               aria-hidden="true"
             />
-            {/* The status tier: a notch smaller than the row's text-sm,
-                medium weight, tracked out and uppercased — the one place a
-                status is rendered as real text on screen (elsewhere it's a
-                colored dot's tooltip or a native <select> option, neither of
-                which can carry this styling). */}
-            <span className="text-xs font-medium uppercase tracking-[0.06em] text-foreground">
+            {/* The status tier: a notch smaller than the row's text-sm and
+                medium weight. Left lowercase, which is the product's
+                convention for status words — this is the one place a status is
+                rendered as real text on screen (elsewhere it's a colored dot's
+                tooltip or a native <select> option). */}
+            <span className="text-xs font-medium text-foreground">
               {segment.label}
             </span>
             <span className="text-muted-foreground">
@@ -126,7 +126,7 @@ function DelayedTable({ items, today }: { items: TimelineItem[]; today: Date }) 
     <div className="overflow-x-auto">
       <table className="w-full text-left text-sm">
         <thead>
-          <tr className="border-b border-border text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <tr className="border-b border-border text-xs font-medium text-muted-foreground">
             <th className="py-2 pr-3 font-medium">Task</th>
             <th className="py-2 pr-3 font-medium">End date</th>
             <th className="py-2 pr-3 font-medium">Days overdue</th>
@@ -157,7 +157,7 @@ function AtRiskTable({ items }: { items: TimelineItem[] }) {
     <div className="overflow-x-auto">
       <table className="w-full text-left text-sm">
         <thead>
-          <tr className="border-b border-border text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <tr className="border-b border-border text-xs font-medium text-muted-foreground">
             <th className="py-2 pr-3 font-medium">Task</th>
             <th className="py-2 pr-3 font-medium">End date</th>
             <th className="py-2 font-medium">Assignee</th>
@@ -197,9 +197,9 @@ export function Dashboard({ highlightSection }: DashboardProps) {
   }, [highlightSection]);
 
   return (
-    <div>
-      <h2 className="mb-3 text-lg font-semibold tracking-tight text-foreground">Dashboard</h2>
-
+    // List pages in the product centre on --content-max; the timeline doesn't,
+    // because a plan needs every pixel of width it can get.
+    <div className="mx-auto w-full max-w-6xl">
       <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
         <KpiCard label="Total tasks" value={`${kpis.total}`} />
         <KpiCard label="Completed" value={`${kpis.completed} (${kpis.completedPercent}%)`}  />

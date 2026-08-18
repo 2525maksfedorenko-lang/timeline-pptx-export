@@ -118,7 +118,7 @@ function drawBackToOverviewLink(doc: jsPDF, overviewSlideNumber: number | null) 
 
   doc.setFont(PDF_FONT_FACE, 'bold');
   doc.setFontSize(BACK_LINK_FONT_SIZE_PT);
-  doc.setTextColor(withHash(COLORS.teal));
+  doc.setTextColor(withHash(COLORS.link));
   drawText(doc, BACK_LINK_TEXT, CONTENT_X_IN, BACK_LINK_Y_IN + BACK_LINK_HEIGHT_IN / 2, { baseline: 'middle' });
 
   linkToPage(doc, overviewSlideNumber, CONTENT_X_IN, BACK_LINK_Y_IN, BACK_LINK_WIDTH_IN, BACK_LINK_HEIGHT_IN);
@@ -186,7 +186,7 @@ function drawOmittedTasksWarning(doc: jsPDF, omittedCount: number) {
 
   doc.setFont(PDF_FONT_FACE, 'bold');
   doc.setFontSize(8);
-  doc.setTextColor(withHash(COLORS.coral));
+  doc.setTextColor(withHash(COLORS.warning));
   drawText(doc, `+${omittedCount} ${taskWord} not shown - narrow the export timeframe to see them`, CONTENT_X_IN, footerY + FOOTER_HEIGHT_IN / 2, {
     baseline: 'middle',
     align: 'left',

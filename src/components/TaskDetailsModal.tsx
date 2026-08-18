@@ -1,6 +1,7 @@
 import { createPortal } from 'react-dom';
 import type { TimelineItem } from '../types/timeline';
 import { AssigneeSelect } from './AssigneeSelect';
+import { X, XCircle } from 'lucide-react';
 
 interface TaskDetailsModalProps {
   item: TimelineItem;
@@ -96,10 +97,10 @@ export function TaskDetailsModal({
           <button
             type="button"
             onClick={onClose}
-            className="hidden h-11 w-11 flex-shrink-0 items-center justify-center rounded-md text-2xl leading-none text-muted-foreground/70 max-md:flex"
+            className="hidden h-11 w-11 flex-shrink-0 items-center justify-center rounded-md text-muted-foreground/70 max-md:flex"
             aria-label="Close"
           >
-            ×
+            <X size={16} strokeWidth={2} />
           </button>
         </div>
 
@@ -147,10 +148,10 @@ export function TaskDetailsModal({
                   <button
                     type="button"
                     onClick={() => onRemoveTag(tag)}
-                    className="leading-none text-muted-foreground/70 hover:text-muted-foreground"
+                    className="text-muted-foreground/70 hover:text-muted-foreground"
                     aria-label={`Remove tag ${tag}`}
                   >
-                    ×
+                    <XCircle size={14} strokeWidth={2} />
                   </button>
                 </span>
               ))}

@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { useTimelineStore } from '../store/timelineStore';
 import { exportPlanToJsonFile } from '../import/planJson';
 import { useFileImport } from '../import/useFileImport';
+import { Download, Table, Upload, X } from 'lucide-react';
 
 export function PlanSwitcher() {
   const savedPlans = useTimelineStore((state) => state.savedPlans);
@@ -74,10 +75,10 @@ export function PlanSwitcher() {
           <button
             type="button"
             onClick={() => handleDelete(plan.id, plan.name)}
-            className="text-muted-foreground/70 opacity-0 transition-opacity hover:text-red-600 group-hover:opacity-100 max-md:opacity-100"
+            className="text-muted-foreground/70 opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100 max-md:opacity-100"
             aria-label={`Delete plan ${plan.name}`}
           >
-            ×
+            <X size={14} strokeWidth={2} />
           </button>
         </div>
       ))}
@@ -143,15 +144,7 @@ export function PlanSwitcher() {
           aria-label="Save current plan as JSON"
           className="rounded-md p-1.5 text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent max-md:p-3"
         >
-          <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4" aria-hidden="true">
-            <path
-              d="M10 3v9m0 0-3-3m3 3 3-3M4 13v2a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-2"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
+          <Download size={16} strokeWidth={2} aria-hidden="true" />
         </button>
         <input
           ref={sheetFileInputRef}
@@ -169,15 +162,7 @@ export function PlanSwitcher() {
         >
           {/* A grid, to read as "spreadsheet" beside the two plain
               file arrows either side of it. */}
-          <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4" aria-hidden="true">
-            <path
-              d="M3.5 4.5h13v11h-13v-11Zm0 3.7h13m-13 3.6h13M8.2 4.5v11"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
+          <Table size={16} strokeWidth={2} aria-hidden="true" />
         </button>
         <button
           type="button"
@@ -186,15 +171,7 @@ export function PlanSwitcher() {
           aria-label="Load plan from JSON"
           className="rounded-md p-1.5 text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground max-md:p-3"
         >
-          <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4" aria-hidden="true">
-            <path
-              d="M10 12V3m0 0-3 3m3-3 3 3M4 13v2a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-2"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
+          <Upload size={16} strokeWidth={2} aria-hidden="true" />
         </button>
       </div>
     </div>

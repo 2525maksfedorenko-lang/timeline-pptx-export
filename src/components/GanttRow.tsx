@@ -15,6 +15,7 @@ import { resolveBarColor } from '../utils/barColor';
 import { isNestedTask, resolveBarGeometry } from '../utils/barNesting';
 import { getDescendantIds } from '../utils/taskHierarchy';
 import { BAR_HEIGHT_PX } from './ganttLayout';
+import { Eye, EyeOff, MessageSquare, Trash2, UserRound } from 'lucide-react';
 
 interface GanttRowProps {
   item: TimelineItem;
@@ -87,40 +88,21 @@ interface DragState {
 }
 
 function EyeIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-      <circle cx="12" cy="12" r="3" />
-    </svg>
-  );
+  return <Eye size={14} strokeWidth={2} />;
 }
 
 function EyeOffIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a18.7 18.7 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
-      <line x1="1" y1="1" x2="23" y2="23" />
-    </svg>
-  );
+  return <EyeOff size={14} strokeWidth={2} />;
 }
 
+/** message-square, not message-circle: the product marks a commented card with
+ * the square glyph, and this row is the same signal in a different view. */
 function CommentIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
-    </svg>
-  );
+  return <MessageSquare size={14} strokeWidth={2} />;
 }
 
 function TrashIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="3 6 5 6 21 6" />
-      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-      <line x1="10" y1="11" x2="10" y2="17" />
-      <line x1="14" y1="11" x2="14" y2="17" />
-    </svg>
-  );
+  return <Trash2 size={14} strokeWidth={2} />;
 }
 
 /** Plain outline "person" glyph shown as the assignee control when a task
@@ -128,12 +110,7 @@ function TrashIcon() {
  * set assignee's badge), never hidden, so there's always something in that
  * slot of zone 3 to click. */
 function PersonIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="8" r="4" />
-      <path d="M4 20.5c0-4.7 3.6-7.5 8-7.5s8 2.8 8 7.5" />
-    </svg>
-  );
+  return <UserRound size={14} strokeWidth={2} />;
 }
 
 const ICON_BUTTON_CLASS = 'flex h-4 w-4 flex-shrink-0 items-center justify-center';
@@ -670,7 +647,7 @@ export function GanttRow({
             type="button"
             onMouseDown={(event) => event.stopPropagation()}
             onClick={handleDelete}
-            className={`${iconButtonClass} text-foreground/70 hover:text-red-600 max-md:hidden`}
+            className={`${iconButtonClass} text-foreground/70 hover:text-destructive max-md:hidden`}
             title="Delete task and subtasks"
             aria-label="Delete task and subtasks"
           >

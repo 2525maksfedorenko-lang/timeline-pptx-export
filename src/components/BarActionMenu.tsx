@@ -99,7 +99,7 @@ export function BarActionMenu({ item, anchor, onChangeStatus, onAddSubtask, onCl
         maxHeight: MENU_MAX_HEIGHT_PX,
       }}
     >
-      <p className="mb-2 truncate text-xs font-semibold uppercase tracking-wide text-muted-foreground">{item.label}</p>
+      <p className="mb-2 truncate text-sm font-semibold text-foreground">{item.label}</p>
 
       <div className="flex flex-col gap-1">
         <span className={FIELD_LABEL_CLASS}>Change status</span>

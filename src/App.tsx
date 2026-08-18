@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Settings } from 'lucide-react'
+import { Calendar, LayoutDashboard, Settings } from 'lucide-react'
 import { GanttChart } from './components/GanttChart'
 import { Dashboard, type DashboardSection } from './components/Dashboard'
 import { FileDropZone } from './components/FileDropZone'
@@ -91,7 +91,14 @@ function App() {
           <div className="flex items-center gap-3">
             <img src={aicooLogo} alt="aicoo" className="h-8 w-auto" />
             <span className="h-5 w-px bg-border max-md:hidden" />
-            <h1 className="text-lg font-semibold">Timeline Export</h1>
+            {activeTab === 'timeline' ? (
+              <Calendar size={20} strokeWidth={2} className="flex-shrink-0 text-muted-foreground" aria-hidden="true" />
+            ) : (
+              <LayoutDashboard size={20} strokeWidth={2} className="flex-shrink-0 text-muted-foreground" aria-hidden="true" />
+            )}
+            <h1 className="truncate text-lg font-semibold">
+              {activeTab === 'timeline' ? 'Timeline' : 'Dashboard'}
+            </h1>
           </div>
           <div className="ml-auto flex items-center gap-2 max-md:ml-0">
             <button

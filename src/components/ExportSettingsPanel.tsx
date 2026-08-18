@@ -149,7 +149,7 @@ export function ExportSettingsPanel() {
   return (
     <div>
       <div className="mb-4 flex items-center justify-between gap-2">
-          <label htmlFor="sort-mode-select" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <label htmlFor="sort-mode-select" className="text-xs font-medium text-muted-foreground">
             Sort by
           </label>
           <select
@@ -168,7 +168,7 @@ export function ExportSettingsPanel() {
 
       <div>
           <div className="mb-3 flex items-center justify-between">
-            <span className="flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <span className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
               Tasks included in export
               {isMobile && (
                 <SectionToggle
@@ -247,7 +247,7 @@ export function ExportSettingsPanel() {
 
           <label
             htmlFor="comment-mode-select"
-            className="mb-1 block text-xs font-medium uppercase tracking-wide text-muted-foreground"
+            className="mb-1 block text-xs font-medium text-muted-foreground"
           >
             Comments in export
           </label>
@@ -288,7 +288,7 @@ export function ExportSettingsPanel() {
 
           <div className="mt-4 border-t border-border pt-4">
             <div className="mb-1 flex items-center justify-between">
-              <span className="flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <span className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
                 Export timeframe (optional)
                 {isMobile && (
                   <SectionToggle
@@ -372,7 +372,7 @@ export function ExportSettingsPanel() {
 
           {comments.length > 0 && (
             <div className="mt-4 border-t border-border pt-4">
-              <span className="mb-2 flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <span className="mb-2 flex items-center gap-1 text-xs font-medium text-muted-foreground">
                 Comments
                 {isMobile && (
                   <SectionToggle
