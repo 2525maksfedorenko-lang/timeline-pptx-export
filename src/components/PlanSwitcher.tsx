@@ -1,8 +1,7 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { useTimelineStore } from '../store/timelineStore';
 import { exportPlanToJsonFile } from '../import/planJson';
-import { useFileImport } from '../import/useFileImport';
-import { Download, Table, Upload, X } from 'lucide-react';
+import { Download, X } from 'lucide-react';
 
 export function PlanSwitcher() {
   const savedPlans = useTimelineStore((state) => state.savedPlans);
@@ -10,12 +9,9 @@ export function PlanSwitcher() {
   const switchToPlan = useTimelineStore((state) => state.switchToPlan);
   const saveCurrentAsPlan = useTimelineStore((state) => state.saveCurrentAsPlan);
   const deletePlan = useTimelineStore((state) => state.deletePlan);
-  const importFile = useFileImport();
 
   const [isCreating, setIsCreating] = useState(false);
   const [newPlanName, setNewPlanName] = useState('');
-  const jsonFileInputRef = useRef<HTMLInputElement>(null);
-  const sheetFileInputRef = useRef<HTMLInputElement>(null);
 
   const activePlan = savedPlans.find((plan) => plan.id === activePlanId);
 
@@ -35,22 +31,6 @@ export function PlanSwitcher() {
   const handleSaveJson = () => {
     if (!activePlan) return;
     exportPlanToJsonFile(activePlan);
-  };
-
-  const handleLoadJsonClick = () => {
-    jsonFileInputRef.current?.click();
-  };
-
-  const handleLoadSheetClick = () => {
-    sheetFileInputRef.current?.click();
-  };
-
-  // Both inputs hand the file to the same importer a drop does (see
-  // useFileImport), so picking a file and dropping one can't diverge.
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (file) void importFile(file);
   };
 
   return (
@@ -128,14 +108,12 @@ export function PlanSwitcher() {
         </button>
       )}
 
+      {/* Saving the plan out, only. Importing is one button in the app
+          header (see ImportModal) rather than a pair of icons here: two
+          entry points for one action meant the format had to be chosen
+          before the file was, and a person with a .csv had to know which of
+          the two icons would accept it. */}
       <div className="ml-auto flex items-center gap-1">
-        <input
-          ref={jsonFileInputRef}
-          type="file"
-          accept=".json"
-          onChange={handleFileChange}
-          className="hidden"
-        />
         <button
           type="button"
           onClick={handleSaveJson}
@@ -145,33 +123,6 @@ export function PlanSwitcher() {
           className="rounded-md p-1.5 text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent max-md:p-3"
         >
           <Download size={16} strokeWidth={2} aria-hidden="true" />
-        </button>
-        <input
-          ref={sheetFileInputRef}
-          type="file"
-          accept=".xlsx,.csv"
-          onChange={handleFileChange}
-          className="hidden"
-        />
-        <button
-          type="button"
-          onClick={handleLoadSheetClick}
-          title="Import tasks from Excel or CSV (columns: Label, Start, End, Progress, Status, Assignee, Parent)"
-          aria-label="Import tasks from Excel or CSV"
-          className="rounded-md p-1.5 text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground max-md:p-3"
-        >
-          {/* A grid, to read as "spreadsheet" beside the two plain
-              file arrows either side of it. */}
-          <Table size={16} strokeWidth={2} aria-hidden="true" />
-        </button>
-        <button
-          type="button"
-          onClick={handleLoadJsonClick}
-          title="Load plan from JSON"
-          aria-label="Load plan from JSON"
-          className="rounded-md p-1.5 text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground max-md:p-3"
-        >
-          <Upload size={16} strokeWidth={2} aria-hidden="true" />
         </button>
       </div>
     </div>
