@@ -36,9 +36,18 @@ export async function savePlan(plan: SavedPlan): Promise<void> {
   await db.put(STORE_NAME, plan);
 }
 
-export async function getAllPlans(): Promise<SavedPlan[]> {
+export interface LoadedPlans {
+  plans: SavedPlan[];
+  /** What had to be repaired to load each plan, keyed by plan id — see
+   * normalizeItemStatuses. Kept per plan rather than pooled because only the
+   * plan actually on screen is worth telling anyone about, and which one that
+   * is isn't decided here. */
+  noticesByPlanId: Record<string, string[]>;
+}
+
+export async function getAllPlans(): Promise<LoadedPlans> {
   const db = await getDb();
-  const plans: SavedPlan[] = await db.getAll(STORE_NAME);
+  const stored: SavedPlan[] = await db.getAll(STORE_NAME);
 
   // Repaired on the way out, not only on the way in. Plans saved before the
   // importers normalized statuses are already sitting in this database, and
@@ -47,7 +56,18 @@ export async function getAllPlans(): Promise<SavedPlan[]> {
   // good, and every reopening would draw a status the colour table, the chip
   // and the export sort all fail to match. Nothing is written back: the repair
   // costs nothing to redo, and the next save persists it anyway.
-  return plans.map((plan) => ({ ...plan, items: normalizeItemStatuses(plan.items).items }));
+  //
+  // What the repair changed is returned rather than swallowed: an import says
+  // so in its dialog, and a reload has to say so too, or the person meets a
+  // plan that sorts differently than they left it with no way to find out why.
+  const noticesByPlanId: Record<string, string[]> = {};
+  const plans = stored.map((plan) => {
+    const { items, warnings } = normalizeItemStatuses(plan.items);
+    if (warnings.length > 0) noticesByPlanId[plan.id] = warnings;
+    return { ...plan, items };
+  });
+
+  return { plans, noticesByPlanId };
 }
 
 export async function deletePlan(id: string): Promise<void> {

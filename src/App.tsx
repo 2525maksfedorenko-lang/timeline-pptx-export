@@ -5,6 +5,7 @@ import { Dashboard, type DashboardSection } from './components/Dashboard'
 import { SettingsFlyout } from './components/SettingsFlyout'
 import { ExportOverflowModal } from './components/ExportOverflowModal'
 import { ImportModal } from './components/ImportModal'
+import { PlanNotice } from './components/PlanNotice'
 import { PlanSwitcher } from './components/PlanSwitcher'
 import { exportTimelineToPptx } from './export/pptxExporter'
 import { exportTimelineToPdf } from './export/pdfExporter'
@@ -144,6 +145,10 @@ function App() {
 
       <main className="min-h-0 flex-1 p-6 max-md:p-3">
       <PlanSwitcher />
+
+      {/* Sits with the plan it describes, above the chart whose order the
+          repair changed — and renders nothing at all when there was none. */}
+      <PlanNotice />
 
       {/* Tabs, per the design system: a muted pill whose active item is a
           white card. Labels are Title Case like every other first-class
