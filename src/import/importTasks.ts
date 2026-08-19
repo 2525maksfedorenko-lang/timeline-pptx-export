@@ -1,4 +1,5 @@
 import type { TimelineItem } from '../types/timeline';
+import { normalizePlanItems } from '../utils/normalizePlanItems';
 
 const REQUIRED_STRING_FIELDS: (keyof TimelineItem)[] = ['id', 'label', 'start', 'end'];
 
@@ -46,6 +47,13 @@ export function validateTimelineItem(raw: unknown, location: string): TimelineIt
     throw new Error(`${location} has an invalid "includeInExport" field (expected a boolean).`);
   }
 
+  // `status` is deliberately not checked here, and neither is what `parentId`
+  // points at. One is a field a person writes in their own words ("In
+  // Progress", "done") and the other is a shape only the whole list can show
+  // (a parent loop), so both are repaired rather than judged — see
+  // normalizePlanItems, the pass every importer and both persistence layers
+  // run their tasks through.
+
   if (
     record.dependencies !== undefined &&
     (!Array.isArray(record.dependencies) || !record.dependencies.every((dep) => typeof dep === 'string'))
@@ -56,9 +64,20 @@ export function validateTimelineItem(raw: unknown, location: string): TimelineIt
   return record as unknown as TimelineItem;
 }
 
+export interface ImportedTasks {
+  items: TimelineItem[];
+  /** What had to be repaired to make a plan of the list — an unknown status,
+   * a circular parent link (see normalizePlanItems). Not errors: every task
+   * is in `items`. */
+  warnings: string[];
+}
+
 /** Parses and validates a JSON string as an array of TimelineItem, throwing a
- * descriptive error on the first invalid entry rather than importing partial data. */
-export function parseImportedTasks(json: string): TimelineItem[] {
+ * descriptive error on the first invalid entry rather than importing partial
+ * data — then running the list through the shared normalization pass, so a
+ * hand-written file saying "In Progress", or describing two tasks as each
+ * other's parent, lands as something the app can actually draw. */
+export function parseImportedTasks(json: string): ImportedTasks {
   let parsed: unknown;
   try {
     parsed = JSON.parse(json);
@@ -74,5 +93,7 @@ export function parseImportedTasks(json: string): TimelineItem[] {
     throw new Error('The JSON file contains no tasks.');
   }
 
-  return parsed.map((item, index) => validateTimelineItem(item, `Task at index ${index}`));
+  const items = parsed.map((item, index) => validateTimelineItem(item, `Task at index ${index}`));
+
+  return normalizePlanItems(items, (_item, index) => `Task at index ${index}`);
 }

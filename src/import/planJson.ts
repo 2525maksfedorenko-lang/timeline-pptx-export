@@ -18,10 +18,18 @@ export function exportPlanToJsonFile(plan: SavedPlan): void {
   URL.revokeObjectURL(url);
 }
 
+export interface ParsedPlan {
+  plan: SavedPlan;
+  /** Passed straight through from parseImportedTasks: statuses this build
+   * doesn't recognize, dropped rather than carried into the plan. */
+  warnings: string[];
+}
+
 /** Parses and validates a JSON string as a SavedPlan, throwing a descriptive error
- * on the first missing or invalid field. Item validation is delegated to
- * parseImportedTasks so the rules aren't duplicated. */
-export function parsePlanJson(json: string): SavedPlan {
+ * on the first missing or invalid field. Item validation — and status
+ * normalization with it — is delegated to parseImportedTasks so the rules
+ * aren't duplicated. */
+export function parsePlanJson(json: string): ParsedPlan {
   let parsed: unknown;
   try {
     parsed = JSON.parse(json);
@@ -43,7 +51,7 @@ export function parsePlanJson(json: string): SavedPlan {
     throw new Error('The plan is missing a valid "items" field (expected an array of tasks).');
   }
 
-  const items = parseImportedTasks(JSON.stringify(record.items));
+  const { items, warnings } = parseImportedTasks(JSON.stringify(record.items));
 
   const exportOptions: ExportOptions =
     typeof record.exportOptions === 'object' && record.exportOptions !== null && !Array.isArray(record.exportOptions)
@@ -53,11 +61,14 @@ export function parsePlanJson(json: string): SavedPlan {
   const now = new Date().toISOString();
 
   return {
-    id: crypto.randomUUID(),
-    name: record.name,
-    items,
-    exportOptions,
-    createdAt: typeof record.createdAt === 'string' ? record.createdAt : now,
-    updatedAt: typeof record.updatedAt === 'string' ? record.updatedAt : now,
+    plan: {
+      id: crypto.randomUUID(),
+      name: record.name,
+      items,
+      exportOptions,
+      createdAt: typeof record.createdAt === 'string' ? record.createdAt : now,
+      updatedAt: typeof record.updatedAt === 'string' ? record.updatedAt : now,
+    },
+    warnings,
   };
 }
