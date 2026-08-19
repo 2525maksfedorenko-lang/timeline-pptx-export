@@ -38,11 +38,16 @@ import {
   AXIS_WEEK_FONT_SIZE_PT,
   COMMENT_BODY_FONT_SIZE_PT,
   COMMENT_META_ROW_HEIGHT_IN,
+  COMMENT_TABLE_FONT_SIZE_PT,
   CONTENT_BOTTOM_IN,
   CONTENT_TOP_IN,
   CONTENT_WIDTH_IN,
   CONTENT_X_IN,
+  DASHBOARD_TABLE_GAP_IN,
+  DASHBOARD_TABLE_QR_COLUMN_WIDTH_IN,
+  DASHBOARD_TABLE_QR_SIZE_IN,
   DASHBOARD_TABLE_TOP_IN,
+  DASHBOARD_TABLE_WIDTH_IN,
   DEPENDENCY_LINE_WIDTH_PT,
   FOOTER_HEIGHT_IN,
   GROUP_HEADER_HEIGHT_IN,
@@ -75,7 +80,6 @@ import { DATE_GRID_STYLES } from './dateGrid';
 const COMMENT_BODY_X_IN = CONTENT_X_IN + 0.2;
 const COMMENT_BODY_WIDTH_IN = CONTENT_WIDTH_IN - 0.2;
 const COMMENT_HEADING_FONT_SIZE: Record<1 | 2 | 3, number> = { 1: 16, 2: 14, 3: 12 };
-const COMMENT_TABLE_FONT_SIZE = 10;
 
 const CHEVRON_WIDTH_IN = 0.14;
 
@@ -474,7 +478,7 @@ function drawTableBlock(
   x: number,
   y: number,
   width: number,
-  fontSize: number = COMMENT_TABLE_FONT_SIZE,
+  fontSize: number = COMMENT_TABLE_FONT_SIZE_PT,
 ) {
   const colCount = Math.max(table.headers.length, 1);
   const colW = width / colCount;
@@ -871,14 +875,14 @@ function drawSummarySlide(slide: PptxSlide, model: SummarySlideModel, qrCodes: Q
   });
 }
 
-const DASHBOARD_TABLE_QR_COLUMN_WIDTH_IN = 2.0;
-const DASHBOARD_TABLE_GAP_IN = 0.4;
-const DASHBOARD_TABLE_QR_SIZE_IN = 1.5;
-
 function drawDashboardTableSlide(slide: PptxSlide, model: DashboardTableSlideModel, qrCodeDataUrl: string) {
   drawChrome(slide, model.title);
+  // The model cut this table to the rows that fit the slide; the note is how
+  // the slide says so — the same footer line the overview announces its own
+  // omissions on, so a reader learns "there is more" in one place per deck.
+  drawOmittedNote(slide, model.note);
 
-  const tableWidth = CONTENT_WIDTH_IN - DASHBOARD_TABLE_QR_COLUMN_WIDTH_IN - DASHBOARD_TABLE_GAP_IN;
+  const tableWidth = DASHBOARD_TABLE_WIDTH_IN;
 
   if (model.table) {
     drawTableBlock(slide, model.table, CONTENT_X_IN, DASHBOARD_TABLE_TOP_IN, tableWidth);

@@ -1,4 +1,5 @@
 import type { TimelineItem } from '../types/timeline';
+import type { DashboardTableSlideModel } from './dashboardSlides';
 import { buildDateGrid, DATE_GRID_LEVELS, DATE_GRID_MIN_GAP_PT } from './dateGrid';
 import { buildDepthMap } from '../utils/barNesting';
 import type { OrderedSlideModel } from './slideOrder';
@@ -9,9 +10,13 @@ import {
   CONTENT_TOP_IN,
   CONTENT_X_IN,
   COMMENT_META_ROW_HEIGHT_IN,
+  DASHBOARD_TABLE_TOP_IN,
+  DASHBOARD_TABLE_WIDTH_IN,
   LIST_ROW_HEIGHT_IN,
   ROW_LABEL_HEIGHT_IN,
   subtaskRowIndent,
+  tableColumnTextWidthIn,
+  tableRowHeightIn,
 } from './slideLayout';
 
 /** Audits a built deck against the plan it was built from.
@@ -21,6 +26,12 @@ import {
  * an overview bar, as an appendix section title, or as a subtask row. The only
  * licensed exception is a task the file itself *counts* in an overview footer
  * note ("+N tasks not shown"), because then the reader knows it exists.
+ *
+ * The dashboard tables are held to the same terms one level down. A row missing
+ * from them is not a task loss — they list tasks the deck covers elsewhere — but
+ * a table cut to fit its slide is the same silent truncation, so what it drops
+ * has to be counted in its own footer note, and what it draws has to end inside
+ * the content area.
  *
  * It runs on the slide models rather than on a PPTX/PDF file because that model
  * is the single thing both exporters draw: an omission here is an omission in
@@ -60,6 +71,22 @@ export interface GridCoverage {
   levels: string;
 }
 
+/** What one dashboard-table slide (Delayed / At risk) drew, and what it cut.
+ * Reported per slide for the same reason the grid is: the two numbers are only
+ * worth anything read side by side. */
+export interface DashboardTableCoverage {
+  slideNumber: number;
+  title: string;
+  /** Rows actually on the slide. */
+  rowsDrawn: number;
+  /** Rows the slide had no room for. */
+  omittedRowCount: number;
+  /** The note announcing them, as drawn in the footer. */
+  note: string | null;
+  /** Where the table's last row ends, re-measured from the rows themselves. */
+  bottomIn: number;
+}
+
 export interface CoverageReport {
   /** Tasks with `includeInExport !== false`. */
   planTaskCount: number;
@@ -79,6 +106,7 @@ export interface CoverageReport {
   announcedOffOverview: number;
   slides: SlideCoverage[];
   grid: GridCoverage[];
+  dashboard: DashboardTableCoverage[];
   /** Every broken invariant, one line each. Empty means the deck is sound. */
   failures: string[];
 }
@@ -166,6 +194,52 @@ function auditGrid(
   };
 }
 
+/** Checks one dashboard-table slide — the deck's other place where a list is
+ * cut down to fit. Two rules, the same two the overview footer is held to: the
+ * rows drawn have to end inside the content area, and every row cut has to be
+ * counted where the reader can see it.
+ *
+ * The height is re-measured here from the rows themselves rather than read off
+ * the model, so a cap that stops matching what the renderers draw — a font size
+ * changed on one side, a row height re-derived — surfaces as a failure here
+ * instead of as rows drawn off the bottom of a slide. */
+function auditDashboardTable(
+  slide: DashboardTableSlideModel,
+  slideNumber: number,
+  failures: string[],
+): DashboardTableCoverage {
+  const table = slide.table;
+  const columnTextWidth = tableColumnTextWidthIn(
+    DASHBOARD_TABLE_WIDTH_IN,
+    table ? table.headers.length : 1,
+  );
+  const bottomIn = table
+    ? table.rows.reduce(
+        (y, row) => y + tableRowHeightIn(row, columnTextWidth),
+        DASHBOARD_TABLE_TOP_IN + tableRowHeightIn(table.headers, columnTextWidth),
+      )
+    : DASHBOARD_TABLE_TOP_IN;
+
+  if (slide.omittedRowCount > 0 && slide.note === null) {
+    failures.push(
+      `slide ${slideNumber}: ${slide.omittedRowCount} row(s) cut from "${slide.title}" ` +
+        `with no note to say so`,
+    );
+  }
+  if (slide.note !== null && slide.omittedRowCount === 0) {
+    failures.push(`slide ${slideNumber}: note "${slide.note}" with nothing cut`);
+  }
+
+  return {
+    slideNumber,
+    title: slide.title,
+    rowsDrawn: table?.rows.length ?? 0,
+    omittedRowCount: slide.omittedRowCount,
+    note: slide.note,
+    bottomIn,
+  };
+}
+
 export function analyzeExportCoverage(
   items: TimelineItem[],
   orderedSlides: OrderedSlideModel[],
@@ -179,6 +253,7 @@ export function analyzeExportCoverage(
   const failures: string[] = [];
   const slides: SlideCoverage[] = [];
   const grid: GridCoverage[] = [];
+  const dashboardTables: DashboardTableCoverage[] = [];
   const present = new Set<string>();
   const rowCounts = new Map<string, number>();
   const barredIds = new Set<string>();
@@ -235,6 +310,13 @@ export function analyzeExportCoverage(
       } else if (slide.gridLines.length > 0) {
         failures.push(`slide ${slideNumber}: ${slide.gridLines.length} grid lines but no date window`);
       }
+    } else if (slide.kind === 'dashboard-table') {
+      const coverage = auditDashboardTable(slide, slideNumber, failures);
+      dashboardTables.push(coverage);
+      // Fed into the same bottom-of-slide check every other kind gets: these
+      // tables are the one thing on a slide whose height comes from how much
+      // text each cell holds, so "it fit last time" proves nothing.
+      maxContentY = Math.max(maxContentY, coverage.bottomIn);
     } else if (slide.kind === 'detail') {
       slide.sections.forEach((section) => {
         taskIds.push(section.taskId);
@@ -414,6 +496,7 @@ export function analyzeExportCoverage(
 
   return {
     grid,
+    dashboard: dashboardTables,
     planTaskCount: exportableItems.length,
     fileTaskCount: present.size,
     missing,

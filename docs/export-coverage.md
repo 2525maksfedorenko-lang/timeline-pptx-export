@@ -182,7 +182,18 @@ every cell is measured for wrapping rather than assumed to be one line.
 - **Dashboard tables** (`dashboardSlides.ts`) see the full tree at any depth, so
   nothing is lost by depth — but they have no row cap, and both exporters let a
   long table overflow one slide rather than paginate (PDF additionally
-  neutralises `addPage` so it cannot desync the deck, `pdfExporter.ts:778`).
+  neutralises `addPage` so it cannot desync the deck, `withoutPageBreaks` in
+  `pdfExporter.ts`).
+
+  **Closed.** `fitTableRows` fills a table row by row and stops at the first one
+  that doesn't fit, measuring each against the same `tableRowHeightIn` both
+  renderers draw with — a wrapped cell makes its whole row taller, so a count of
+  rows was never the unit. What it cuts is announced as `+43 more delayed tasks
+  - scan for the full list`, drawn in the footer band by the same
+  `drawOmittedNote` the overview's own count uses, next to the QR code that
+  opens the full list on screen. Rows are kept in the plan's order rather than
+  re-sorted by severity, so the slide shows the top of the same list the app
+  shows — which is exactly why the count is not optional.
 - **Comment mode** (`getCommentsForSlide`): `none` → 0, `pinned` → pinned only,
   `latest` → 1 of N. A deliberate user choice, but the file itself never said how
   many were left out. **Closed**: the section heading reads "Comments (1 of 4)"
@@ -208,10 +219,15 @@ edge case (**B3**), one silent comment-loss (**A3**) plus one under-reported one
 | C1 | oversized block let through onto a full chunk | only when genuinely alone; tables can no longer add pages |
 | C2 | table rows under-measured by 18% | derived row height, per-cell wrap measurement |
 | E  | comment-mode truncation unstated | "Comments (1 of 4)" in the heading |
+| E  | dashboard tables drawn off the slide | cut to what fits, remainder counted in the footer |
 
-**Still open, by design.** A3 (comments on a non-root task are not rendered), the
-dashboard tables' missing row cap, and the estimate-not-measure limit of C2 for
-text blocks. The overview remains roots-only (A2).
+**Still open, by design.** A3 (comments on a non-root task are not rendered) and
+the estimate-not-measure limit of C2, for text blocks and for the dashboard
+tables alike: their rows are measured against equal columns, which is what
+pptxgenjs draws, while `jspdf-autotable` sizes columns by content and so ends its
+table higher up the slide than the model reserved. Over-estimating cuts a row or
+two more than the PDF strictly needs — the safe direction, and the same bias as
+everywhere else here. The overview remains roots-only (A2).
 
 ## The invariant, enforced
 
@@ -226,6 +242,9 @@ comment mode, with and without a timeframe — and fails when:
   same slide (a level torn across a slide break);
 - a row's drawn depth or indent disagrees with `buildDepthMap` / `subtaskRowIndent`;
 - a continuation is unlabelled, or a first section claims to be one;
-- content is laid out past `CONTENT_BOTTOM_IN`;
+- content is laid out past `CONTENT_BOTTOM_IN` — including a dashboard table,
+  re-measured from the rows it actually drew rather than taken from the model;
+- a dashboard table cuts rows without a footer note, or carries one having cut
+  nothing;
 - a hyperlink points at a missing slide, at a slide with no section for that
   task, or at anything other than where that task's subtree starts.

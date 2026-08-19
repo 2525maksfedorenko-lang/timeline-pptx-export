@@ -33,7 +33,12 @@ import {
   type DateGridLevel,
   type DateGridMark,
 } from './dateGrid';
-import { measureLetterSpacingWidthIn, measureMonoTextWidthIn, measureTextWidthIn } from './textMetrics';
+import {
+  estimateWrappedLines,
+  measureLetterSpacingWidthIn,
+  measureMonoTextWidthIn,
+  measureTextWidthIn,
+} from './textMetrics';
 import { COLORS } from './theme';
 import {
   BAR_HEIGHT_IN,
@@ -43,7 +48,6 @@ import {
   AXIS_LABEL_GAP_IN,
   AXIS_MONTH_FONT_SIZE_PT,
   AXIS_WEEK_FONT_SIZE_PT,
-  STATUS_LETTER_SPACING_EM,
   DATE_LETTER_SPACING_EM,
   letterSpacingPt,
   SUBTASK_DATE_FONT_SIZE_PT,
@@ -54,9 +58,6 @@ import {
   COMMENT_HEADING_ROW_HEIGHT_IN,
   COMMENT_LINE_HEIGHT_IN,
   COMMENT_META_ROW_HEIGHT_IN,
-  COMMENT_TABLE_CELL_PADDING_IN,
-  COMMENT_TABLE_FONT_SIZE_PT,
-  COMMENT_TABLE_LINE_HEIGHT_IN,
   CONTENT_HEIGHT_IN,
   CONTENT_TOP_IN,
   CONTENT_BOTTOM_IN,
@@ -85,7 +86,10 @@ import {
   SUBTASK_META_STATUS_GAP_IN,
   SUBTASK_STATUS_FONT_SIZE_PT,
   SUBTASK_TEXT_FONT_SIZE_PT,
+  statusTextWidthIn,
   subtaskRowIndent,
+  tableColumnTextWidthIn,
+  tableRowHeightIn,
   TAG_PILL_FONT_SIZE_PT,
   TAG_PILL_GAP_IN,
   TAG_PILL_PADDING_IN,
@@ -1140,21 +1144,6 @@ interface DetailChunk {
   commentsHeadingText: string;
 }
 
-// Rough text-wrapping estimate used only to size layout boxes ahead of
-// render: neither pptxgenjs nor jsPDF expose real text measurement before
-// drawing. Assumes an average glyph is ~0.55em wide — a bit wider than a
-// typical sans-serif average, so this skews toward *more* estimated lines
-// rather than fewer, which is the safer direction to be wrong in (extra
-// whitespace instead of overlapping the next block).
-const AVG_CHAR_WIDTH_EM = 0.55;
-
-function estimateWrappedLines(text: string, fontSizePt: number, widthIn: number): number {
-  if (!text) return 1;
-  const charWidthIn = (fontSizePt * AVG_CHAR_WIDTH_EM) / 72;
-  const charsPerLine = Math.max(1, Math.floor(widthIn / charWidthIn));
-  return Math.max(1, Math.ceil(text.length / charsPerLine));
-}
-
 const COMMENT_BODY_X_INDENT_IN = 0.2;
 const COMMENT_BODY_WIDTH_IN = CONTENT_WIDTH_IN - COMMENT_BODY_X_INDENT_IN;
 const COMMENT_LIST_BULLET_INDENT_IN = 0.2;
@@ -1179,16 +1168,12 @@ function estimateBlockHeight(block: MarkdownBlock): number {
     return Math.max(totalLines, 1) * COMMENT_LINE_HEIGHT_IN;
   }
 
-  // Every cell in a row is measured, and the tallest decides the row: a cell
-  // whose text wraps to two lines makes the whole row two lines tall in
-  // autoTable, and a row estimated at one line is exactly how a table ends up
-  // taller than the space reserved for it.
-  const columnWidth =
-    COMMENT_BODY_WIDTH_IN / Math.max(block.headers.length, 1) - COMMENT_TABLE_CELL_PADDING_IN * 2;
-  const rowHeight = (cells: string[]) =>
-    Math.max(...cells.map((cell) => estimateWrappedLines(cell, COMMENT_TABLE_FONT_SIZE_PT, columnWidth))) *
-      COMMENT_TABLE_LINE_HEIGHT_IN +
-    COMMENT_TABLE_CELL_PADDING_IN * 2;
+  // Measured cell by cell through the same helper the dashboard's own tables
+  // use (tableRowHeightIn): the tallest cell decides the row, because a row
+  // estimated at one line is exactly how a table ends up taller than the space
+  // reserved for it.
+  const columnWidth = tableColumnTextWidthIn(COMMENT_BODY_WIDTH_IN, block.headers.length);
+  const rowHeight = (cells: string[]) => tableRowHeightIn(cells, columnWidth);
 
   return rowHeight(block.headers) + block.rows.reduce((total, row) => total + rowHeight(row), 0);
 }
@@ -1266,12 +1251,7 @@ function buildDetailSection(
         letterSpacingPt(SUBTASK_DATE_FONT_SIZE_PT, DATE_LETTER_SPACING_EM),
       );
       const progressWidth = measureTextWidthIn(progressText, SUBTASK_TEXT_FONT_SIZE_PT);
-      const statusTextWidth =
-        measureTextWidthIn(statusText, SUBTASK_STATUS_FONT_SIZE_PT) +
-        measureLetterSpacingWidthIn(
-          statusText,
-          letterSpacingPt(SUBTASK_STATUS_FONT_SIZE_PT, STATUS_LETTER_SPACING_EM),
-        );
+      const statusTextWidth = statusTextWidthIn(statusText, SUBTASK_STATUS_FONT_SIZE_PT);
 
       const availableWidth =
         CONTENT_WIDTH_IN -
