@@ -60,11 +60,18 @@ export function PlanNotice() {
             </li>
           ))}
         </ul>
+        {/* Said on every screen, because it is the one thing here that cannot
+            be undone later: the repair keeps no copy of what it replaced. The
+            plan is repaired again on every load until it is saved, but nothing
+            anywhere holds the original spelling once it has been. */}
+        <p className="mt-1.5 text-xs text-muted-foreground max-md:text-sm">
+          The original values are kept only in the file this plan came from.
+        </p>
         {/* Hidden on a phone, not shortened: it is the one line here that is
             context rather than fact, and on a 375px screen those four lines
             are the difference between the first bar being on screen and being
             under the fold. The facts above it still say what changed. */}
-        <p className="mt-1.5 text-xs text-muted-foreground max-md:hidden">
+        <p className="mt-1 text-xs text-muted-foreground max-md:hidden">
           The chart and the export both order tasks by status, so check these before exporting.
         </p>
       </div>
