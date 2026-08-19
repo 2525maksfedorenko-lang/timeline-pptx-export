@@ -6,6 +6,7 @@ import type {
   TaskComment,
   TimelineItem,
 } from '../types/timeline';
+import { normalizeItemStatuses } from '../utils/normalizeStatus';
 import { getDescendantIds } from '../utils/taskHierarchy';
 import { DEV_SEED_COMMENTS, DEV_SEED_ITEMS, DEV_SEED_TITLE } from './devSeed';
 import {
@@ -50,6 +51,13 @@ interface TimelineStore {
   setZoomLevel: (zoomLevel: number) => void;
   setEditingItem: (id: string | null) => void;
 
+  // What loading a plan had to repair in it, keyed by plan id — see
+  // normalizeItemStatuses and PlanNotice. Deliberately absent from
+  // `partialize`: it describes one load of one plan, so it must not outlive
+  // the session that found it.
+  planNotices: Record<string, string[]>;
+  dismissPlanNotices: () => void;
+
   // Multiple plans, persisted locally in IndexedDB (see planStorage.ts).
   activePlanId: string | null;
   savedPlans: SavedPlan[];
@@ -69,6 +77,40 @@ export const DEFAULT_EXPORT_OPTIONS: ExportOptions = {
   sortMode: 'status',
   exportTimeframe: null,
 };
+
+/** Which bucket of `planNotices` a repair belongs to before any plan has been
+ * loaded — the mirror can hold items with no plan id beside them. */
+const UNNAMED_PLAN_KEY = '';
+
+/** Both doors into a plan repair it, so both can report the same thing about
+ * the same plan in one load. Notices are plain sentences, so identical text is
+ * identical news: a Set is the whole deduplication rule. */
+function mergePlanNotices(
+  existing: Record<string, string[]>,
+  incoming: Record<string, string[]>,
+): Record<string, string[]> {
+  const merged = { ...existing };
+  Object.entries(incoming).forEach(([planId, notices]) => {
+    merged[planId] = [...new Set([...(merged[planId] ?? []), ...notices])];
+  });
+  return merged;
+}
+
+/** Moves a plan's notices to the id it ends up with. The mirror keys what it
+ * repaired by the plan id it was saved with, and the bootstrap path below
+ * mints a *new* id for those same items — without this the notice would be
+ * filed under a plan that no longer exists and nobody would ever see it. */
+function renamePlanNotices(
+  notices: Record<string, string[]>,
+  from: string,
+  to: string,
+): Record<string, string[]> {
+  if (from === to || notices[from] === undefined) return notices;
+
+  const renamed = { ...notices };
+  delete renamed[from];
+  return mergePlanNotices(renamed, { [to]: notices[from] });
+}
 
 const DEFAULT_UI: UiState = {
   selectedItemId: null,
@@ -169,11 +211,28 @@ export const useTimelineStore = create<TimelineStore>()(
       setZoomLevel: (zoomLevel) => set((state) => ({ ui: { ...state.ui, zoomLevel } })),
       setEditingItem: (id) => set((state) => ({ ui: { ...state.ui, editingItemId: id } })),
 
+      planNotices: {},
+      dismissPlanNotices: () =>
+        set((state) => {
+          const key = state.activePlanId ?? UNNAMED_PLAN_KEY;
+          if (state.planNotices[key] === undefined) return state;
+
+          const remaining = { ...state.planNotices };
+          delete remaining[key];
+          return { planNotices: remaining };
+        }),
+
       activePlanId: null,
       savedPlans: [],
 
       loadPlans: async () => {
-        const plans = await getAllPlans();
+        const { plans, noticesByPlanId } = await getAllPlans();
+
+        // Merged rather than assigned, and deduplicated: the active plan
+        // usually arrives twice in one load — once through the localStorage
+        // mirror below, once from here — and the same repair said twice is
+        // two lines about one thing.
+        set((state) => ({ planNotices: mergePlanNotices(state.planNotices, noticesByPlanId) }));
 
         if (plans.length === 0) {
           const state = get();
@@ -182,7 +241,15 @@ export const useTimelineStore = create<TimelineStore>()(
             items: state.items,
             exportOptions: state.exportOptions,
           });
-          set({ savedPlans: [defaultPlan], activePlanId: defaultPlan.id });
+          set((current) => ({
+            savedPlans: [defaultPlan],
+            activePlanId: defaultPlan.id,
+            planNotices: renamePlanNotices(
+              current.planNotices,
+              current.activePlanId ?? UNNAMED_PLAN_KEY,
+              defaultPlan.id,
+            ),
+          }));
           return;
         }
 
@@ -317,6 +384,29 @@ export const useTimelineStore = create<TimelineStore>()(
       // integration doesn't need multiple named plans, IndexedDB can be
       // dropped and this `persist` config becomes the only storage layer.
       name: 'timeline-pptx-export-storage',
+      // The same repair getAllPlans does, on the other door — and the one that
+      // opens first. This mirror restores synchronously on reload, before
+      // IndexedDB has even opened, so a plan that predates the importers'
+      // status rule would otherwise be drawn with an unmatched status until
+      // loadPlans() resolved, and saved straight back that way if anything was
+      // edited in between.
+      merge: (persistedState, currentState) => {
+        const persisted = (persistedState ?? {}) as Partial<TimelineStore>;
+        if (!persisted.items) return { ...currentState, ...persisted };
+
+        const { items, warnings } = normalizeItemStatuses(persisted.items);
+        const key = persisted.activePlanId ?? UNNAMED_PLAN_KEY;
+
+        return {
+          ...currentState,
+          ...persisted,
+          items,
+          planNotices:
+            warnings.length > 0
+              ? mergePlanNotices(currentState.planNotices, { [key]: warnings })
+              : currentState.planNotices,
+        };
+      },
       partialize: (state) => ({
         title: state.title,
         items: state.items,
