@@ -618,6 +618,7 @@ export function GanttRow({
             item={item}
             anchor={menuAnchor}
             onChangeStatus={(next) => updateItem(item.id, { status: next })}
+            onChangeProgress={(next) => updateItem(item.id, { progress: next })}
             onAddSubtask={addItem}
             onClose={() => setMenuAnchor(null)}
           />
