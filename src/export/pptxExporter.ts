@@ -380,6 +380,12 @@ function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel, links: S
       color: COLORS.navy,
       fontFace: PPTX_FONT_FACE,
       valign: 'middle',
+      // Like every other piece of text on this slide, and unlike this one
+      // until now: without it pptxgenjs's default 0.05in inset started the
+      // name that far right of the labelX the model resolved, so the PPTX
+      // column did not line up with the PDF's, with its own "Task" heading, or
+      // with the tag pills measured from that same x.
+      margin: 0,
       wrap: false,
       ...barJump(bar),
     });
@@ -409,6 +415,10 @@ function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel, links: S
         fontFace: PPTX_FONT_FACE,
         align: 'center',
         valign: 'middle',
+        // Zero inset for the same reason the name above it has one: the box is
+        // the pill, measured to the glyph, and pptxgenjs's default 0.05in would
+        // be a third of a 7pt pill's own padding.
+        margin: 0,
         wrap: false,
       });
     });

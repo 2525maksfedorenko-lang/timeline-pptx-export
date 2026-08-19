@@ -38,7 +38,7 @@ export const BAR_HEIGHT_RATIO_BY_DEPTH: readonly number[] = [1, 0.7, 0.55];
 export const LABEL_INDENT_RATIO = 0.5;
 
 /** How many indent steps a label gets before the indent stops growing. The Task
- * column is a fixed width on a slide (2.35in) and only ~160px on screen, so an
+ * column is a fixed width on a slide (2.60in) and only ~160px on screen, so an
  * unbounded indent would eventually eat the name it is meant to qualify. */
 export const MAX_LABEL_INDENT_STEPS = 3;
 

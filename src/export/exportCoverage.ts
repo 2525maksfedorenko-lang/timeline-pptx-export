@@ -6,6 +6,7 @@ import type { OrderedSlideModel } from './slideOrder';
 import type { SlideLinks } from './slideLinks';
 import {
   BAR_HEIGHT_IN,
+  COLUMN_TEXT_INSET_IN,
   CONTENT_BOTTOM_IN,
   CONTENT_TOP_IN,
   CONTENT_X_IN,
@@ -14,7 +15,9 @@ import {
   DASHBOARD_TABLE_WIDTH_IN,
   LIST_ROW_HEIGHT_IN,
   ROW_LABEL_HEIGHT_IN,
+  STATUS_COL_WIDTH_IN,
   subtaskRowIndent,
+  TASK_COL_WIDTH_IN,
   TIMELINE_X_IN,
   TIMELINE_WIDTH_IN,
   tableColumnTextWidthIn,
@@ -319,6 +322,33 @@ export function analyzeExportCoverage(
           failures.push(
             `slide ${slideNumber}: bar "${bar.id}" is ${bar.barHeight.toFixed(4)}in tall, ` +
               `which is no rung of the depth ladder`,
+          );
+        }
+
+        // A bar's name has to say *something*. Truncation is expected — the
+        // column is fixed and names are not — but a row rendering "" or a bare
+        // "..." has spent a line of the overview identifying nothing, and that
+        // is not a state a reader can tell from a bug. It is reachable whenever
+        // something else in the Task column is allowed to reserve width ahead of
+        // the name (tag pills, once), so it is checked rather than reasoned
+        // about.
+        if (bar.label.replace(/\.+$/, '').length === 0) {
+          failures.push(
+            `slide ${slideNumber}: bar "${bar.id}" renders no name (label "${bar.label}")`,
+          );
+        }
+
+        // Nothing in the Task column may cross into the gutter: the name is
+        // truncated against the column and the pills are laid out from where it
+        // ends, so an overhanging pill means one of the two measured against a
+        // width the other did not.
+        const columnRight = CONTENT_X_IN + STATUS_COL_WIDTH_IN + TASK_COL_WIDTH_IN - COLUMN_TEXT_INSET_IN;
+        const lastTag = bar.tags[bar.tags.length - 1];
+        if (lastTag !== undefined && lastTag.x + lastTag.width > columnRight + EPSILON_IN) {
+          failures.push(
+            `slide ${slideNumber}: bar "${bar.id}" tag "${lastTag.text}" ends at ` +
+              `${(lastTag.x + lastTag.width).toFixed(4)}in, past the Task column's ` +
+              `${columnRight.toFixed(4)}in`,
           );
         }
 
