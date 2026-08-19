@@ -83,6 +83,11 @@ interface GanttRowProps {
   // The trade-off is real and deliberate: a bar scrolled off-screen can no
   // longer be hovered at all. Bounds you can see beat reach you cannot.
   onBarHoverChange: (isHovered: boolean) => void;
+  // The bar the pointer is actually on, as opposed to the rest of its branch:
+  // `isHighlighted` covers the whole branch including this one, and the outline
+  // treatment needs to tell "what you are pointing at" from "what it is part
+  // of" (see BAR_OUTLINE).
+  isHoveredBar: boolean;
 }
 
 // One drag state shape for all three bar interactions (move + resize each
@@ -167,6 +172,38 @@ const ROW_DIM_CLASS = 'opacity-40';
 // label column is the only place the branch can be seen at all.
 const branchTintClass = (isHighlighted: boolean) => (isHighlighted ? 'bg-muted/50' : 'bg-card');
 
+// The third signal, and the only one the bars themselves carry: a hairline
+// around the bar under the pointer, a fainter one around every bar in its
+// branch. It answers the question the tint on the sticky columns cannot —
+// *which* bar is the one being pointed at — without moving anything.
+//
+// `outline`, not `border`: a border is part of the box, so a 1px one would take
+// 2px out of the track and shift the progress fill inside it — on a 24px
+// third-level bar that reads as the bar resizing under the pointer. An outline
+// is drawn outside the box and costs the bar no height at all, which also puts
+// it against the row's own background rather than against a dark bar fill,
+// where a dark hairline would simply disappear. Not an inset shadow for the
+// same second reason.
+//
+// Offset by 1px rather than drawn flush: a dark hairline against a saturated
+// bar fill merges into the fill's own edge and reads as nothing at all. The
+// 1px of row background between bar and ring is what makes it a ring. Costs no
+// geometry either — an outline is outside the box at any offset.
+//
+// One colour, two weights, from the brand navy (`--primary`, 212 30% 17%)
+// rather than a status colour: what the outline says is structural — this bar,
+// and the ones it is nested with — and colour in this product only ever carries
+// meaning. Written as hsl(var(--primary)) because the tokens hold raw HSL
+// components, and the fainter weight as an alpha of the same one, so the two
+// can never drift into being two different colours.
+const HOVERED_BAR_OUTLINE = '1px solid hsl(var(--primary))';
+const RELATED_BAR_OUTLINE = '1px solid hsl(var(--primary) / 0.4)';
+
+function barOutline(isHoveredBar: boolean, isHighlighted: boolean): string | undefined {
+  if (isHoveredBar) return HOVERED_BAR_OUTLINE;
+  return isHighlighted ? RELATED_BAR_OUTLINE : undefined;
+}
+
 export function GanttRow({
   item,
   minDate,
@@ -190,6 +227,7 @@ export function GanttRow({
   onRequestClosePopup,
   isDimmed,
   isHighlighted,
+  isHoveredBar,
   onBarHoverChange,
 }: GanttRowProps) {
   const items = useTimelineStore((state) => state.items);
@@ -570,7 +608,16 @@ export function GanttRow({
         >
           <div
             className="h-full overflow-hidden rounded-md shadow-sm"
-            style={{ backgroundColor: BAR_TRACK_COLOR, opacity: 1 }}
+            // The outline goes on the track rather than on the positioned
+            // wrapper around it: this element is the one with the bar's
+            // rounded corners, so the hairline follows them instead of boxing
+            // a rounded bar in a square.
+            style={{
+              backgroundColor: BAR_TRACK_COLOR,
+              opacity: 1,
+              outline: barOutline(isHoveredBar, isHighlighted),
+              outlineOffset: '1px',
+            }}
           >
             <div className="h-full" style={{ width: `${progress}%`, backgroundColor: barColor, opacity: 1 }} />
           </div>
