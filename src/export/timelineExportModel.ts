@@ -194,7 +194,12 @@ export interface OverviewGridLineModel {
 // Daily lines are deliberately never labeled — one caption per day would be
 // an unreadable smear at any realistic range.
 export interface OverviewAxisLabelModel {
-  level: 'month' | 'week';
+  // 'day' only ever appears through the minimum-captions rule (see
+  // AXIS_MIN_LABELS): the density tiers themselves never caption days. Both
+  // exporters size anything that isn't 'month' at the finer caption size, so
+  // a day caption looks like a week one — which is what it is, a
+  // "Aug 17"-format date on a line the grid drew.
+  level: 'month' | 'week' | 'day';
   text: string;
   x: number;
 }
@@ -419,6 +424,27 @@ function thinAxisLabels(
   return kept;
 }
 
+/** How few captions leave a slide without a usable scale.
+ *
+ * The timeline zone is TIMELINE_WIDTH_IN (5.53in) wide. Three captions leave
+ * two intervals across it, so a bar in the middle can sit ~1.8in from the
+ * nearest date; two leave one interval and the middle is 2.8in from either
+ * end — at that point the axis names the range but stops measuring it, which
+ * is what a reader uses it for. Four is the smallest count that puts a date
+ * within about 1.8in of any point on the axis, and it is a floor rather than
+ * a target: once a level is admitted, thinning decides how many of its
+ * captions actually fit, which on a two-week window is closer to seven.
+ *
+ * Deliberately not a density *maximum* — that is thinAxisLabels' job, and it
+ * measures each caption's drawn width rather than counting. */
+const AXIS_MIN_LABELS = 4;
+
+/** How dense a range buildDateGrid should assume when asked for a grid whose
+ * levels are all populated: any span at or under MAX_VISIBLE_DAYS_FOR_DAY_LINES
+ * draws all three levels, so this asks for the finest tier there is without
+ * hard-coding a level list next to getVisibleGridLevels' own. */
+const FINE_GRID_VISIBLE_DAYS = 1;
+
 /** Date captions for the overview axis, thinned to what actually fits.
  *
  * Which lines get captioned follows the grid's own density (see
@@ -430,34 +456,79 @@ function thinAxisLabels(
  * readily as weekly ones do. Day and year lines get no caption of their own:
  * a caption per day is an unreadable smear at any range, and every 1 January
  * already carries a month caption that names its year. */
-function buildAxisLabels(
-  grid: DateGrid,
-  toX: (mark: DateGridMark) => number,
-  isMultiYear: boolean,
-): OverviewAxisLabelModel[] {
-  const monthLabels = thinAxisLabels(
-    grid.month.map((mark) => ({
-      level: 'month' as const,
-      text: isMultiYear ? formatMonthYear(mark.date) : formatShortDate(mark.date),
-      x: toX(mark),
-    })),
-    (label) => measureMonoTextWidthIn(label.text, AXIS_MONTH_FONT_SIZE_PT),
+function labelWidthIn(label: OverviewAxisLabelModel): number {
+  return measureMonoTextWidthIn(
+    label.text,
+    label.level === 'month' ? AXIS_MONTH_FONT_SIZE_PT : AXIS_WEEK_FONT_SIZE_PT,
   );
+}
 
-  // Week captions fill the gaps the month captions leave, so they're thinned
-  // against the months already kept as well as against each other.
-  const weekLabels = thinAxisLabels(
-    grid.week.map((mark) => ({ level: 'week' as const, text: formatShortDate(mark.date), x: toX(mark) })),
-    (label) => measureMonoTextWidthIn(label.text, AXIS_WEEK_FONT_SIZE_PT),
-  ).filter((label) =>
-    monthLabels.every(
-      (month) =>
-        label.x + measureMonoTextWidthIn(label.text, AXIS_WEEK_FONT_SIZE_PT) + AXIS_LABEL_GAP_IN <= month.x ||
-        label.x >= month.x + measureMonoTextWidthIn(month.text, AXIS_MONTH_FONT_SIZE_PT) + AXIS_LABEL_GAP_IN,
+/** `kept` plus whichever of `marks` still fit: thinned against each other
+ * first, then against every caption already kept. Both halves are the same
+ * rule the month/week pair always used — a caption may not start before the
+ * one before it has ended, plus a gap — applied across levels so a finer
+ * level can only ever land in the clear ground the coarser ones left. */
+function addLabelLevel(
+  kept: OverviewAxisLabelModel[],
+  marks: DateGridMark[],
+  level: OverviewAxisLabelModel['level'],
+  toX: (mark: DateGridMark) => number,
+  text: (mark: DateGridMark) => string,
+): OverviewAxisLabelModel[] {
+  const candidates = thinAxisLabels(
+    marks.map((mark) => ({ level, text: text(mark), x: toX(mark) })),
+    labelWidthIn,
+  )
+    // A caption is drawn rightwards from its own line (both exporters place it
+    // at `x`), so one sitting on the last line or two runs out of the zone and
+    // into the slide's margin — "Apr 2027" on a line at 9.49in ends at 10.02in,
+    // which is past the 10in slide. It captions nothing out there, so it is
+    // dropped rather than drawn off the edge. This bites more now that the grid
+    // is ruled across the whole zone: before, a narrow page's lines stopped
+    // short and never reached the edge to begin with.
+    .filter((label) => label.x + labelWidthIn(label) <= TIMELINE_X_IN + TIMELINE_WIDTH_IN)
+    .filter((label) =>
+    kept.every(
+      (other) =>
+        label.x + labelWidthIn(label) + AXIS_LABEL_GAP_IN <= other.x ||
+        label.x >= other.x + labelWidthIn(other) + AXIS_LABEL_GAP_IN,
     ),
   );
 
-  return [...monthLabels, ...weekLabels];
+  return [...kept, ...candidates];
+}
+
+function buildAxisLabels(
+  grid: DateGrid,
+  fineGrid: () => DateGrid,
+  toX: (mark: DateGridMark) => number,
+  isMultiYear: boolean,
+): OverviewAxisLabelModel[] {
+  const monthText = (mark: DateGridMark) =>
+    isMultiYear ? formatMonthYear(mark.date) : formatShortDate(mark.date);
+  const dayText = (mark: DateGridMark) => formatShortDate(mark.date);
+
+  // Months first, then week captions filling the gaps they leave — the axis
+  // as the density tiers alone would caption it.
+  const tiered = addLabelLevel(
+    addLabelLevel([], grid.month, 'month', toX, monthText),
+    grid.week,
+    'week',
+    toX,
+    dayText,
+  );
+  if (tiered.length >= AXIS_MIN_LABELS) return tiered;
+
+  // Too few to read a position off. Descend a level and try again — weeks if
+  // this tier drew none, then days — each pass laying its captions only where
+  // the ones already kept leave room, so descending can add captions but never
+  // move or crowd an existing one.
+  const fine = fineGrid();
+  const withWeeks =
+    grid.week.length > 0 ? tiered : addLabelLevel(tiered, fine.week, 'week', toX, dayText);
+  if (withWeeks.length >= AXIS_MIN_LABELS) return withWeeks;
+
+  return addLabelLevel(withWeeks, fine.day, 'day', toX, dayText);
 }
 
 /** Parent items that overlap the given export timeframe window (any part of
@@ -660,11 +731,21 @@ function buildOverviewSlide(
     // instead of being allowed to run on into blank space.
     const windowWidthIn = totalDays * BASE_PX_PER_DAY * scale;
 
-    // The grid's density tier comes from this slide's own window (buildDateGrid
-    // reads the span it is handed), so a slide covering four months draws week
-    // lines while one covering three years draws months — instead of every
-    // slide inheriting the whole plan's tier.
-    const grid = buildDateGrid(minDate, maxDate, tierDays);
+    // Ruled across the whole zone, not across this slide's own window.
+    //
+    // The zone holds exactly `tierDays` days at this scale — that is how the
+    // scale is defined (see buildOverviewAxes: TIMELINE_WIDTH_IN over
+    // tierDays * BASE_PX_PER_DAY) — so ruling that many days from this slide's
+    // own start covers it edge to edge. Handing buildDateGrid the *window*
+    // instead, as this did, ties the grid to a fact about the page's tasks:
+    // on the export's widest page the two coincide and nothing looks wrong,
+    // but a page whose tasks span a third of the widest ruled a third of the
+    // zone and left the rest blank.
+    //
+    // `tierDays` is still what picks the density, so a slide covering four
+    // months draws week lines while one covering three years draws months.
+    const gridEnd = addDays(minDate, tierDays - 1);
+    const grid = buildDateGrid(minDate, gridEnd, tierDays);
     const toX = (mark: DateGridMark) => TIMELINE_X_IN + mark.dayOffset * BASE_PX_PER_DAY * scale;
     // One stroke per position, owned by the strongest level there — see
     // resolveGridStrokes. The gap is the shared constant in points, converted
@@ -676,7 +757,7 @@ function buildOverviewSlide(
     // range is.
     // Captions follow the same tier as the lines, so a slide can't caption a
     // range more finely than it rules it.
-    axisLabels = buildAxisLabels(grid, toX, tierDays > MAX_VISIBLE_DAYS_FOR_WEEK_LINES);
+    axisLabels = buildAxisLabels(grid, () => buildDateGrid(minDate, gridEnd, FINE_GRID_VISIBLE_DAYS), toX, tierDays > MAX_VISIBLE_DAYS_FOR_WEEK_LINES);
 
     // The two column headings sit on the axis row, so "Status", "Task" and the
     // month captions all share one line; the hairline under that row and the
