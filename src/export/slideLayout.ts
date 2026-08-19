@@ -44,9 +44,30 @@ const TITLE_BAND_MIN_HEIGHT_IN =
 export const HEADER_HEIGHT_IN = Math.max(PAGE_HEIGHT_IN * 0.15, TITLE_BAND_MIN_HEIGHT_IN);
 export const FOOTER_HEIGHT_IN = PAGE_HEIGHT_IN * 0.04;
 
-export const MARGIN_X_IN = 0.5;
-export const CONTENT_X_IN = MARGIN_X_IN;
-export const CONTENT_WIDTH_IN = PAGE_WIDTH_IN - MARGIN_X_IN * 2;
+// The page's two side margins, which are deliberately *not* the same number.
+//
+// The right one is the classic half-inch slide margin. The left one is the
+// typographic minimum, because everything that reads left-to-right on these
+// slides starts against it — the title, the Status column, and the task names
+// the deck exists to be read for. A half inch there was half an inch taken off
+// the one column that was running out of room.
+//
+// A quarter inch is the floor rather than a taste: it is three times the clear
+// space kept *inside* a column (COLUMN_TEXT_INSET_IN, 0.08in), and an outer
+// margin has to stay visibly wider than the padding inside the content or the
+// slide's edge starts reading as tighter than its columns' edges. It is also
+// the allowance a printer typically cannot print inside, so a PDF of one of
+// these slides still comes off a desk printer whole.
+//
+// Both are here rather than one MARGIN_X_IN because the asymmetry is the
+// point: every slide in the deck takes CONTENT_X_IN from here, so the whole
+// deck's left edge moves together and a reader flicking through does not see
+// the grid shift (see TASK_COL_WIDTH_IN for what happens to the width this
+// frees, and why the timeline does not move).
+export const MARGIN_LEFT_IN = 0.25;
+export const MARGIN_RIGHT_IN = 0.5;
+export const CONTENT_X_IN = MARGIN_LEFT_IN;
+export const CONTENT_WIDTH_IN = PAGE_WIDTH_IN - MARGIN_LEFT_IN - MARGIN_RIGHT_IN;
 export const CONTENT_TOP_IN = HEADER_HEIGHT_IN + 0.3;
 export const CONTENT_BOTTOM_IN = PAGE_HEIGHT_IN - FOOTER_HEIGHT_IN - 0.15;
 // Vertical space actually available for slide content, used to compute how
@@ -175,10 +196,22 @@ export const STATUS_COL_WIDTH_IN =
     ),
   ) +
   (STATUS_CHIP_TEXT_INSET_IN + COLUMN_TEXT_INSET_IN) * 2;
-// A task name averages 0.110in per glyph at BAR_LABEL_FONT_SIZE_PT, so 2.35in
-// holds roughly 21 characters before the ellipsis (see
-// labelWidth/truncateToWidth in timelineExportModel.ts).
-export const TASK_COL_WIDTH_IN = 2.35;
+// The Task column takes every inch the left margin gave up, and the Status
+// column is not squeezed for it — the two simply move left together.
+//
+// Written as base + reclaimed rather than as one number so the invariant is
+// visible: the column block shifts left by (MARGIN_RIGHT_IN - MARGIN_LEFT_IN)
+// and Task grows by the same amount, which lands TIMELINE_X_IN below exactly
+// where it sat when both margins were 0.5in. The timeline zone therefore keeps
+// its width, and with it its scale — a day is the same number of inches before
+// and after this, so no bar moves and no date line shifts.
+//
+// A task name averages 0.110in per glyph at BAR_LABEL_FONT_SIZE_PT, so the
+// 2.60in this comes to holds roughly 23 characters before the ellipsis, against
+// 21 at the old 2.35in (see labelWidth/truncateToWidth in
+// timelineExportModel.ts).
+const TASK_COL_BASE_WIDTH_IN = 2.35;
+export const TASK_COL_WIDTH_IN = TASK_COL_BASE_WIDTH_IN + (MARGIN_RIGHT_IN - MARGIN_LEFT_IN);
 // Clear space around the divider, split evenly either side of it.
 export const TIMELINE_GUTTER_IN = 0.14;
 export const TIMELINE_X_IN =
@@ -251,15 +284,30 @@ export const SUBTASK_META_STATUS_GAP_IN = 0.05;
 export const SUBTASK_META_GAP_IN = 0.09;
 
 // An overview bar's tag pills (item.tags — see TimelineItem) sit right
-// after its label, before the status text: mini gray pills, small enough
-// not to compete with the label for attention. Their total width (measured
-// against TAG_PILL_FONT_SIZE_PT, same as the label/status pattern above) is
-// reserved out of the label's box the same way the status text already is,
-// so a label long enough to reach them still truncates instead of
-// overlapping.
-export const TAG_PILL_FONT_SIZE_PT = 8;
-export const TAG_PILL_PADDING_IN = 0.04;
-export const TAG_PILL_HEIGHT_IN = 0.16;
+// after its label, in the rest of the Task column: mini gray pills, small
+// enough not to compete with the name for attention. They take the width the
+// name does not want rather than reserving their own out of it — the name is
+// the last thing on the row to give way, and the pills are what compresses
+// first (see buildOverviewSlides in timelineExportModel.ts).
+//
+// They run at the bottom rung of the slide's type scale, one step under the
+// status text and four under the name they sit beside — the same rung the
+// week-level date captions use, which is the tier this deck reserves for
+// reference detail. At 8pt, set bold in a filled pill, they carried as much
+// weight on the row as the 11pt name did, and a tag is a qualifier: it should
+// be legible when looked for and quiet when not.
+//
+// The pill's own padding and height are held in em of its own type rather than
+// in inches, so "proportional to the size" is a property of the definition
+// instead of an arithmetic step someone has to remember to repeat. The two
+// em figures are exactly what the old inch values were at the old 8pt
+// (0.04in = 0.36em, 0.16in = 1.44em), so the pill's proportions are unchanged
+// — it is the same chip, drawn one size down.
+export const TAG_PILL_FONT_SIZE_PT = AXIS_WEEK_FONT_SIZE_PT;
+const TAG_PILL_PADDING_EM = 0.36;
+const TAG_PILL_HEIGHT_EM = 1.44;
+export const TAG_PILL_PADDING_IN = (TAG_PILL_FONT_SIZE_PT * TAG_PILL_PADDING_EM) / 72;
+export const TAG_PILL_HEIGHT_IN = (TAG_PILL_FONT_SIZE_PT * TAG_PILL_HEIGHT_EM) / 72;
 export const TAG_PILL_RADIUS_IN = 0.03;
 export const TAG_PILL_GAP_IN = 0.05;
 export const LABEL_TAG_GAP_IN = 0.08;

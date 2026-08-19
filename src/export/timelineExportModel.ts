@@ -882,39 +882,66 @@ function buildOverviewSlide(
       const statusText = TASK_STATUS_LABELS[status];
       const statusScale = TASK_STATUS_SCALE[status];
 
-      // Tag pills share the Task column with the name, so their measured total
-      // is reserved out of the name's box first and the name truncates against
-      // what's left — the same rule as before, now against a fixed column
-      // instead of whatever space a bar happened to leave.
+      // The name and the tag pills share the Task column, and inside that
+      // column the name outranks them.
+      //
+      // It used to be the other way round: every pill's measured width was
+      // reserved first and the name was cut against whatever survived. Three
+      // tags is ~1.0in of pills, so a name at the third nesting level was left
+      // the column minus its depth indent minus all of that — which is how an
+      // overview came to read "M...", "C...", "Arc...". A tag qualifies a name;
+      // it cannot be worth more of the row than the name it qualifies.
+      //
+      // So the order of giving way is: pills drop from the end of the row
+      // first, and only once a single pill is left does the name itself start
+      // to truncate. Concretely, the name is measured against the column less
+      // one pill's reservation, and the pills are then laid out from where the
+      // name actually ends — so a short name keeps all three, a longer one
+      // pushes the third and then the second off the row, and the longest one
+      // truncates beside the one pill that is always kept.
+      //
+      // Pills are dropped whole rather than truncated to "Bil...": a slide
+      // cannot be hovered to see the rest, so a half-tag spends the same width
+      // on a word that no longer says anything.
       const tagTexts = item.tags ?? [];
-      const tagPillWidths = tagTexts.map(
-        (tag) => measureTextWidthIn(tag, TAG_PILL_FONT_SIZE_PT) + TAG_PILL_PADDING_IN * 2,
-      );
-      const tagsReservedWidth =
-        tagPillWidths.length > 0
-          ? tagPillWidths.reduce((sum, width) => sum + width, 0) +
-            TAG_PILL_GAP_IN * (tagPillWidths.length - 1) +
-            LABEL_TAG_GAP_IN
-          : 0;
+      const tagPillWidth = (text: string) =>
+        measureTextWidthIn(text, TAG_PILL_FONT_SIZE_PT) + TAG_PILL_PADDING_IN * 2;
+      // What the name gives up for the pill that is always kept — and the cap
+      // that stops it giving up too much. A pill may never take more of the
+      // column than it leaves the name: at the deepest indent, with a long tag,
+      // reserving unconditionally would starve the name exactly the way the old
+      // rule did. Past that point the tags go entirely and the name takes the
+      // column, which is the priority this whole block exists to state.
+      const tagReservedWidth = tagTexts.length > 0 ? tagPillWidth(tagTexts[0]) + LABEL_TAG_GAP_IN : 0;
+      const labelMaxWidth =
+        tagReservedWidth * 2 <= labelBoxWidth ? labelBoxWidth - tagReservedWidth : labelBoxWidth;
 
-      // One truncation rule, in one place: the name is cut to the Task
-      // column's own width with an ellipsis. At BAR_LABEL_FONT_SIZE_PT a glyph
-      // averages 0.110in, so an untagged row holds roughly 20 characters
-      // (2.35in of column, less 0.08in of inset either side) before the
-      // ellipsis appears; a row carrying tags holds correspondingly fewer.
-      const labelWidth = Math.max(labelBoxWidth - tagsReservedWidth, 0);
-      const label = truncateToWidth(item.label, BAR_LABEL_FONT_SIZE_PT, labelWidth);
+      const label = truncateToWidth(item.label, BAR_LABEL_FONT_SIZE_PT, labelMaxWidth);
+      const labelTextWidth = Math.min(measureTextWidthIn(label, BAR_LABEL_FONT_SIZE_PT), labelMaxWidth);
 
-      // Tag pills start right after the label's own actual (already
-      // truncated) text, not at the edge of its reserved box — otherwise a
-      // short label would leave a visible gap before the first pill.
-      let tagX = labelX + measureTextWidthIn(label, BAR_LABEL_FONT_SIZE_PT) + (tagTexts.length > 0 ? LABEL_TAG_GAP_IN : 0);
-      const tags: OverviewBarTagModel[] = tagTexts.map((text, index) => {
-        const width = tagPillWidths[index];
-        const tag: OverviewBarTagModel = { text, x: tagX, width };
+      // Pills start right after the name's own actual (already truncated)
+      // text, not at the edge of its reserved box — otherwise a short name
+      // would leave a visible gap before the first pill.
+      const tagsEndX = labelX + labelBoxWidth;
+      let tagX = labelX + labelTextWidth + LABEL_TAG_GAP_IN;
+      const tags: OverviewBarTagModel[] = [];
+      for (const text of tagTexts) {
+        const width = tagPillWidth(text);
+        // Strictly inside the column: a pill is a filled shape, so one
+        // overhanging by a rounding error shows in a way a glyph's side
+        // bearing does not.
+        if (tagX + width > tagsEndX) break;
+        tags.push({ text, x: tagX, width });
         tagX += width + TAG_PILL_GAP_IN;
-        return tag;
-      });
+      }
+
+      // The box the name is drawn in and clicked on: up to the first pill when
+      // the row has one, otherwise the whole rest of the column. Not the
+      // measured text width in both cases, because this is also the PDF's link
+      // target for the task — an untagged row has nothing to its right to
+      // avoid, and a name of five letters should still be as easy to hit as
+      // the bar beside it.
+      const labelWidth = tags.length > 0 ? labelTextWidth : labelBoxWidth;
 
       bars.push({
         id: item.id,
