@@ -295,6 +295,7 @@ export function GanttChart() {
                   onRequestClosePopup={closeTaskPopup}
                   isDimmed={highlightedIds !== null && !highlightedIds.has(item.id)}
                   isHighlighted={highlightedIds !== null && highlightedIds.has(item.id)}
+                  isHoveredBar={hoveredTaskId === item.id}
                   onBarHoverChange={(isHovered) =>
                     // Clearing only when this bar is still the hovered one:
                     // crossing diagonally from one bar to another can deliver
