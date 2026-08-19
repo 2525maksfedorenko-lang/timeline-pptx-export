@@ -1,5 +1,11 @@
 import { useMemo } from 'react';
-import { buildDateGrid, DATE_GRID_LEVELS, DATE_GRID_STYLES } from '../export/dateGrid';
+import {
+  buildDateGrid,
+  DATE_GRID_LEVELS,
+  DATE_GRID_MIN_GAP_PX,
+  DATE_GRID_STYLES,
+  resolveGridStrokes,
+} from '../export/dateGrid';
 import { MS_PER_DAY } from '../export/dateScale';
 
 interface DateGridLinesProps {
@@ -31,10 +37,14 @@ interface DateGridLinesProps {
  * for their own width. Sits at the bottom of the row area's z-stack, under
  * the connector overlays and well under the bars themselves. */
 export function DateGridLines({ minDate, totalDays, pxPerDay, timelineStartX, visibleDays }: DateGridLinesProps) {
-  const grid = useMemo(
-    () => buildDateGrid(minDate, new Date(minDate.getTime() + (totalDays - 1) * MS_PER_DAY), visibleDays),
-    [minDate, totalDays, visibleDays],
-  );
+  // One stroke per position, resolved by the same shared rule the slides use
+  // (resolveGridStrokes) and in this surface's own unit: a Monday that is also
+  // a 1st is one month-weight line here too, not a week line with a month line
+  // stacked on it.
+  const strokes = useMemo(() => {
+    const grid = buildDateGrid(minDate, new Date(minDate.getTime() + (totalDays - 1) * MS_PER_DAY), visibleDays);
+    return resolveGridStrokes(grid, (mark) => timelineStartX + mark.dayOffset * pxPerDay, DATE_GRID_MIN_GAP_PX);
+  }, [minDate, totalDays, visibleDays, timelineStartX, pxPerDay]);
 
   return (
     <svg className="pointer-events-none absolute inset-0 z-0 h-full w-full" aria-hidden="true">
@@ -44,10 +54,11 @@ export function DateGridLines({ minDate, totalDays, pxPerDay, timelineStartX, vi
           stroke={`#${DATE_GRID_STYLES[level].color}`}
           strokeWidth={DATE_GRID_STYLES[level].widthPx}
         >
-          {grid[level].map((mark) => {
-            const x = timelineStartX + mark.dayOffset * pxPerDay;
-            return <line key={mark.dayOffset} x1={x} x2={x} y1={0} y2="100%" />;
-          })}
+          {strokes
+            .filter((stroke) => stroke.level === level)
+            .map((stroke) => (
+              <line key={stroke.date} x1={stroke.x} x2={stroke.x} y1={0} y2="100%" />
+            ))}
         </g>
       ))}
     </svg>

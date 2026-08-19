@@ -25,8 +25,10 @@ import {
 } from './dateScale';
 import {
   buildDateGrid,
-  DATE_GRID_LEVELS,
+  DATE_GRID_MIN_GAP_PT,
+  getVisibleGridLevels,
   MAX_VISIBLE_DAYS_FOR_WEEK_LINES,
+  resolveGridStrokes,
   type DateGrid,
   type DateGridLevel,
   type DateGridMark,
@@ -66,6 +68,7 @@ import {
   LIST_ROW_HEIGHT_IN,
   MAX_OVERVIEW_BARS_PER_SLIDE,
   MIN_TRACK_WIDTH_IN,
+  OVERVIEW_WINDOW_PAD_RATIO,
   TIMELINE_X_IN,
   TIMELINE_WIDTH_IN,
   STATUS_COL_WIDTH_IN,
@@ -173,6 +176,10 @@ export interface OverviewBarModel {
 // One vertical date line behind the bars. `level` picks its weight/color out
 // of DATE_GRID_STYLES — the same table the on-screen grid draws from.
 export interface OverviewGridLineModel {
+  /** The calendar day this stroke marks, yyyy-mm-dd. Nothing is drawn from it
+   * — it is what lets an audit confirm a line is a real date at its own level
+   * rather than a stroke the layout invented (see exportCoverage.ts). */
+  date: string;
   level: DateGridLevel;
   x: number;
 }
@@ -232,6 +239,17 @@ export interface OverviewSlideModel {
   // from export, outside the timeframe window, or truncated by overflow) —
   // silently omitted rather than drawn as a bracket to nowhere.
   dependencyConnectors: OverviewConnectorModel[];
+  // The date span this slide's axis covers, yyyy-mm-dd, or null when the slide
+  // draws nothing. Carried for the same reason the grid lines carry their
+  // dates: it is what an audit needs to say whether the grid matches the
+  // window, and no renderer reads it.
+  windowStart: string | null;
+  windowEnd: string | null;
+  // The day count the grid's density tier was chosen from — the widest
+  // window's, shared by every slide (see OverviewAxis.tierDays). Carried so an
+  // audit reproduces the tier this slide actually used instead of guessing it
+  // from the window, which would be a different tier and a different count.
+  windowTierDays: number | null;
   // --- what this overview leaves out ------------------------------------------
   // Two different facts, kept apart because conflating them is what made the
   // old single count unverifiable: a task can be missing from the *overview*
@@ -479,23 +497,126 @@ export function planOverview(parentItems: TimelineItem[], timeframe: ExportTimef
   };
 }
 
-/** The date span every overview slide of one export is drawn against. */
+/** The date span one overview slide is drawn against. */
 interface OverviewWindow {
   minDate: Date;
   maxDate: Date;
 }
 
-/** The window for a set of overview slides: the export timeframe when one is
- * set, otherwise the full span of the items being drawn. Computed once for
- * the whole export rather than per slide, so 'full' mode's pages all share a
- * single axis — pages drawn to their own scales couldn't be read against
- * each other. Null when there's nothing to draw. */
-function getOverviewWindow(items: TimelineItem[], timeframe: ExportTimeframe | null): OverviewWindow | null {
-  if (items.length === 0) return null;
-  if (timeframe) return { minDate: new Date(timeframe.start), maxDate: new Date(timeframe.end) };
+/** A slide's own window, plus the density every slide of the export shares.
+ *
+ * The two halves are deliberately separate. The *window* is per slide, because
+ * a slide holding one quarter of a three-year plan drawn against the whole
+ * plan's axis puts its bars in the last inch and leaves the rest blank. The
+ * *density* is shared, because a bar's length is the only thing on these
+ * slides that says how long a task takes: if each slide stretched its own
+ * window to the full width, a two-week task would be a stub on one slide and
+ * half the slide wide on the next, and no two slides could be compared.
+ *
+ * A narrower window therefore does not stretch — it starts at the left edge of
+ * the timeline zone, runs at the shared density, and stops wherever it ends. */
+interface OverviewAxis extends OverviewWindow {
+  /** Inches per BASE_PX_PER_DAY pixel. Identical on every slide. */
+  scale: number;
+  /** How many days a *full* timeline width holds at this density — which is
+   * the widest window's own length, and therefore the same on every slide.
+   *
+   * This, not the slide's own day count, is what the grid's density tier has
+   * to be chosen from. The tier answers "how close together would these lines
+   * land", and at a shared density that is a property of the density, not of
+   * how much of the width this particular slide happens to use: a 112-day
+   * window drawn across half an inch has its Mondays 2pt apart, and calling
+   * that a week-level range because 112 < 365 produces a comb, not a grid. */
+  tierDays: number;
+}
 
-  const { minDate, maxDate } = getDateRange(items);
-  return { minDate, maxDate };
+function addDays(date: Date, days: number): Date {
+  const moved = new Date(date.getTime());
+  moved.setUTCDate(moved.getUTCDate() + days);
+  return moved;
+}
+
+/** The Monday on or before `date` — the same anchor getWeekMarkers uses, so a
+ * snapped edge lands on a week line the grid actually draws. */
+function startOfWeek(date: Date): Date {
+  return addDays(date, -((date.getUTCDay() + 6) % 7));
+}
+
+function startOfMonth(date: Date): Date {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
+}
+
+/** Widens a window outward until both edges sit on marks the grid will draw.
+ *
+ * Snapped to the *finest* level this window's length draws, not the coarsest:
+ * the fine one is the smaller move (at most six days at week level against as
+ * much as a month at month level), and an axis that begins and ends on a drawn
+ * line reads as a measured range rather than as one cut at an arbitrary date.
+ * A day-level window is already on whole days and needs no move at all. */
+function snapWindowToGrid(window: OverviewWindow): OverviewWindow {
+  const days = daysBetween(window.minDate, window.maxDate) + 1;
+  // getVisibleGridLevels returns its levels finest-first.
+  const [finest] = getVisibleGridLevels(days);
+
+  if (finest === 'day') return window;
+
+  if (finest === 'week') {
+    const start = startOfWeek(window.minDate);
+    const lastMonday = startOfWeek(window.maxDate);
+    const end = lastMonday.getTime() === window.maxDate.getTime() ? lastMonday : addDays(lastMonday, 7);
+    return { minDate: start, maxDate: end };
+  }
+
+  const start = startOfMonth(window.minDate);
+  const firstOfMonth = startOfMonth(window.maxDate);
+  const end =
+    firstOfMonth.getTime() === window.maxDate.getTime()
+      ? firstOfMonth
+      : new Date(Date.UTC(firstOfMonth.getUTCFullYear(), firstOfMonth.getUTCMonth() + 1, 1));
+  return { minDate: start, maxDate: end };
+}
+
+/** One axis per page, in page order; null for a page with nothing on it.
+ *
+ * An explicit export timeframe is a window the reader chose, so every slide
+ * keeps it unchanged — narrowing it per slide would quietly overrule the
+ * setting. Only the automatic window is computed per slide. */
+function buildOverviewAxes(
+  pages: TimelineItem[][],
+  timeframe: ExportTimeframe | null,
+): (OverviewAxis | null)[] {
+  if (timeframe) {
+    const minDate = new Date(timeframe.start);
+    const maxDate = new Date(timeframe.end);
+    const tierDays = daysBetween(minDate, maxDate) + 1;
+    const scale = TIMELINE_WIDTH_IN / (tierDays * BASE_PX_PER_DAY);
+    return pages.map((page) => (page.length > 0 ? { minDate, maxDate, scale, tierDays } : null));
+  }
+
+  const ranges = pages.map((page) => (page.length > 0 ? getDateRange(page) : null));
+  const widestRawDays = Math.max(1, ...ranges.map((range) => range?.totalDays ?? 1));
+  // One padding for the whole export, measured off the widest window, so the
+  // clear space either side is the same number of inches on every slide.
+  const padDays = Math.max(1, Math.round(widestRawDays * OVERVIEW_WINDOW_PAD_RATIO));
+
+  const windows = ranges.map((range) =>
+    range === null
+      ? null
+      : snapWindowToGrid({
+          minDate: addDays(range.minDate, -padDays),
+          maxDate: addDays(range.maxDate, padDays),
+        }),
+  );
+
+  // The widest window fills the timeline zone exactly; every other slide runs
+  // at that same inches-per-day and simply stops earlier.
+  const widestDays = Math.max(
+    1,
+    ...windows.map((window) => (window ? daysBetween(window.minDate, window.maxDate) + 1 : 1)),
+  );
+  const scale = TIMELINE_WIDTH_IN / (widestDays * BASE_PX_PER_DAY);
+
+  return windows.map((window) => (window ? { ...window, scale, tierDays: widestDays } : null));
 }
 
 /** Lays out one overview slide: a date-scale axis at the top, then one bar
@@ -504,13 +625,16 @@ function getOverviewWindow(items: TimelineItem[], timeframe: ExportTimeframe | n
  * is unaffected by the clip. */
 function buildOverviewSlide(
   items: TimelineItem[],
-  dateWindow: OverviewWindow | null,
+  axis: OverviewAxis | null,
   title: string,
   omission: OverviewOmission,
   showDependencies: boolean,
 ): OverviewSlideModel {
   const bars: OverviewBarModel[] = [];
   const dateAxisY = CONTENT_TOP_IN;
+  const windowStart = axis && items.length > 0 ? axis.minDate.toISOString().slice(0, 10) : null;
+  const windowEnd = axis && items.length > 0 ? axis.maxDate.toISOString().slice(0, 10) : null;
+  const windowTierDays = axis && items.length > 0 ? axis.tierDays : null;
   let gridLines: OverviewGridLineModel[] = [];
   let axisLabels: OverviewAxisLabelModel[] = [];
   let columnHeaders: OverviewColumnHeaderModel[] = [];
@@ -522,26 +646,33 @@ function buildOverviewSlide(
   // slide is a root here and is drawn like one.
   const depthById = buildDepthMap(items);
 
-  if (dateWindow && items.length > 0) {
-    const { minDate, maxDate } = dateWindow;
+  if (axis && items.length > 0) {
+    const { minDate, maxDate, scale, tierDays } = axis;
     const totalDays = daysBetween(minDate, maxDate) + 1;
-    const totalWidthPx = totalDays * BASE_PX_PER_DAY;
-    // The date scale now spans the timeline zone only, not the whole content
-    // width — everything derived from `toX` (grid lines, axis captions, bar
-    // positions, and through those the dependency connectors) moves
-    // with it, so nothing can land back over the columns.
-    const scale = TIMELINE_WIDTH_IN / totalWidthPx;
+    // How much of the timeline zone this slide's window actually occupies. The
+    // widest slide of the export fills it; a narrower one stops short, and
+    // everything below clamps against *this* edge rather than the zone's, so a
+    // bar at the end of a short window is held at the end of that window
+    // instead of being allowed to run on into blank space.
+    const windowWidthIn = totalDays * BASE_PX_PER_DAY * scale;
 
-    const grid = buildDateGrid(minDate, maxDate);
+    // The grid's density tier comes from this slide's own window (buildDateGrid
+    // reads the span it is handed), so a slide covering four months draws week
+    // lines while one covering three years draws months — instead of every
+    // slide inheriting the whole plan's tier.
+    const grid = buildDateGrid(minDate, maxDate, tierDays);
     const toX = (mark: DateGridMark) => TIMELINE_X_IN + mark.dayOffset * BASE_PX_PER_DAY * scale;
-    gridLines = DATE_GRID_LEVELS.flatMap((level) =>
-      grid[level].map((mark) => ({ level, x: toX(mark) })),
-    );
+    // One stroke per position, owned by the strongest level there — see
+    // resolveGridStrokes. The gap is the shared constant in points, converted
+    // to this surface's inches.
+    gridLines = resolveGridStrokes(grid, toX, DATE_GRID_MIN_GAP_PT / 72);
     // The slide shows the whole window at once, so the grid's density tier
     // follows the window's own length — and the axis captions follow the
     // same tier, so lines and captions can't disagree about how coarse this
     // range is.
-    axisLabels = buildAxisLabels(grid, toX, totalDays > MAX_VISIBLE_DAYS_FOR_WEEK_LINES);
+    // Captions follow the same tier as the lines, so a slide can't caption a
+    // range more finely than it rules it.
+    axisLabels = buildAxisLabels(grid, toX, tierDays > MAX_VISIBLE_DAYS_FOR_WEEK_LINES);
 
     // The two column headings sit on the axis row, so "Status", "Task" and the
     // month captions all share one line; the hairline under that row and the
@@ -571,20 +702,20 @@ function buildOverviewSlide(
       const rawLeftIn = left * scale;
       const rawRightIn = (left + width) * scale;
       const chevronLeft = rawLeftIn < -0.001;
-      const chevronRight = rawRightIn > TIMELINE_WIDTH_IN + 0.001;
+      const chevronRight = rawRightIn > windowWidthIn + 0.001;
 
       const clippedLeftIn = Math.max(rawLeftIn, 0);
-      const clippedRightIn = Math.min(rawRightIn, TIMELINE_WIDTH_IN);
+      const clippedRightIn = Math.min(rawRightIn, windowWidthIn);
 
       // No label zone to reserve any more: the name and the status live in their
       // own columns, so a bar is free to use the whole timeline zone and is
       // clamped only by that zone's own right edge. A bar can still start at the
       // very end of the window, in which case MIN_TRACK_WIDTH_IN keeps it
       // visible — it just can't spill past TIMELINE_X_IN + TIMELINE_WIDTH_IN.
-      const maxLeftIn = Math.max(0, TIMELINE_WIDTH_IN - MIN_TRACK_WIDTH_IN);
+      const maxLeftIn = Math.max(0, windowWidthIn - MIN_TRACK_WIDTH_IN);
       const barX = TIMELINE_X_IN + Math.min(clippedLeftIn, maxLeftIn);
 
-      const maxTrackWidth = Math.max(MIN_TRACK_WIDTH_IN, TIMELINE_X_IN + TIMELINE_WIDTH_IN - barX);
+      const maxTrackWidth = Math.max(MIN_TRACK_WIDTH_IN, TIMELINE_X_IN + windowWidthIn - barX);
       const windowClippedWidth = Math.max(clippedRightIn - (barX - TIMELINE_X_IN), 0);
       const trackWidth = Math.min(Math.max(windowClippedWidth, MIN_TRACK_WIDTH_IN), maxTrackWidth);
       const fillWidth = progress > 0 ? Math.max((trackWidth * progress) / 100, 0.05) : 0;
@@ -708,6 +839,9 @@ function buildOverviewSlide(
     dividerBottom: CONTENT_BOTTOM_IN,
     bars,
     dependencyConnectors,
+    windowStart,
+    windowEnd,
+    windowTierDays,
     ...omission,
   };
 }
@@ -771,7 +905,6 @@ function buildOverviewSlides(
 ): OverviewSlideModel[] {
   const isPaged = exportMode === 'full' && plan.inRange.length > plan.capacity;
   const drawnItems = isPaged ? plan.inRange : plan.included;
-  const dateWindow = getOverviewWindow(drawnItems, timeframe);
 
   // Judged against every exportable root, not just the in-range ones, so a root
   // the timeframe filtered out is counted the same as one that didn't fit.
@@ -781,19 +914,28 @@ function buildOverviewSlides(
     sectionedIds,
   );
 
-  if (!isPaged) {
-    return [buildOverviewSlide(drawnItems, dateWindow, 'Timeline Overview', omission, showDependencies)];
+  // Paged first, so each page's own tasks are known before its window is: the
+  // window is a fact about the page, and the shared density a fact about the
+  // widest of them, so neither can be resolved one slide at a time.
+  const pages: TimelineItem[][] = [];
+  if (isPaged) {
+    for (let i = 0; i < drawnItems.length; i += plan.capacity) {
+      pages.push(drawnItems.slice(i, i + plan.capacity));
+    }
+  } else {
+    pages.push(drawnItems);
   }
 
-  const pages: TimelineItem[][] = [];
-  for (let i = 0; i < drawnItems.length; i += plan.capacity) {
-    pages.push(drawnItems.slice(i, i + plan.capacity));
+  const axes = buildOverviewAxes(pages, timeframe);
+
+  if (!isPaged) {
+    return [buildOverviewSlide(drawnItems, axes[0], 'Timeline Overview', omission, showDependencies)];
   }
 
   return pages.map((pageItems, index) =>
     buildOverviewSlide(
       pageItems,
-      dateWindow,
+      axes[index],
       `Timeline Overview (${index + 1}/${pages.length})`,
       // The note belongs on the last page — a closing footnote, not something
       // repeated under every page — and the counts go with it so they stay
