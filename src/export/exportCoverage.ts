@@ -1,7 +1,7 @@
 import type { TimelineItem } from '../types/timeline';
 import type { DashboardTableSlideModel } from './dashboardSlides';
 import { buildDateGrid, DATE_GRID_LEVELS, DATE_GRID_MIN_GAP_PT } from './dateGrid';
-import { buildDepthMap } from '../utils/barNesting';
+import { BAR_HEIGHT_RATIO_BY_DEPTH, buildDepthMap } from '../utils/barNesting';
 import type { OrderedSlideModel } from './slideOrder';
 import type { SlideLinks } from './slideLinks';
 import {
@@ -15,6 +15,8 @@ import {
   LIST_ROW_HEIGHT_IN,
   ROW_LABEL_HEIGHT_IN,
   subtaskRowIndent,
+  TIMELINE_X_IN,
+  TIMELINE_WIDTH_IN,
   tableColumnTextWidthIn,
   tableRowHeightIn,
 } from './slideLayout';
@@ -131,9 +133,18 @@ function auditGrid(
   slideNumber: number,
   failures: string[],
 ): GridCoverage {
-  // Same window *and* same tier the slide drew with, or the two would be
-  // counting different grids.
-  const calendar = buildDateGrid(new Date(windowStart), new Date(windowEnd), tierDays);
+  // The same span the slide actually ruled, which is not the same as the span
+  // its tasks occupy: an overview rules `tierDays` days from its window's start
+  // — that being exactly how much of the zone the shared density covers — so a
+  // page whose tasks span less than the widest still rules edge to edge (see
+  // buildOverviewSlide). Rebuilding over `windowStart..windowEnd` instead
+  // audits a shorter grid than the one drawn, and every line past the page's
+  // last task reads as a line off the calendar.
+  const gridStart = new Date(windowStart);
+  const gridEnd = new Date(gridStart);
+  gridEnd.setUTCDate(gridEnd.getUTCDate() + tierDays - 1);
+  const ruledRange = `${windowStart}..${gridEnd.toISOString().slice(0, 10)}`;
+  const calendar = buildDateGrid(gridStart, gridEnd, tierDays);
   const drawnLevels = DATE_GRID_LEVELS.filter((level) => calendar[level].length > 0);
   const datesByLevel = new Map(
     DATE_GRID_LEVELS.map((level) => [
@@ -153,7 +164,7 @@ function auditGrid(
   lines.forEach((line, index) => {
     if (!datesByLevel.get(line.level)?.has(line.date)) {
       failures.push(
-        `slide ${slideNumber}: grid line at ${line.date} is not a ${line.level} mark of ${windowStart}..${windowEnd}`,
+        `slide ${slideNumber}: grid line at ${line.date} is not a ${line.level} mark of ${ruledRange}`,
       );
     }
     if (seen.has(line.date)) {
@@ -274,7 +285,7 @@ export function analyzeExportCoverage(
       // A count nobody can read is not an announcement.
       if (slide.omittedFromOverviewCount > 0 && slide.omittedNote === null) {
         failures.push(
-          `slide ${slideNumber}: ${slide.omittedFromOverviewCount} root(s) left off the overview ` +
+          `slide ${slideNumber}: ${slide.omittedFromOverviewCount} task(s) left off the overview ` +
             `with no footer note to say so`,
         );
       }
@@ -294,6 +305,51 @@ export function analyzeExportCoverage(
         present.add(bar.id);
         barredIds.add(bar.id);
         maxContentY = Math.max(maxContentY, bar.y + BAR_HEIGHT_IN);
+
+        // A bar's height is one of the ladder's rungs and nothing else — a
+        // height arrived at any other way means some caller is scaling bars on
+        // its own, which is exactly the drift barNesting exists to stop. Not
+        // checked against this task's depth in the *plan*: the overview judges
+        // depth against the set it draws, so a task whose parent the timeframe
+        // or the compact cut removed is legitimately drawn as a root.
+        const isLadderHeight = BAR_HEIGHT_RATIO_BY_DEPTH.some(
+          (ratio) => Math.abs(bar.barHeight - BAR_HEIGHT_IN * ratio) <= EPSILON_IN,
+        );
+        if (!isLadderHeight) {
+          failures.push(
+            `slide ${slideNumber}: bar "${bar.id}" is ${bar.barHeight.toFixed(4)}in tall, ` +
+              `which is no rung of the depth ladder`,
+          );
+        }
+
+        // The row pitch is what every overlay, the date grid and the
+        // bars-per-slide ceiling are pinned to, so a shortened bar has to give
+        // its height back evenly to both sides. Off-center by even a little and
+        // the dependency connectors — which aim at the row's center line — stop
+        // meeting the bars they connect.
+        const rowCenter = bar.y + BAR_HEIGHT_IN / 2;
+        const barCenter = bar.barY + bar.barHeight / 2;
+        if (Math.abs(barCenter - rowCenter) > EPSILON_IN) {
+          failures.push(
+            `slide ${slideNumber}: bar "${bar.id}" is centered at ${barCenter.toFixed(4)}in ` +
+              `but its row's center line is ${rowCenter.toFixed(4)}in`,
+          );
+        }
+
+        // Wherever the progress label ended up — in the fill, on the track, or
+        // clear of a bar too short to hold it — it stays inside the timeline
+        // zone. This is the one piece of a bar that is placed relative to the
+        // fill rather than clamped with the track, so it is the one that can
+        // walk off the slide.
+        const labelLeft = bar.progressX;
+        const labelRight = bar.progressX + bar.progressWidth;
+        if (labelLeft < TIMELINE_X_IN - EPSILON_IN || labelRight > TIMELINE_X_IN + TIMELINE_WIDTH_IN + EPSILON_IN) {
+          failures.push(
+            `slide ${slideNumber}: bar "${bar.id}" progress label spans ` +
+              `${labelLeft.toFixed(4)}-${labelRight.toFixed(4)}in, outside the timeline zone ` +
+              `(${TIMELINE_X_IN.toFixed(4)}-${(TIMELINE_X_IN + TIMELINE_WIDTH_IN).toFixed(4)}in)`,
+          );
+        }
       });
 
       if (slide.windowStart !== null && slide.windowEnd !== null && slide.windowTierDays !== null) {
@@ -479,15 +535,14 @@ export function analyzeExportCoverage(
     );
   }
 
-  // The other half of the footer's claim: the roots it says are off the
-  // overview are exactly the roots with no bar. Descendants never get bars, so
-  // only depth-0 tasks count here.
-  const rootsWithoutBar = exportableItems.filter(
-    (item) => depthById.get(item.id) === 0 && !barredIds.has(item.id),
-  ).length;
-  if (rootsWithoutBar !== announcedOffOverview) {
+  // The other half of the footer's claim: the tasks it says are off the
+  // overview are exactly the tasks with no bar. Every depth counts now — the
+  // overview draws subtasks as bars too, so a check that still looked only at
+  // depth 0 would pass while every missing subtask went unannounced.
+  const tasksWithoutBar = exportableItems.filter((item) => !barredIds.has(item.id)).length;
+  if (tasksWithoutBar !== announcedOffOverview) {
     failures.push(
-      `${rootsWithoutBar} root(s) have no overview bar, but the footers announce ` +
+      `${tasksWithoutBar} task(s) have no overview bar, but the footers announce ` +
         `${announcedOffOverview}`,
     );
   }

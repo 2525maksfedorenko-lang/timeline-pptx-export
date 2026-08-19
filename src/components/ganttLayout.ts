@@ -99,3 +99,12 @@ export const STICKY_TINT_CLASS = 'bg-card bg-[linear-gradient(hsl(var(--muted)/0
 export const ROW_HEIGHT_PX = 40;
 export const BAR_HEIGHT_PX = 32;
 export const BAR_CENTER_Y_PX = 20;
+
+// The progress percentage drawn on a bar, in px. Here rather than in GanttRow
+// because two things ask about it and only one of them is styling: how wide the
+// label renders, and whether a bar is tall enough to hold it inside itself
+// (progressLabelFitsInBar). The second is what the export-parity check compares
+// against the slides' own BAR_PROGRESS_FONT_SIZE_PT, and it can only do that
+// from a module that doesn't drag React in. Must match the `text-[11px]` class
+// the label is actually drawn with.
+export const PROGRESS_FONT_SIZE_PX = 11;
