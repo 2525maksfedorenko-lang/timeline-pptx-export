@@ -1,4 +1,5 @@
 import type { TimelineItem } from '../types/timeline';
+import { normalizeItemStatuses } from '../utils/normalizeStatus';
 
 const REQUIRED_STRING_FIELDS: (keyof TimelineItem)[] = ['id', 'label', 'start', 'end'];
 
@@ -46,6 +47,11 @@ export function validateTimelineItem(raw: unknown, location: string): TimelineIt
     throw new Error(`${location} has an invalid "includeInExport" field (expected a boolean).`);
   }
 
+  // `status` is deliberately not checked here. It is the one field a person
+  // writes in their own words ("In Progress", "done"), so it is normalized
+  // rather than judged — see normalizeItemStatuses, which every importer and
+  // both persistence layers run it through.
+
   if (
     record.dependencies !== undefined &&
     (!Array.isArray(record.dependencies) || !record.dependencies.every((dep) => typeof dep === 'string'))
@@ -56,9 +62,18 @@ export function validateTimelineItem(raw: unknown, location: string): TimelineIt
   return record as unknown as TimelineItem;
 }
 
+export interface ImportedTasks {
+  items: TimelineItem[];
+  /** Statuses that had to be dropped to canonicalize the list — see
+   * normalizeItemStatuses. Not errors: every task is in `items`. */
+  warnings: string[];
+}
+
 /** Parses and validates a JSON string as an array of TimelineItem, throwing a
- * descriptive error on the first invalid entry rather than importing partial data. */
-export function parseImportedTasks(json: string): TimelineItem[] {
+ * descriptive error on the first invalid entry rather than importing partial
+ * data — and normalizing every status on the way out, so a hand-written file
+ * saying "In Progress" lands as the value the app actually draws from. */
+export function parseImportedTasks(json: string): ImportedTasks {
   let parsed: unknown;
   try {
     parsed = JSON.parse(json);
@@ -74,5 +89,7 @@ export function parseImportedTasks(json: string): TimelineItem[] {
     throw new Error('The JSON file contains no tasks.');
   }
 
-  return parsed.map((item, index) => validateTimelineItem(item, `Task at index ${index}`));
+  const items = parsed.map((item, index) => validateTimelineItem(item, `Task at index ${index}`));
+
+  return normalizeItemStatuses(items, (_item, index) => `Task at index ${index}`);
 }

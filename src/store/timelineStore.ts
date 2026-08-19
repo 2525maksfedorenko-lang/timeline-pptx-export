@@ -6,6 +6,7 @@ import type {
   TaskComment,
   TimelineItem,
 } from '../types/timeline';
+import { normalizeItemStatuses } from '../utils/normalizeStatus';
 import { getDescendantIds } from '../utils/taskHierarchy';
 import { DEV_SEED_COMMENTS, DEV_SEED_ITEMS, DEV_SEED_TITLE } from './devSeed';
 import {
@@ -317,6 +318,21 @@ export const useTimelineStore = create<TimelineStore>()(
       // integration doesn't need multiple named plans, IndexedDB can be
       // dropped and this `persist` config becomes the only storage layer.
       name: 'timeline-pptx-export-storage',
+      // The same repair getAllPlans does, on the other door — and the one that
+      // opens first. This mirror restores synchronously on reload, before
+      // IndexedDB has even opened, so a plan that predates the importers'
+      // status rule would otherwise be drawn with an unmatched status until
+      // loadPlans() resolved, and saved straight back that way if anything was
+      // edited in between.
+      merge: (persistedState, currentState) => {
+        const persisted = (persistedState ?? {}) as Partial<TimelineStore>;
+
+        return {
+          ...currentState,
+          ...persisted,
+          items: persisted.items ? normalizeItemStatuses(persisted.items).items : currentState.items,
+        };
+      },
       partialize: (state) => ({
         title: state.title,
         items: state.items,

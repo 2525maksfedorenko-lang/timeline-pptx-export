@@ -1,5 +1,10 @@
 import * as XLSX from 'xlsx';
-import { TASK_STATUS_LABELS, TASK_STATUS_VALUES, type TaskStatus, type TimelineItem } from '../types/timeline';
+import type { TimelineItem } from '../types/timeline';
+import {
+  normalizeTaskStatus,
+  unknownStatusWarnings,
+  type UnknownStatus,
+} from '../utils/normalizeStatus';
 import { validateTimelineItem } from './importTasks';
 
 /** Which task field each accepted column heading feeds. Headings are matched
@@ -40,9 +45,9 @@ export interface SheetImportResult {
    * importer, where a malformed entry means the file itself is wrong. */
   errors: string[];
   /** Things that were imported, but not necessarily as the file's author
-   * meant them — an ambiguous Parent above all. Unlike `errors` these cost no
-   * rows, so they are worth showing before the import is applied rather than
-   * after it. */
+   * meant them — an ambiguous Parent, a Status spelt in a way this app
+   * doesn't know. Unlike `errors` these cost no rows, so they are worth
+   * showing before the import is applied rather than after it. */
   warnings: string[];
 }
 
@@ -108,26 +113,6 @@ function toIsoDate(value: unknown): string | null {
   }
 
   return null;
-}
-
-/** Every spelling of a status a sheet may plausibly hold, keyed the way
- * normalizeHeading leaves them: the stored value ("in_progress" -> "in
- * progress"), and the label the app itself displays ("In progress"). A
- * person filling in a spreadsheet types what they see on screen, not the
- * enum, and "To do" is not "todo" until something says so. */
-const STATUS_BY_TEXT = new Map<string, TaskStatus>(
-  TASK_STATUS_VALUES.flatMap((value) => [
-    [normalizeHeading(value), value] as const,
-    [normalizeHeading(TASK_STATUS_LABELS[value]), value] as const,
-  ]),
-);
-
-/** The spellings quoted back when a Status cell doesn't match — the display
- * labels, since those are what a person would have been copying. */
-const STATUS_HINT = TASK_STATUS_VALUES.map((value) => TASK_STATUS_LABELS[value]).join(', ');
-
-function toStatus(value: unknown): TaskStatus | null {
-  return STATUS_BY_TEXT.get(normalizeHeading(value)) ?? null;
 }
 
 /** A cell's value as a 0-100 progress figure. Accepts a bare number, a
@@ -223,6 +208,9 @@ export function parseSheet(bytes: ArrayBuffer, existingItems: TimelineItem[] = [
   const items: TimelineItem[] = [];
   const errors: string[] = [];
   const warnings: string[] = [];
+  // Collected rather than reported row by row, so one column of "WIP" is one
+  // line in the import dialog (see unknownStatusWarnings).
+  const unknownStatuses: UnknownStatus[] = [];
   // Parent lookups: existing tasks first, then whatever this file has
   // already produced. First registration wins, so which task a Parent names
   // doesn't depend on how far down the file the row sits.
@@ -276,11 +264,15 @@ export function parseSheet(bytes: ArrayBuffer, existingItems: TimelineItem[] = [
       const end = toIsoDate(cell('end'));
       if (end === null) throw new Error(`Row ${rowNumber} has an invalid "End" date.`);
 
+      // An unrecognized Status costs the row its status, not its place in the
+      // plan: the label, the dates and the hierarchy in that row are all still
+      // good, and dropping them over one misspelt word loses more than it
+      // protects. The task imports as "to do" and the spelling is reported.
       const rawStatus = cell('status');
       const hasStatus = rawStatus !== undefined && String(rawStatus).trim() !== '';
-      const status = hasStatus ? toStatus(rawStatus) : undefined;
-      if (hasStatus && status === null) {
-        throw new Error(`Row ${rowNumber} has an unknown "Status" (expected one of: ${STATUS_HINT}).`);
+      const status = hasStatus ? (normalizeTaskStatus(rawStatus) ?? undefined) : undefined;
+      if (hasStatus && status === undefined) {
+        unknownStatuses.push({ location: `Row ${rowNumber}`, value: String(rawStatus).trim() });
       }
 
       const rawProgress = cell('progress');
@@ -339,6 +331,8 @@ export function parseSheet(bytes: ArrayBuffer, existingItems: TimelineItem[] = [
       errors.push(error instanceof Error ? error.message : `Row ${rowNumber} could not be read.`);
     }
   });
+
+  warnings.push(...unknownStatusWarnings(unknownStatuses));
 
   if (items.length === 0 && errors.length === 0) {
     throw new Error('The sheet has no task rows under its headings.');

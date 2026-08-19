@@ -27,8 +27,9 @@ export interface ImportPreview {
   items: TimelineItem[];
   /** One line per row that will not be imported, and why. */
   skipped: string[];
-  /** Imported, but worth saying out loud first — an ambiguous Parent, a file
-   * whose contents don't match its name. */
+  /** Imported, but worth saying out loud first — an ambiguous Parent, a
+   * status spelt in a way this app doesn't know, a file whose contents don't
+   * match its name. */
   warnings: string[];
   /** Earliest start to latest end across `items`; null when there are none. */
   dateRange: { start: string; end: string } | null;
@@ -119,20 +120,20 @@ export async function prepareImport(file: File, existingItems: TimelineItem[]): 
     // begin the bare task array, `{` only the whole-plan object, so each file
     // reaches the parser that can report properly on it.
     if (text.trimStart().startsWith('[')) {
-      const items = parseImportedTasks(text);
+      const { items, warnings: statusWarnings } = parseImportedTasks(text);
       return {
         fileName: file.name,
         format,
         action: 'add-tasks',
         items,
         skipped: [],
-        warnings,
+        warnings: [...warnings, ...statusWarnings],
         dateRange: summariseDates(items),
         ...summariseNesting(items, existingItems),
       };
     }
 
-    const plan = parsePlanJson(text);
+    const { plan, warnings: statusWarnings } = parsePlanJson(text);
     return {
       fileName: file.name,
       format,
@@ -140,7 +141,7 @@ export async function prepareImport(file: File, existingItems: TimelineItem[]): 
       plan,
       items: plan.items,
       skipped: [],
-      warnings,
+      warnings: [...warnings, ...statusWarnings],
       dateRange: summariseDates(plan.items),
       // A plan replaces everything, so its tasks nest among themselves only.
       ...summariseNesting(plan.items, []),
