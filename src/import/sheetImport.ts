@@ -170,7 +170,10 @@ function readWorkbook(bytes: ArrayBuffer): XLSX.WorkBook {
  *
  * `existingItems` is what a Parent column resolves against, by id or by
  * label; rows earlier in the same file count too, so a file can bring in a
- * parent and its subtasks together. Two tasks may share a label — nothing
+ * parent and its subtasks together. That backward-only resolution is also why
+ * this parser needs no cycle check of its own (see breakParentCycles): a row
+ * can only be attached to a task that already exists, and the tasks it creates
+ * are new ids nothing else points at, so no loop can come out of a sheet. Two tasks may share a label — nothing
  * stops it, and a plan full of "Review" phases is normal — so an ambiguous
  * Parent is resolved to the first of them and reported (see warnings). */
 export function parseSheet(bytes: ArrayBuffer, existingItems: TimelineItem[] = []): SheetImportResult {
