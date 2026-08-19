@@ -13,9 +13,14 @@ import { COLORS, withHash } from '../export/theme';
 import { getInitials } from '../utils/initials';
 import { measureTextWidthPx } from '../utils/measureTextWidth';
 import { resolveBarColor } from '../utils/barColor';
-import { labelIndent, resolveBarGeometry } from '../utils/barNesting';
+import {
+  labelIndent,
+  progressLabelFitsInBar,
+  progressLabelXOutsideBar,
+  resolveBarGeometry,
+} from '../utils/barNesting';
 import { getDescendantIds } from '../utils/taskHierarchy';
-import { BAR_HEIGHT_PX, STICKY_TINT_CLASS } from './ganttLayout';
+import { BAR_HEIGHT_PX, PROGRESS_FONT_SIZE_PX, STICKY_TINT_CLASS } from './ganttLayout';
 import { Eye, EyeOff, MessageSquare, Trash2, UserRound } from 'lucide-react';
 
 interface GanttRowProps {
@@ -142,8 +147,9 @@ const FALLBACK_ASSIGNEE_COLOR = COLORS.assigneeFallback;
 const BAR_TRACK_COLOR = withHash(COLORS.barTrack);
 // Must match how the progress text on the bar is actually styled below
 // (`text-[11px] font-semibold`, app font stack), since it's what the fit
-// measurement is made against.
-const PROGRESS_FONT = '600 11px ui-sans-serif, system-ui, sans-serif';
+// measurement is made against. The size itself lives in ganttLayout, next to
+// the bar height it gets compared against — see PROGRESS_FONT_SIZE_PX.
+const PROGRESS_FONT = `600 ${PROGRESS_FONT_SIZE_PX}px ui-sans-serif, system-ui, sans-serif`;
 const PROGRESS_PADDING_PX = 5;
 // How far the pointer may travel between pressing and releasing on a bar
 // and still count as a click (which opens the bar's action menu) rather
@@ -236,20 +242,24 @@ export function GanttRow({
     ? `#${people.find((person) => person.name === item.assignee?.name)?.color ?? FALLBACK_ASSIGNEE_COLOR}`
     : undefined;
 
-  // Progress text rides on the bar: centered in the filled part when that
-  // part is measurably wide enough to hold it, otherwise immediately after
-  // the fill, in dark text on the gray track. The fit is a real measurement
-  // against the fill's own pixel width — a percentage cutoff would say
-  // nothing about how wide "100%" renders on a two-day bar.
   // Same rule the exporters use (see resolveBarColor): the task's own color
   // when it has one, its status color otherwise — no separate on-screen
   // default. Prefixed here because this one is going into a CSS property.
   const barColor = `#${resolveBarColor(item)}`;
   const progressText = item.progress != null ? `${progress}%` : '';
+  const progressTextWidth = progressText === '' ? 0 : measureTextWidthPx(progressText, PROGRESS_FONT);
   const fillWidth = (barWidth * progress) / 100;
+  // The same three placements the slides use, in the same order and off the
+  // same two shared rules — see the note in timelineExportModel's overview bar
+  // builder. Whether the bar can hold the label at all is asked of the height
+  // it is actually drawn at, never of its depth (progressLabelFitsInBar); a bar
+  // that can't holds it alongside instead, inside the timeline zone
+  // (progressLabelXOutsideBar).
+  const progressFitsInBar = progressLabelFitsInBar(barHeight, PROGRESS_FONT_SIZE_PX);
   const progressInsideFill =
     progressText !== '' &&
-    fillWidth >= measureTextWidthPx(progressText, PROGRESS_FONT) + PROGRESS_PADDING_PX * 2;
+    progressFitsInBar &&
+    fillWidth >= progressTextWidth + PROGRESS_PADDING_PX * 2;
 
   const progressTextStyle: React.CSSProperties = progressInsideFill
     ? {
@@ -258,7 +268,22 @@ export function GanttRow({
         justifyContent: 'center',
         color: readableTextOn(barColor),
       }
-    : { left: fillWidth + PROGRESS_PADDING_PX, color: withHash(COLORS.textOnSurface) };
+    : {
+        // The span is positioned inside the bar element, so an absolute x in
+        // the zone comes back to bar-relative by subtracting the bar's own
+        // left — which is also what lets it sit outside the bar it belongs to
+        // without leaving it.
+        left: progressFitsInBar
+          ? // Past the fill, on the bar's own track — held off the zone's right
+            // edge for the same reason the slides hold it off theirs.
+            Math.min(fillWidth + PROGRESS_PADDING_PX, timelineWidth - progressTextWidth - left)
+          : progressLabelXOutsideBar(left, barWidth, progressTextWidth, {
+              zoneStart: 0,
+              zoneEnd: timelineWidth,
+              padding: PROGRESS_PADDING_PX,
+            }) - left,
+        color: withHash(COLORS.textOnSurface),
+      };
 
   const descendantIds = useMemo(() => getDescendantIds(items, item.id), [items, item.id]);
   const hasSubtasks = descendantIds.length > 0;

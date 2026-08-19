@@ -12,7 +12,14 @@ import { parseMarkdownBlocks, type MarkdownBlock } from '../utils/renderMarkdown
 import { getStatusSegments, type StatusSegment } from '../utils/dashboardMetrics';
 import { clampProgress } from '../utils/clampProgress';
 import { resolveBarColor } from '../utils/barColor';
-import { buildDepthMap, labelIndent, resolveBarGeometry } from '../utils/barNesting';
+import {
+  buildDepthMap,
+  labelIndent,
+  progressLabelFitsInBar,
+  progressLabelXOutsideBar,
+  resolveBarGeometry,
+  type ProgressLabelBounds,
+} from '../utils/barNesting';
 import { readableTextOn } from '../utils/colorContrast';
 import { buildTaskHierarchy, type TaskNode } from '../utils/taskHierarchy';
 import {
@@ -531,20 +538,20 @@ function buildAxisLabels(
   return addLabelLevel(withWeeks, fine.day, 'day', toX, dayText);
 }
 
-/** Parent items that overlap the given export timeframe window (any part of
- * the task's real date span inside the window counts). With no timeframe,
- * every parent item is "in range" — the window is implicitly the full date
- * span of the items themselves. */
+/** The items that overlap the given export timeframe window (any part of the
+ * task's real date span inside the window counts). With no timeframe, every
+ * item is "in range" — the window is implicitly the full date span of the
+ * items themselves. */
 export function getItemsInTimeframe(
-  parentItems: TimelineItem[],
+  candidateItems: TimelineItem[],
   timeframe: ExportTimeframe | null,
 ): TimelineItem[] {
-  if (!timeframe) return parentItems;
+  if (!timeframe) return candidateItems;
 
   const windowStart = new Date(timeframe.start).getTime();
   const windowEnd = new Date(timeframe.end).getTime();
 
-  return parentItems.filter((item) => {
+  return candidateItems.filter((item) => {
     const start = new Date(item.start).getTime();
     const end = new Date(item.end).getTime();
     return start <= windowEnd && end >= windowStart;
@@ -552,7 +559,7 @@ export function getItemsInTimeframe(
 }
 
 export interface OverviewPlan {
-  /** Parent items that overlap the effective date range, before truncation. */
+  /** Candidate items that overlap the effective date range, before truncation. */
   inRange: TimelineItem[];
   /** How many of those actually fit on the single overview slide. */
   capacity: number;
@@ -561,10 +568,14 @@ export interface OverviewPlan {
 }
 
 /** Overview is always a single slide: this decides which of the in-range
- * parent items fit (first `MAX_OVERVIEW_BARS_PER_SLIDE`, in their current
- * sort order) so a caller can warn the user before truncating anything. */
-export function planOverview(parentItems: TimelineItem[], timeframe: ExportTimeframe | null): OverviewPlan {
-  const inRange = getItemsInTimeframe(parentItems, timeframe);
+ * items fit (first `MAX_OVERVIEW_BARS_PER_SLIDE`, in their current sort order)
+ * so a caller can warn the user before truncating anything.
+ *
+ * Fed every exportable task, at every depth — the overview draws subtasks as
+ * bars too, so counting only the roots here would let the pre-flight check tell
+ * the user everything fits and then hand them a truncated slide. */
+export function planOverview(candidateItems: TimelineItem[], timeframe: ExportTimeframe | null): OverviewPlan {
+  const inRange = getItemsInTimeframe(candidateItems, timeframe);
   return {
     inRange,
     capacity: MAX_OVERVIEW_BARS_PER_SLIDE,
@@ -694,6 +705,14 @@ function buildOverviewAxes(
   return windows.map((window) => (window ? { ...window, scale, tierDays: widestDays } : null));
 }
 
+/** The slide's timeline zone, as the band a progress label pushed outside its
+ * bar is held inside — the same two edges the bars themselves are clamped to. */
+const PROGRESS_LABEL_BOUNDS_IN: ProgressLabelBounds = {
+  zoneStart: TIMELINE_X_IN,
+  zoneEnd: TIMELINE_X_IN + TIMELINE_WIDTH_IN,
+  padding: BAR_PROGRESS_PADDING_IN,
+};
+
 /** Lays out one overview slide: a date-scale axis at the top, then one bar
  * per item. If a task's real dates fall outside `dateWindow`, the bar is
  * clipped to the content edge and flagged with a chevron — but its progress
@@ -704,6 +723,7 @@ function buildOverviewSlide(
   title: string,
   omission: OverviewOmission,
   showDependencies: boolean,
+  depthById: ReadonlyMap<string, number>,
 ): OverviewSlideModel {
   const bars: OverviewBarModel[] = [];
   const dateAxisY = CONTENT_TOP_IN;
@@ -715,11 +735,6 @@ function buildOverviewSlide(
   let columnHeaders: OverviewColumnHeaderModel[] = [];
   let headerRuleY: number | null = null;
   let dividerX: number | null = null;
-
-  // Depth per task for the set actually drawn on this slide, resolved once from
-  // the tree. Judged against *these* items, so a task whose parent isn't on the
-  // slide is a root here and is drawn like one.
-  const depthById = buildDepthMap(items);
 
   if (axis && items.length > 0) {
     const { minDate, maxDate, scale, tierDays } = axis;
@@ -805,20 +820,53 @@ function buildOverviewSlide(
       const trackWidth = Math.min(Math.max(windowClippedWidth, MIN_TRACK_WIDTH_IN), maxTrackWidth);
       const fillWidth = progress > 0 ? Math.max((trackWidth * progress) / 100, 0.05) : 0;
       const barColor = resolveBarColor(item);
-      // Nesting is judged against the items actually drawn on this slide:
-      // a task whose parent isn't among them is a root here, and is drawn
-      // full height like one.
+      // Nesting is judged against the items the overview draws *in total*, not
+      // against this page's slice of them (see buildOverviewSlides): a task
+      // whose parent the timeframe or the capacity cut is a root here and is
+      // drawn full height like one, but a task merely separated from its parent
+      // by a page break keeps its level. Which page a bar landed on is a fact
+      // about how much fits on a slide, and nesting must not be readable as
+      // that.
       const depth = depthById.get(item.id) ?? 0;
       const { height: barHeight, offset: barOffsetY } = resolveBarGeometry(BAR_HEIGHT_IN, depth);
 
-      // The progress text goes inside the fill only when the fill measurably
-      // holds it at the size it's actually drawn — not at some percentage of
-      // the bar, which says nothing about how wide "100%" renders on a track
-      // that may itself be a fraction of an inch wide.
+      // Where the progress percentage goes. Vertically, nowhere new: both
+      // exporters center it on the row's own center line, which is every bar's
+      // center line whatever its height (see resolveBarGeometry), so a
+      // shortened bar keeps its percentage on the same line a full-height one
+      // has it on.
+      //
+      // Horizontally there are three placements, in order of preference:
+      //   1. centered in the fill — the bar is tall enough to hold text at all
+      //      *and* the fill measurably holds it at the size it is actually
+      //      drawn. Measured, not a percentage of the bar, which says nothing
+      //      about how wide "100%" renders on a track that may itself be a
+      //      fraction of an inch;
+      //   2. just past the fill, on the pale track — tall enough, fill too
+      //      short;
+      //   3. clear of the bar altogether — the bar itself is too short to hold
+      //      text. This is the case the lower rungs of the height ladder
+      //      create, and the reason that ladder is free to go as low as it now
+      //      does: the percentage no longer has to fit inside every bar, so bar
+      //      height no longer has to be traded against reading it.
       const progressText = `${progress}%`;
       const progressTextWidth = measureTextWidthIn(progressText, BAR_PROGRESS_FONT_SIZE_PT);
-      const progressInsideFill = fillWidth >= progressTextWidth + BAR_PROGRESS_PADDING_IN * 2;
-      const progressX = progressInsideFill ? barX : barX + fillWidth + BAR_PROGRESS_PADDING_IN;
+      // Keyed on the height this bar is actually drawn at, never on its depth —
+      // one shared rule, one call site per surface. See progressLabelFitsInBar.
+      const progressFitsInBar = progressLabelFitsInBar(barHeight, BAR_PROGRESS_FONT_SIZE_PT / 72);
+      const progressInsideFill =
+        progressFitsInBar && fillWidth >= progressTextWidth + BAR_PROGRESS_PADDING_IN * 2;
+      const progressX = progressInsideFill
+        ? barX
+        : progressFitsInBar
+          ? // Past the fill, on the bar's own track — but held off the zone's
+            // right edge all the same: a bar ending there with a short fill
+            // would otherwise put its label past the edge of the timeline.
+            Math.min(
+              barX + fillWidth + BAR_PROGRESS_PADDING_IN,
+              PROGRESS_LABEL_BOUNDS_IN.zoneEnd - progressTextWidth,
+            )
+          : progressLabelXOutsideBar(barX, trackWidth, progressTextWidth, PROGRESS_LABEL_BOUNDS_IN);
       const progressWidth = progressInsideFill ? fillWidth : progressTextWidth;
 
       // The name lives in the Task column: same x on every row, whatever the
@@ -896,8 +944,8 @@ function buildOverviewSlide(
         // Inside the fill, whichever of the two text tokens actually measures
         // more contrast against it (status fills clear 4.5:1 with the light one
         // by construction; a user's own item.color might not, and then the dark
-        // one wins). Outside the fill the label sits on the pale track, where
-        // only the dark token is readable.
+        // one wins). Anywhere else the label is on the pale track or on the
+        // slide itself, and the dark token is the readable one on both.
         progressColor: progressInsideFill
           ? readableTextOn(barColor).replace('#', '')
           : COLORS.textOnSurface,
@@ -985,19 +1033,30 @@ function buildOverviewSlides(
   timeframe: ExportTimeframe | null,
   exportMode: ExportMode,
   showDependencies: boolean,
-  parentItems: TimelineItem[],
+  candidateItems: TimelineItem[],
   sectionedIds: ReadonlySet<string>,
 ): OverviewSlideModel[] {
   const isPaged = exportMode === 'full' && plan.inRange.length > plan.capacity;
   const drawnItems = isPaged ? plan.inRange : plan.included;
 
-  // Judged against every exportable root, not just the in-range ones, so a root
+  // Judged against every exportable task, not just the in-range ones, so a task
   // the timeframe filtered out is counted the same as one that didn't fit.
   const drawnIds = new Set(drawnItems.map((item) => item.id));
   const omission = resolveOmission(
-    parentItems.filter((item) => !drawnIds.has(item.id)),
+    candidateItems.filter((item) => !drawnIds.has(item.id)),
     sectionedIds,
   );
+
+  // One depth answer for the whole overview, resolved from the set the overview
+  // actually draws and then shared by every page of it.
+  //
+  // Judged against `drawnItems` rather than against the plan, so the existing
+  // rule survives: a task whose parent the timeframe excluded, or whose parent
+  // the compact cut dropped, has no parent on the overview and is drawn as a
+  // root. Judged *once* rather than per page, so the other way a parent can go
+  // missing — the page break between them — does not also reset a subtask to
+  // full height, which would make nesting read as pagination.
+  const depthById = buildDepthMap(drawnItems);
 
   // Paged first, so each page's own tasks are known before its window is: the
   // window is a fact about the page, and the shared density a fact about the
@@ -1014,7 +1073,9 @@ function buildOverviewSlides(
   const axes = buildOverviewAxes(pages, timeframe);
 
   if (!isPaged) {
-    return [buildOverviewSlide(drawnItems, axes[0], 'Timeline Overview', omission, showDependencies)];
+    return [
+      buildOverviewSlide(drawnItems, axes[0], 'Timeline Overview', omission, showDependencies, depthById),
+    ];
   }
 
   return pages.map((pageItems, index) =>
@@ -1027,6 +1088,7 @@ function buildOverviewSlides(
       // summable across the deck.
       index === pages.length - 1 ? omission : NO_OMISSION,
       showDependencies,
+      depthById,
     ),
   );
 }
@@ -1688,15 +1750,17 @@ export function getCommentsForSlide(
   return taskComments;
 }
 
-/** The top-level (parent) items that would appear on the overview slide for
- * a given item set — same hierarchy rules used by the export settings list
- * and the overview/detail slide builders, so all three always agree on
- * "what counts as a top-level task". Exported so a caller (e.g. the export
- * button) can run `planOverview` itself before generating the file. */
-export function getExportParentItems(items: TimelineItem[]): TimelineItem[] {
-  const exportableItems = items.filter((item) => item.includeInExport !== false);
-  const { roots } = buildTaskHierarchy(exportableItems);
-  return roots.map((node) => node.item);
+/** The items that would appear on the overview slide for a given item set —
+ * every exportable task at every depth, in the order given, which is exactly
+ * what `buildExportSlides` hands `planOverview`. Exported so a caller (e.g. the
+ * export button) can run `planOverview` itself before generating the file and
+ * get the same answer the export will.
+ *
+ * One function rather than each caller filtering for itself: the pre-flight
+ * check's whole job is to predict the file, and it can only do that while its
+ * candidate set is the file's. */
+export function getExportOverviewItems(items: TimelineItem[]): TimelineItem[] {
+  return items.filter((item) => item.includeInExport !== false);
 }
 
 /** Filters/groups items exactly like the on-screen Gantt chart and builds a
@@ -1712,8 +1776,13 @@ export function buildExportSlides(
 ): ExportSlideModel[] {
   const exportableItems = items.filter((item) => item.includeInExport !== false);
   const { roots } = buildTaskHierarchy(exportableItems);
-  const parentItems = roots.map((node) => node.item);
-  const overviewPlan = planOverview(parentItems, exportTimeframe);
+  // Every exportable task is an overview candidate, at every depth — not just
+  // the roots. A subtask reaching the deck only as a text row in the appendix
+  // could be read but not *seen*: the one thing a Gantt slide is for, where a
+  // task sits against the others in time, was exactly what the levels carrying
+  // most of a plan's detail never got. They are drawn as bars now, shorter by
+  // depth (BAR_HEIGHT_RATIO_BY_DEPTH) so a level is legible as a level.
+  const overviewPlan = planOverview(exportableItems, exportTimeframe);
 
   // One depth answer for the whole export, from the same helper the on-screen
   // chart uses, handed down to the sections that indent by it.
@@ -1739,9 +1808,17 @@ export function buildExportSlides(
     });
   });
 
-  // Which roots have an appendix section is what tells a root the overview left
-  // off ("also in the appendix") from one that reaches no slide at all.
-  const sectionedIds = new Set(detailCandidates.map((candidate) => candidate.parent.id));
+  // Which tasks the appendix carries is what tells a task the overview left off
+  // ("also in the appendix") from one that reaches no slide at all. Every row a
+  // section prints, not just the section's own title task: a subtask is now an
+  // overview candidate in its own right, so when one is left off the overview
+  // the footer has to know that its parent's section still lists it.
+  const sectionedIds = new Set(
+    detailCandidates.flatMap((candidate) => [
+      candidate.parent.id,
+      ...candidate.descendants.map((descendant) => descendant.item.id),
+    ]),
+  );
 
   const slides: ExportSlideModel[] = [
     ...buildOverviewSlides(
@@ -1749,7 +1826,7 @@ export function buildExportSlides(
       exportTimeframe,
       exportMode,
       showDependencies,
-      parentItems,
+      exportableItems,
       sectionedIds,
     ),
     ...buildDetailSlides(detailCandidates, people),

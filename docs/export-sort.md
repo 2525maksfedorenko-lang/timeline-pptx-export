@@ -28,14 +28,23 @@ above its own parent, and a child never lands between another parent's children.
 Sorting the flat list — which is what `sortItems`' own `'status'` mode still does
 for the screen — would scatter subtasks away from their parents.
 
-**Where this is actually visible.** The Overview slide draws *roots only*
-(`getExportParentItems`), so the hierarchy rules change nothing there; what they
-change is the appendix, because `buildTaskHierarchy` preserves the input's
-relative order at each level. Concretely:
+**Where this is actually visible.** Both slides, and for the same reason.
+`buildTaskHierarchy` preserves the input's relative order at each level, and
+since the Overview began drawing every task rather than only the roots
+(`getExportOverviewItems`, see docs/export-coverage.md A2) the depth-first
+flattening is what puts a subtask's bar directly under its parent's instead of
+somewhere else on the slide. Concretely:
 
-- Overview: root order follows `STATUS_SORT_ORDER`.
+- Overview: root order follows `STATUS_SORT_ORDER`, and each root is
+  immediately followed by its own subtree's bars in the sorted child order.
 - Subtasks & Comments: parent sections follow the same root order, and each
   parent's subtask rows follow the sorted child order.
+
+This is also why the flat sort modes matter more than they used to: `'date'` and
+`'progress'` (`sortItems`) order the list without regard to the tree, so a
+subtask's bar can land far from its parent's on the Overview — exactly as its
+row already does on screen, which is the point of the two surfaces sharing one
+sort.
 
 ## A `done` parent with an open child
 

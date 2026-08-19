@@ -19,7 +19,7 @@ stop it appearing in the PPTX/PDF — and does the file say so when it happens?*
 | 1 | Pre-flight capacity check (to offer Compact/Full) | `src/App.tsx:71` |
 | 2 | Sort, hierarchically | `src/utils/sortItemsForExport.ts:66` |
 | 3 | `includeInExport` filter | `src/export/timelineExportModel.ts:1276` |
-| 4 | Tree build → **roots only** become overview bars | `timelineExportModel.ts:1277` |
+| 4 | Tree build (roots drive the appendix; **every** task becomes an overview bar) | `timelineExportModel.ts:1277` |
 | 5 | Timeframe filter + capacity slice | `timelineExportModel.ts:448` |
 | 6 | Overview slide(s): compact (1) or full (N) | `timelineExportModel.ts:695` |
 | 7 | Detail candidates — **one root, its direct children** | `timelineExportModel.ts:1281` |
@@ -57,17 +57,41 @@ every descendant at any depth. Depth is drawn as indent through
 the same *step per level* the on-screen label column uses, so three levels read
 as three levels instead of one flat list.
 
-### A2. Only roots get overview bars  ✅ by design
+### A2. Only roots got overview bars  ✅ closed
 
-`timelineExportModel.ts:1277-1278` (and `getExportParentItems`, used for the
-pre-flight check) reduce the tree to `roots`. The Overview is a top-level
-report; the tree belongs in the appendix. Already documented in
-`docs/export-sort.md`.
+**Was:** `timelineExportModel.ts` (and `getExportParentItems`, used for the
+pre-flight check) reduced the tree to `roots` before planning the overview. The
+Overview was a top-level report; the tree belonged in the appendix.
 
-Worth noting for anyone reading `buildOverviewSlide`: it computes
-`buildDepthMap(items)` and a per-depth bar height/label indent
-(`resolveBarGeometry`, `labelIndent`), but because it is only ever fed roots,
-every bar resolves to depth 0. That machinery is live on screen, inert here.
+The cost was not task loss — every subtask still reached the appendix as a text
+row, so the invariant below always held — but it was the one thing a Gantt slide
+is for. A subtask's dates, its overlap with its siblings, where it sits against
+the plan's other work: none of that was visible anywhere in the file, for the
+levels that carry most of a plan's detail. On a deep plan the deck showed 23 bars
+for 100 tasks.
+
+Worth noting at the time: `buildOverviewSlide` already computed a per-depth bar
+height and label indent (`resolveBarGeometry`, `labelIndent`), but because it was
+only ever fed roots every bar resolved to depth 0 — that machinery was live on
+screen and inert here, which is why the height ladder could be tuned without
+anything in the file changing.
+
+**Closed.** `planOverview` is fed every exportable task at every depth, and a bar
+is drawn shorter by its depth (`BAR_HEIGHT_RATIO_BY_DEPTH`, 1 / 0.7 / 0.55)
+while its row keeps the same pitch. Three consequences worth knowing:
+
+- **Depth is judged once for the whole overview**, not per page
+  (`buildOverviewSlides`). A task whose parent the timeframe or the compact cut
+  removed has no parent on the overview and is drawn as a root — the existing
+  rule — but a task merely separated from its parent by a page break keeps its
+  level, or nesting would read as pagination.
+- **The pre-flight check counts every task**, not the roots (`App.tsx`,
+  `getExportOverviewItems`). Counting roots alone would promise the user that
+  everything fits and then hand them a truncated slide.
+- **A shortened bar hands its progress percentage out to the side** rather than
+  holding it at an unreadable size (`progressLabelFitsInBar`). The switch is a
+  measurement against the label's own text height, not a depth, and it is one
+  function shared with the screen.
 
 ### A3. A comment on a non-root task is never rendered  ❌ silent
 
@@ -90,11 +114,15 @@ deliberately.
 - Full mode: paged across `ceil(N/12)` overview slides, `omittedCount` 0.
 
 The user chooses between the two in `ExportOverflowModal`, but only when the
-pre-flight check trips — and that check counts **roots only** (`App.tsx:71`),
-which is correct today and stays correct only as long as A2 holds.
+pre-flight check trips — and since A2 closed, that check counts **every
+exportable task** (`App.tsx`, `getExportOverviewItems`), which is what the
+overview itself now draws. A deep plan therefore reaches the modal far more
+often than it used to: 100 tasks against a 12-bar slide, where before it was 23
+roots.
 
-A root cut here still gets its appendix section (stage 7 does not consult the
-plan), so the *task* survives even in compact mode. The exception is B2.
+A task cut here still reaches the appendix (stage 7 does not consult the plan) —
+a root as its own section, a subtask as a row in its root's — so the *task*
+survives even in compact mode. The exception is B2.
 
 ### B2. A childless root outside the timeframe  ❌ silent
 
@@ -227,7 +255,7 @@ tables alike: their rows are measured against equal columns, which is what
 pptxgenjs draws, while `jspdf-autotable` sizes columns by content and so ends its
 table higher up the slide than the model reserved. Over-estimating cuts a row or
 two more than the PDF strictly needs — the safe direction, and the same bias as
-everywhere else here. The overview remains roots-only (A2).
+everywhere else here.
 
 ## The invariant, enforced
 
@@ -241,6 +269,11 @@ comment mode, with and without a timeframe — and fails when:
 - a subtask row's parent is neither its section's title nor a row above it on the
   same slide (a level torn across a slide break);
 - a row's drawn depth or indent disagrees with `buildDepthMap` / `subtaskRowIndent`;
+- an overview bar's height is no rung of `BAR_HEIGHT_RATIO_BY_DEPTH`, or the bar
+  is not centered on its row's center line (which is where the dependency
+  connectors aim), or its progress label lands outside the timeline zone;
+- the screen and the slides disagree about which rungs hold their progress label
+  inside the bar (`checkBarHeightParity`);
 - a continuation is unlabelled, or a first section claims to be one;
 - content is laid out past `CONTENT_BOTTOM_IN` — including a dashboard table,
   re-measured from the rows it actually drew rather than taken from the model;

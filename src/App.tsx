@@ -9,7 +9,7 @@ import { PlanNotice } from './components/PlanNotice'
 import { PlanSwitcher } from './components/PlanSwitcher'
 import { exportTimelineToPptx } from './export/pptxExporter'
 import { exportTimelineToPdf } from './export/pdfExporter'
-import { getExportParentItems, planOverview, type ExportMode } from './export/timelineExportModel'
+import { getExportOverviewItems, planOverview, type ExportMode } from './export/timelineExportModel'
 import { buildExportFilename } from './export/dateScale'
 import { sortItemsForExport } from './utils/sortItemsForExport'
 import { useTimelineStore } from './store/timelineStore'
@@ -65,13 +65,16 @@ function App() {
     void exportTimeline(items, exportOptions, comments, people, fileName, exportMode)
   }
 
-  // More top-level tasks in the effective date range than fit on one overview
-  // slide is a real choice (truncate to one slide vs. page across several),
-  // so it goes to the user rather than being decided here. Everything fitting
-  // exports straight away — the two modes would produce the same file.
+  // More tasks in the effective date range than fit on one overview slide is a
+  // real choice (truncate to one slide vs. page across several), so it goes to
+  // the user rather than being decided here. Everything fitting exports
+  // straight away — the two modes would produce the same file.
+  //
+  // Counted over every exportable task, not just the roots: the overview draws
+  // subtasks as bars too, so the roots alone would under-count what has to fit.
   const handleExport = (format: ExportFormat) => {
-    const parentItems = getExportParentItems(sortItemsForExport(items, exportOptions.sortMode))
-    const plan = planOverview(parentItems, exportOptions.exportTimeframe)
+    const overviewItems = getExportOverviewItems(sortItemsForExport(items, exportOptions.sortMode))
+    const plan = planOverview(overviewItems, exportOptions.exportTimeframe)
 
     if (plan.inRange.length <= plan.capacity) {
       runExport(format, 'compact')

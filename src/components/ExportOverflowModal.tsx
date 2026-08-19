@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import type { ExportMode } from '../export/timelineExportModel';
 
 interface ExportOverflowModalProps {
-  /** In-range top-level tasks — more than `capacity`, or this modal
+  /** In-range tasks, at every depth — more than `capacity`, or this modal
    * shouldn't be shown at all. */
   totalTasks: number;
   /** How many of them fit on a single overview slide. */
@@ -32,8 +32,8 @@ function ModeOption({
   );
 }
 
-/** Asked before an export whose top-level tasks outnumber one overview
- * slide's capacity: keep the single slide and note the rest as omitted, or
+/** Asked before an export whose tasks outnumber one overview slide's
+ * capacity: keep the single slide and note the rest as omitted, or
  * page them across several overview slides. */
 export function ExportOverflowModal({ totalTasks, capacity, onSelect, onCancel }: ExportOverflowModalProps) {
   useEffect(() => {
