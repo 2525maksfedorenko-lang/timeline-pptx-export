@@ -1,5 +1,5 @@
 import type { TimelineItem } from '../types/timeline';
-import { normalizeItemStatuses } from '../utils/normalizeStatus';
+import { normalizePlanItems } from '../utils/normalizePlanItems';
 
 const REQUIRED_STRING_FIELDS: (keyof TimelineItem)[] = ['id', 'label', 'start', 'end'];
 
@@ -47,10 +47,12 @@ export function validateTimelineItem(raw: unknown, location: string): TimelineIt
     throw new Error(`${location} has an invalid "includeInExport" field (expected a boolean).`);
   }
 
-  // `status` is deliberately not checked here. It is the one field a person
-  // writes in their own words ("In Progress", "done"), so it is normalized
-  // rather than judged — see normalizeItemStatuses, which every importer and
-  // both persistence layers run it through.
+  // `status` is deliberately not checked here, and neither is what `parentId`
+  // points at. One is a field a person writes in their own words ("In
+  // Progress", "done") and the other is a shape only the whole list can show
+  // (a parent loop), so both are repaired rather than judged — see
+  // normalizePlanItems, the pass every importer and both persistence layers
+  // run their tasks through.
 
   if (
     record.dependencies !== undefined &&
@@ -64,15 +66,17 @@ export function validateTimelineItem(raw: unknown, location: string): TimelineIt
 
 export interface ImportedTasks {
   items: TimelineItem[];
-  /** Statuses that had to be dropped to canonicalize the list — see
-   * normalizeItemStatuses. Not errors: every task is in `items`. */
+  /** What had to be repaired to make a plan of the list — an unknown status,
+   * a circular parent link (see normalizePlanItems). Not errors: every task
+   * is in `items`. */
   warnings: string[];
 }
 
 /** Parses and validates a JSON string as an array of TimelineItem, throwing a
  * descriptive error on the first invalid entry rather than importing partial
- * data — and normalizing every status on the way out, so a hand-written file
- * saying "In Progress" lands as the value the app actually draws from. */
+ * data — then running the list through the shared normalization pass, so a
+ * hand-written file saying "In Progress", or describing two tasks as each
+ * other's parent, lands as something the app can actually draw. */
 export function parseImportedTasks(json: string): ImportedTasks {
   let parsed: unknown;
   try {
@@ -91,5 +95,5 @@ export function parseImportedTasks(json: string): ImportedTasks {
 
   const items = parsed.map((item, index) => validateTimelineItem(item, `Task at index ${index}`));
 
-  return normalizeItemStatuses(items, (_item, index) => `Task at index ${index}`);
+  return normalizePlanItems(items, (_item, index) => `Task at index ${index}`);
 }

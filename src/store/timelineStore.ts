@@ -6,7 +6,7 @@ import type {
   TaskComment,
   TimelineItem,
 } from '../types/timeline';
-import { normalizeItemStatuses } from '../utils/normalizeStatus';
+import { normalizePlanItems } from '../utils/normalizePlanItems';
 import { getDescendantIds } from '../utils/taskHierarchy';
 import { DEV_SEED_COMMENTS, DEV_SEED_ITEMS, DEV_SEED_TITLE } from './devSeed';
 import {
@@ -52,7 +52,7 @@ interface TimelineStore {
   setEditingItem: (id: string | null) => void;
 
   // What loading a plan had to repair in it, keyed by plan id — see
-  // normalizeItemStatuses and PlanNotice. Deliberately absent from
+  // normalizePlanItems and PlanNotice. Deliberately absent from
   // `partialize`: it describes one load of one plan, so it must not outlive
   // the session that found it.
   planNotices: Record<string, string[]>;
@@ -394,7 +394,7 @@ export const useTimelineStore = create<TimelineStore>()(
         const persisted = (persistedState ?? {}) as Partial<TimelineStore>;
         if (!persisted.items) return { ...currentState, ...persisted };
 
-        const { items, warnings } = normalizeItemStatuses(persisted.items);
+        const { items, warnings } = normalizePlanItems(persisted.items);
         const key = persisted.activePlanId ?? UNNAMED_PLAN_KEY;
 
         return {
