@@ -164,33 +164,54 @@ export function GanttChart() {
   // collapse every level below the first into one.
   const depthById = useMemo(() => buildDepthMap(items), [items]);
 
-  const { minDate, days } = useMemo(() => {
+  // What the plan itself covers: where day 0 sits, and how many days from
+  // there to its last task. This is the *data's* extent, deliberately kept
+  // apart from how much of the chart is drawn (below) — conflating the two
+  // is what let the frame wander with the plan's length.
+  const { minDate, planDays } = useMemo(() => {
     const { minDate: min, totalDays } = getDateRange(items);
-    const dayList = Array.from(
-      { length: totalDays },
-      (_, index) => new Date(min.getTime() + index * MS_PER_DAY),
-    );
-
-    return { minDate: min, days: dayList };
+    return { minDate: min, planDays: totalDays };
   }, [items]);
 
-  // The date-scaled timeline is whatever's left of each row after the three
-  // fixed columns — matches GanttRow's own column math exactly so bars line
-  // up under the day headers below. It ends the row now that the actions
-  // column has moved off the right edge, so a row is exactly as wide as the
-  // date range at this zoom, with nothing after it.
-  const timelineWidth = days.length * pxPerDay;
+  // The card's own width, remeasured on every resize (see useElementWidth),
+  // and what is left of it for the timeline once the three fixed columns
+  // have taken theirs. Everything below is derived from this rather than
+  // from the plan, which is what pins the chart's right edge to the window:
+  // it is the *viewport* that decides how wide the timeline zone is, at any
+  // zoom and any plan length.
+  const viewportWidth = useElementWidth(scrollRef);
+  const availableWidth = Math.max(0, viewportWidth - timelineStartX);
+
+  // The zone always fills what's left, and grows past it only when the plan
+  // needs more room than that — which is the whole of the zoom behaviour:
+  // pxPerDay rises, the plan's own width outgrows the zone, and the surplus
+  // goes behind the horizontal scroll while the frame stays put. It never
+  // *shrinks* below the available width, so no strip of empty card can open
+  // up to its right.
+  const timelineWidth = Math.max(availableWidth, planDays * pxPerDay);
   const rowWidth = timelineStartX + timelineWidth;
 
-  // How much time the chart shows at once: the scroll viewport's own width
-  // divided by the current pixels-per-day. This is what makes the zoom
-  // control drive the grid — zooming out fits more days on screen, and past
-  // 90 of them the daily lines stop being a grid and become a smear (see
+  // How many day columns to draw. At least the plan's own days — the scroll
+  // has to reach the last task, not an arbitrary date — and at least enough
+  // to cover the zone, so a plan shorter than the window is padded with real
+  // calendar days rather than leaving the grid to stop in mid-air. The last
+  // column can overhang the zone's edge by up to a day; the strip clips it
+  // (see overflow-hidden on the day header), which is what keeps that
+  // rounding from adding a scrollbar to a plan that fits.
+  const renderedDays = Math.max(planDays, Math.ceil(availableWidth / pxPerDay));
+  const days = useMemo(
+    () => Array.from({ length: renderedDays }, (_, index) => new Date(minDate.getTime() + index * MS_PER_DAY)),
+    [minDate, renderedDays],
+  );
+
+  // How much time the chart shows at once: the zone's own width divided by
+  // the current pixels-per-day. This is what makes the zoom control drive the
+  // grid — zooming out fits more days on screen, and past 90 of them the
+  // daily lines stop being a grid and become a smear (see
   // getVisibleGridLevels). Before the first measurement lands, fall back to
   // the whole plan, which errs toward the coarser grid rather than painting
   // one dense frame.
-  const viewportWidth = useElementWidth(scrollRef);
-  const visibleDays = viewportWidth > 0 ? (viewportWidth - timelineStartX) / pxPerDay : days.length;
+  const visibleDays = availableWidth > 0 ? availableWidth / pxPerDay : planDays;
 
   // Day captions in the header thin out as the columns narrow, for the same
   // reason the grid does: "Aug" needs about 22px, so below that only every
@@ -205,18 +226,14 @@ export function GanttChart() {
   const showDayCellBorders = visibleDays <= MAX_VISIBLE_DAYS_FOR_DAY_LINES;
 
   return (
-    // Hugs the chart instead of the page: the card used to be `w-full` while
-    // the track inside it is exactly the fixed columns plus days x pxPerDay,
-    // so on any plan too short to fill the page the surplus showed up as a
-    // white strip to the right of the last column — sticky `right-0` cannot
-    // reach the card's edge, since a sticky box is clamped to its containing
-    // block (the row), not to the scrollport. Sizing to content removes the
-    // strip at its source rather than papering over it, and keeps the zoom
-    // control honest: the card's width *is* the date range at this zoom.
-    // Wrapping the controls too keeps them aligned to the card's right edge
-    // rather than to the page's. max-w-full so a plan wider than the page
-    // still stops at the page and scrolls, as before.
-    <div className="w-fit max-w-full">
+    // Full width, always: the frame belongs to the window, not to the plan.
+    // Sizing this to content (which is what an earlier pass did, to kill the
+    // empty strip on a short plan) means the card's right edge moves as the
+    // plan or the zoom changes, and stops moving only once the page clamps
+    // it — two rules fighting over one edge. The strip is dealt with where it
+    // comes from instead: the timeline zone fills the width and the grid is
+    // drawn across all of it (see renderedDays).
+    <div>
       {/* Title and controls sit on one line until there isn't room for one:
           on a phone the controls take their own full-width row underneath,
           which is also what gives the zoom buttons and the add-task form
@@ -253,7 +270,11 @@ export function GanttChart() {
             >
               {!isMobile && 'Actions'}
             </div>
-            <div className="flex flex-shrink-0" style={{ width: timelineWidth }}>
+            {/* overflow-hidden because the day columns are a whole number of
+                pxPerDay and the zone is not: the last one may overhang, and
+                clipping it there is what keeps the rounding from showing up
+                as a scrollbar on a plan that otherwise fits. */}
+            <div className="flex flex-shrink-0 overflow-hidden" style={{ width: timelineWidth }}>
               {days.map((day, index) => (
                 <div
                   key={day.toISOString()}
