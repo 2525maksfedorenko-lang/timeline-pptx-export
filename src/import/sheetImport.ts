@@ -124,10 +124,10 @@ function toIsoDate(value: unknown): string | null {
 }
 
 /** Which rule a Progress cell was read under. Carried out of readProgress
- * rather than kept private, because two of the four are worth telling the
+ * rather than kept private, because three of the five are worth telling the
  * person about: they are the ones where the file did not say enough and this
  * importer had to apply a rule of its own. */
-type ProgressRule = 'percent-format' | 'number-format' | 'per-cent-sign' | 'no-format';
+type ProgressRule = 'percent-format' | 'number-format' | 'general-format' | 'per-cent-sign' | 'no-format';
 
 interface ProgressReading {
   /** The figure as a percentage, or null when the cell says nothing usable. */
@@ -153,6 +153,14 @@ function isPercentFormat(format: string | undefined): boolean {
   return format.replace(/"[^"]*"/g, '').replace(/\\./g, '').includes('%');
 }
 
+/** True when a number format says nothing about the number under it. General is
+ * what a cell wears when nobody formatted it, so unlike `0.00` or `0%` it is not
+ * the file stating anything — which is why the two are told apart (see the
+ * summary lines in parseSheet). */
+function isGeneralFormat(format: string | undefined): boolean {
+  return format?.trim().toLowerCase() === 'general';
+}
+
 /** A Progress cell as a percentage, read from what the cell actually says.
  *
  * The size of the number decides nothing. A spreadsheet that formats a cell as
@@ -163,6 +171,7 @@ function isPercentFormat(format: string | undefined): boolean {
  * rather than inferring (see the summary lines in parseSheet).
  *
  *   .xlsx, percent format      0.45 -> 45%,  1 -> 100%,  0.01 -> 1%
+ *   .xlsx, General               45 -> 45%,  0.45 -> 0.45%  — reported, not guessed
  *   .xlsx, any other format      45 -> 45%,  1 -> 1%,     100 -> 100%
  *   .xlsx, no format readable    45 -> 45%,  1 -> 1%   — reported, not guessed
  *   .csv, typed with a sign   "45%" -> 45%, "0.5%" -> 0.5%
@@ -173,12 +182,15 @@ function readProgress(value: unknown, cell: CellFacts, source: SheetSource): Pro
   if (typeof value === 'number' && Number.isFinite(value)) {
     if (source === 'xlsx') {
       if (cell.format === undefined) return { percent: value, rule: 'no-format' };
-      return isPercentFormat(cell.format)
-        ? // Multiplied then rounded: 0.07 * 100 is 7.000000000000001 in binary
-          // floating point, and a progress figure of 7.000000000000001% would
-          // travel into the plan and out into every export.
-          { percent: Math.round(value * 1000) / 10, rule: 'percent-format' }
-        : { percent: value, rule: 'number-format' };
+      if (isPercentFormat(cell.format)) {
+        // Multiplied then rounded: 0.07 * 100 is 7.000000000000001 in binary
+        // floating point, and a progress figure of 7.000000000000001% would
+        // travel into the plan and out into every export.
+        return { percent: Math.round(value * 1000) / 10, rule: 'percent-format' };
+      }
+      // Read the same either way — the format decides nothing here, and that is
+      // the point of telling General apart from a format that does say something.
+      return { percent: value, rule: isGeneralFormat(cell.format) ? 'general-format' : 'number-format' };
     }
 
     // A CSV cell that was typed with a per cent sign reaches here as a number —
@@ -321,10 +333,12 @@ export function parseSheet(
   // line in the import dialog (see unknownStatusWarnings).
   const unknownStatuses: UnknownStatus[] = [];
   // Progress figures this importer could not use, and the ones it could only
-  // read by applying a rule the file didn't state. Both are collected rather
-  // than reported row by row, for the same reason statuses are.
+  // read by applying a rule the file didn't state — split by what the file
+  // failed to say, since that is what each line has to explain. All three are
+  // collected rather than reported row by row, for the same reason statuses are.
   const droppedProgress: LocatedValue[] = [];
   const assumedProgress: LocatedValue[] = [];
+  const unstatedProgress: LocatedValue[] = [];
   // Parent lookups: existing tasks first, then whatever this file has
   // already produced. First registration wins, so which task a Parent names
   // doesn't depend on how far down the file the row sits.
@@ -414,9 +428,20 @@ export function parseSheet(
           // where a person might have meant a fraction, which is exactly the
           // range the old size-based guess used to claim. `45` needs no note;
           // `0.45` does.
+          //
+          // General is the same silence in .xlsx clothing: the cell carries a
+          // format, but the one a cell wears when nobody formatted it, so it
+          // states no more about 0.45 than a CSV does — hence the same (0, 1]
+          // range. A format that does state something (`0.00`, `0%`) is the
+          // file speaking, and is taken at its word without a note.
           const ambiguous = typeof rawProgress === 'number' && rawProgress > 0 && rawProgress <= 1;
-          if (reading.rule === 'no-format' && typeof rawProgress === 'number' && (source === 'xlsx' || ambiguous)) {
-            assumedProgress.push({ location: `Row ${rowNumber}`, value: `${value} -> ${reading.percent}%` });
+          const read = { location: `Row ${rowNumber}`, value: `${value} -> ${reading.percent}%` };
+          if (typeof rawProgress === 'number') {
+            if (reading.rule === 'no-format' && (source === 'xlsx' || ambiguous)) {
+              assumedProgress.push(read);
+            } else if (reading.rule === 'general-format' && ambiguous) {
+              unstatedProgress.push(read);
+            }
           }
         }
       }
@@ -477,6 +502,15 @@ export function parseSheet(
       droppedProgress,
       (value, where) =>
         `"${value}" is not a progress figure from 0 to 100 (${where}) — imported without one.`,
+    ),
+  );
+  warnings.push(
+    ...groupedWarnings(
+      unstatedProgress,
+      (value, where) =>
+        `Progress ${value}, read as a plain percentage (${where}) — that cell's format is General, so the ` +
+        `file didn't say whether it holds a fraction or the figure itself. Format the column as a ` +
+        `percentage if it holds fractions, or write "45%".`,
     ),
   );
   warnings.push(
