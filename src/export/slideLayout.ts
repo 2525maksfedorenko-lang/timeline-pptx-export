@@ -21,7 +21,27 @@ import { estimateWrappedLines, measureLetterSpacingWidthIn, measureTextWidthIn }
 export const PAGE_WIDTH_IN = 10;
 export const PAGE_HEIGHT_IN = 5.625;
 
-export const HEADER_HEIGHT_IN = PAGE_HEIGHT_IN * 0.15;
+// The slide title, and the band it sits in. The band's height used to be a
+// bare proportion of the page with no relation to the type inside it, and the
+// 24pt was written out again in each exporter — so nothing connected the two,
+// and a title that outgrew its band had nowhere to go but over the edge. Both
+// exporters centre the title in this band, so half of any overflow lands above
+// the top of the slide, which is exactly what "the top half of the letters is
+// missing" looks like.
+//
+// So the band is derived from the title instead: one line of it at a
+// line-height a renderer can be trusted to stay inside (1.2 covers Arial's
+// ~1.15 with room to spare), plus clear space above and below so the letters
+// never touch the band's edges. The proportion stays as a floor, and at 24pt
+// it is the one that wins — 0.84in against the 0.52in the type needs — so this
+// changes no geometry today. What it changes is what happens if someone raises
+// the title's size: the band grows with it instead of clipping it.
+export const TITLE_FONT_SIZE_PT = 24;
+const TITLE_LINE_HEIGHT_RATIO = 1.2;
+const TITLE_BAND_PADDING_IN = 0.06;
+const TITLE_BAND_MIN_HEIGHT_IN =
+  (TITLE_FONT_SIZE_PT * TITLE_LINE_HEIGHT_RATIO) / 72 + TITLE_BAND_PADDING_IN * 2;
+export const HEADER_HEIGHT_IN = Math.max(PAGE_HEIGHT_IN * 0.15, TITLE_BAND_MIN_HEIGHT_IN);
 export const FOOTER_HEIGHT_IN = PAGE_HEIGHT_IN * 0.04;
 
 export const MARGIN_X_IN = 0.5;

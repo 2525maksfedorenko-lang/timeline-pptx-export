@@ -18,6 +18,23 @@ const HEX_COLOR = /^#?[0-9a-fA-F]{6}$/;
  * color — the same value its status dot already uses, rather than a separate
  * default blue that meant nothing.
  *
+ * That the explicit color wins is deliberate, and it has a cost worth stating
+ * plainly: on a plan where only some tasks carry one, bar color stops being a
+ * status reading. Three tasks can all be "done" with two bars green and the
+ * third amber, which looks like a distinction that isn't there. The trade is
+ * accepted because a task's color is a choice someone made — dropping it in
+ * the export would make the deck disagree with the screen, which is the one
+ * thing this module exists to prevent — and because status is not carried by
+ * the bar alone: every row states it twice more, as the word in the Status
+ * column and as that chip's own color (see OverviewBarModel's statusText /
+ * statusChipBg, and the status dot in GanttRow). A colored bar therefore
+ * carries the task's own meaning (the seed uses the brand's kind colors —
+ * blue task, purple project, amber phase) while its status stays legible
+ * beside it.
+ *
+ * If status should ever win instead, this is the only place to change: return
+ * the status color unconditionally and every surface follows.
+ *
  * Pure: no React, no DOM, no store. That's what lets src/export/ — which
  * must stay independent of the components — share it.
  */
