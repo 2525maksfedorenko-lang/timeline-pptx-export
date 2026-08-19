@@ -175,6 +175,21 @@ function main() {
       ['links checked', `${links.detailSlideNumberByTaskId.size} bar links + back-to-overview`],
     ]);
 
+    if (report.grid.length > 0) {
+      console.log('');
+      printTable([
+        ['overview', 'window', 'levels', 'calendar marks', 'positions', 'strokes drawn'],
+        ...report.grid.map((g) => [
+          `${g.slideNumber}`,
+          g.window,
+          g.levels,
+          `${g.calendarMarks}`,
+          `${g.distinctPositions}`,
+          `${g.strokes}`,
+        ]),
+      ]);
+    }
+
     if (scenario.perSlide || allSlides) {
       console.log('');
       printTable([

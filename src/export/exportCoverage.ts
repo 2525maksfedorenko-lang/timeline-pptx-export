@@ -1,4 +1,5 @@
 import type { TimelineItem } from '../types/timeline';
+import { buildDateGrid, DATE_GRID_LEVELS, DATE_GRID_MIN_GAP_PT } from './dateGrid';
 import { buildDepthMap } from '../utils/barNesting';
 import type { OrderedSlideModel } from './slideOrder';
 import type { SlideLinks } from './slideLinks';
@@ -40,6 +41,25 @@ export interface SlideCoverage {
   taskIds: string[];
 }
 
+/** What one overview slide's date grid holds, and what the calendar says it
+ * should. Reported per slide so the two numbers can be read side by side
+ * rather than taken on trust. */
+export interface GridCoverage {
+  slideNumber: number;
+  window: string;
+  /** Marks the calendar produces for this window at the levels it draws —
+   * counting a day that qualifies for two levels twice, which is exactly what
+   * used to be drawn. */
+  calendarMarks: number;
+  /** Distinct positions among them: one per calendar day, however many levels
+   * claim it. */
+  distinctPositions: number;
+  /** Strokes actually drawn. Equals distinctPositions minus the ones a
+   * stronger neighbour absorbed within the minimum gap. */
+  strokes: number;
+  levels: string;
+}
+
 export interface CoverageReport {
   /** Tasks with `includeInExport !== false`. */
   planTaskCount: number;
@@ -58,6 +78,7 @@ export interface CoverageReport {
    * `announcedAbsent`, since the rest are in the appendix. */
   announcedOffOverview: number;
   slides: SlideCoverage[];
+  grid: GridCoverage[];
   /** Every broken invariant, one line each. Empty means the deck is sound. */
   failures: string[];
 }
@@ -66,6 +87,84 @@ const CONTINUED_SUFFIX = '(continued)';
 /** Slack for comparing inch coordinates that were reached by summing many
  * fractional row heights — a hair over a boundary is float noise, not overflow. */
 const EPSILON_IN = 0.001;
+
+/** Checks one slide's grid against the calendar its window implies.
+ *
+ * The point is not that the two counts match — they must *not*, since a
+ * position claimed by several levels draws once (see resolveGridStrokes). What
+ * has to hold is that the collapse only ever removed: every stroke is a real
+ * date at its own level, no two strokes sit close enough to read as one, and
+ * nothing was invented. */
+function auditGrid(
+  windowStart: string,
+  windowEnd: string,
+  tierDays: number,
+  lines: readonly { level: string; x: number; date: string }[],
+  slideNumber: number,
+  failures: string[],
+): GridCoverage {
+  // Same window *and* same tier the slide drew with, or the two would be
+  // counting different grids.
+  const calendar = buildDateGrid(new Date(windowStart), new Date(windowEnd), tierDays);
+  const drawnLevels = DATE_GRID_LEVELS.filter((level) => calendar[level].length > 0);
+  const datesByLevel = new Map(
+    DATE_GRID_LEVELS.map((level) => [
+      level as string,
+      new Set(calendar[level].map((mark) => mark.date.toISOString().slice(0, 10))),
+    ]),
+  );
+
+  const calendarMarks = drawnLevels.reduce((total, level) => total + calendar[level].length, 0);
+  const distinctPositions = new Set(
+    drawnLevels.flatMap((level) => calendar[level].map((mark) => mark.date.toISOString().slice(0, 10))),
+  ).size;
+
+  const minGapIn = DATE_GRID_MIN_GAP_PT / 72;
+  const seen = new Set<string>();
+
+  lines.forEach((line, index) => {
+    if (!datesByLevel.get(line.level)?.has(line.date)) {
+      failures.push(
+        `slide ${slideNumber}: grid line at ${line.date} is not a ${line.level} mark of ${windowStart}..${windowEnd}`,
+      );
+    }
+    if (seen.has(line.date)) {
+      failures.push(`slide ${slideNumber}: grid line repeated at ${line.date}`);
+    }
+    seen.add(line.date);
+
+    if (line.level === 'week' && new Date(line.date).getUTCDay() !== 1) {
+      failures.push(`slide ${slideNumber}: week line at ${line.date} is not a Monday`);
+    }
+
+    const previous = lines[index - 1];
+    if (previous) {
+      if (line.x <= previous.x) {
+        failures.push(`slide ${slideNumber}: grid lines out of order at ${line.date}`);
+      } else if (line.x - previous.x <= minGapIn) {
+        failures.push(
+          `slide ${slideNumber}: grid lines ${(line.x - previous.x).toFixed(4)}in apart at ${previous.date}/${line.date} ` +
+            `— under the ${minGapIn.toFixed(4)}in minimum, they read as one`,
+        );
+      }
+    }
+  });
+
+  if (lines.length > distinctPositions) {
+    failures.push(
+      `slide ${slideNumber}: ${lines.length} strokes drawn for ${distinctPositions} calendar positions`,
+    );
+  }
+
+  return {
+    slideNumber,
+    window: `${windowStart}..${windowEnd}`,
+    calendarMarks,
+    distinctPositions,
+    strokes: lines.length,
+    levels: drawnLevels.join('+'),
+  };
+}
 
 export function analyzeExportCoverage(
   items: TimelineItem[],
@@ -79,6 +178,7 @@ export function analyzeExportCoverage(
 
   const failures: string[] = [];
   const slides: SlideCoverage[] = [];
+  const grid: GridCoverage[] = [];
   const present = new Set<string>();
   const rowCounts = new Map<string, number>();
   const barredIds = new Set<string>();
@@ -120,6 +220,21 @@ export function analyzeExportCoverage(
         barredIds.add(bar.id);
         maxContentY = Math.max(maxContentY, bar.y + BAR_HEIGHT_IN);
       });
+
+      if (slide.windowStart !== null && slide.windowEnd !== null && slide.windowTierDays !== null) {
+        grid.push(
+          auditGrid(
+            slide.windowStart,
+            slide.windowEnd,
+            slide.windowTierDays,
+            slide.gridLines,
+            slideNumber,
+            failures,
+          ),
+        );
+      } else if (slide.gridLines.length > 0) {
+        failures.push(`slide ${slideNumber}: ${slide.gridLines.length} grid lines but no date window`);
+      }
     } else if (slide.kind === 'detail') {
       slide.sections.forEach((section) => {
         taskIds.push(section.taskId);
@@ -298,6 +413,7 @@ export function analyzeExportCoverage(
   duplicated.forEach((id) => failures.push(`task "${id}" is listed as a subtask row more than once`));
 
   return {
+    grid,
     planTaskCount: exportableItems.length,
     fileTaskCount: present.size,
     missing,

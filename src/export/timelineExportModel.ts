@@ -25,9 +25,10 @@ import {
 } from './dateScale';
 import {
   buildDateGrid,
-  DATE_GRID_LEVELS,
+  DATE_GRID_MIN_GAP_PT,
   getVisibleGridLevels,
   MAX_VISIBLE_DAYS_FOR_WEEK_LINES,
+  resolveGridStrokes,
   type DateGrid,
   type DateGridLevel,
   type DateGridMark,
@@ -175,6 +176,10 @@ export interface OverviewBarModel {
 // One vertical date line behind the bars. `level` picks its weight/color out
 // of DATE_GRID_STYLES — the same table the on-screen grid draws from.
 export interface OverviewGridLineModel {
+  /** The calendar day this stroke marks, yyyy-mm-dd. Nothing is drawn from it
+   * — it is what lets an audit confirm a line is a real date at its own level
+   * rather than a stroke the layout invented (see exportCoverage.ts). */
+  date: string;
   level: DateGridLevel;
   x: number;
 }
@@ -234,6 +239,17 @@ export interface OverviewSlideModel {
   // from export, outside the timeframe window, or truncated by overflow) —
   // silently omitted rather than drawn as a bracket to nowhere.
   dependencyConnectors: OverviewConnectorModel[];
+  // The date span this slide's axis covers, yyyy-mm-dd, or null when the slide
+  // draws nothing. Carried for the same reason the grid lines carry their
+  // dates: it is what an audit needs to say whether the grid matches the
+  // window, and no renderer reads it.
+  windowStart: string | null;
+  windowEnd: string | null;
+  // The day count the grid's density tier was chosen from — the widest
+  // window's, shared by every slide (see OverviewAxis.tierDays). Carried so an
+  // audit reproduces the tier this slide actually used instead of guessing it
+  // from the window, which would be a different tier and a different count.
+  windowTierDays: number | null;
   // --- what this overview leaves out ------------------------------------------
   // Two different facts, kept apart because conflating them is what made the
   // old single count unverifiable: a task can be missing from the *overview*
@@ -502,6 +518,16 @@ interface OverviewWindow {
 interface OverviewAxis extends OverviewWindow {
   /** Inches per BASE_PX_PER_DAY pixel. Identical on every slide. */
   scale: number;
+  /** How many days a *full* timeline width holds at this density — which is
+   * the widest window's own length, and therefore the same on every slide.
+   *
+   * This, not the slide's own day count, is what the grid's density tier has
+   * to be chosen from. The tier answers "how close together would these lines
+   * land", and at a shared density that is a property of the density, not of
+   * how much of the width this particular slide happens to use: a 112-day
+   * window drawn across half an inch has its Mondays 2pt apart, and calling
+   * that a week-level range because 112 < 365 produces a comb, not a grid. */
+  tierDays: number;
 }
 
 function addDays(date: Date, days: number): Date {
@@ -562,8 +588,9 @@ function buildOverviewAxes(
   if (timeframe) {
     const minDate = new Date(timeframe.start);
     const maxDate = new Date(timeframe.end);
-    const scale = TIMELINE_WIDTH_IN / ((daysBetween(minDate, maxDate) + 1) * BASE_PX_PER_DAY);
-    return pages.map((page) => (page.length > 0 ? { minDate, maxDate, scale } : null));
+    const tierDays = daysBetween(minDate, maxDate) + 1;
+    const scale = TIMELINE_WIDTH_IN / (tierDays * BASE_PX_PER_DAY);
+    return pages.map((page) => (page.length > 0 ? { minDate, maxDate, scale, tierDays } : null));
   }
 
   const ranges = pages.map((page) => (page.length > 0 ? getDateRange(page) : null));
@@ -589,7 +616,7 @@ function buildOverviewAxes(
   );
   const scale = TIMELINE_WIDTH_IN / (widestDays * BASE_PX_PER_DAY);
 
-  return windows.map((window) => (window ? { ...window, scale } : null));
+  return windows.map((window) => (window ? { ...window, scale, tierDays: widestDays } : null));
 }
 
 /** Lays out one overview slide: a date-scale axis at the top, then one bar
@@ -605,6 +632,9 @@ function buildOverviewSlide(
 ): OverviewSlideModel {
   const bars: OverviewBarModel[] = [];
   const dateAxisY = CONTENT_TOP_IN;
+  const windowStart = axis && items.length > 0 ? axis.minDate.toISOString().slice(0, 10) : null;
+  const windowEnd = axis && items.length > 0 ? axis.maxDate.toISOString().slice(0, 10) : null;
+  const windowTierDays = axis && items.length > 0 ? axis.tierDays : null;
   let gridLines: OverviewGridLineModel[] = [];
   let axisLabels: OverviewAxisLabelModel[] = [];
   let columnHeaders: OverviewColumnHeaderModel[] = [];
@@ -617,7 +647,7 @@ function buildOverviewSlide(
   const depthById = buildDepthMap(items);
 
   if (axis && items.length > 0) {
-    const { minDate, maxDate, scale } = axis;
+    const { minDate, maxDate, scale, tierDays } = axis;
     const totalDays = daysBetween(minDate, maxDate) + 1;
     // How much of the timeline zone this slide's window actually occupies. The
     // widest slide of the export fills it; a narrower one stops short, and
@@ -626,16 +656,23 @@ function buildOverviewSlide(
     // instead of being allowed to run on into blank space.
     const windowWidthIn = totalDays * BASE_PX_PER_DAY * scale;
 
-    const grid = buildDateGrid(minDate, maxDate);
+    // The grid's density tier comes from this slide's own window (buildDateGrid
+    // reads the span it is handed), so a slide covering four months draws week
+    // lines while one covering three years draws months — instead of every
+    // slide inheriting the whole plan's tier.
+    const grid = buildDateGrid(minDate, maxDate, tierDays);
     const toX = (mark: DateGridMark) => TIMELINE_X_IN + mark.dayOffset * BASE_PX_PER_DAY * scale;
-    gridLines = DATE_GRID_LEVELS.flatMap((level) =>
-      grid[level].map((mark) => ({ level, x: toX(mark) })),
-    );
+    // One stroke per position, owned by the strongest level there — see
+    // resolveGridStrokes. The gap is the shared constant in points, converted
+    // to this surface's inches.
+    gridLines = resolveGridStrokes(grid, toX, DATE_GRID_MIN_GAP_PT / 72);
     // The slide shows the whole window at once, so the grid's density tier
     // follows the window's own length — and the axis captions follow the
     // same tier, so lines and captions can't disagree about how coarse this
     // range is.
-    axisLabels = buildAxisLabels(grid, toX, totalDays > MAX_VISIBLE_DAYS_FOR_WEEK_LINES);
+    // Captions follow the same tier as the lines, so a slide can't caption a
+    // range more finely than it rules it.
+    axisLabels = buildAxisLabels(grid, toX, tierDays > MAX_VISIBLE_DAYS_FOR_WEEK_LINES);
 
     // The two column headings sit on the axis row, so "Status", "Task" and the
     // month captions all share one line; the hairline under that row and the
@@ -802,6 +839,9 @@ function buildOverviewSlide(
     dividerBottom: CONTENT_BOTTOM_IN,
     bars,
     dependencyConnectors,
+    windowStart,
+    windowEnd,
+    windowTierDays,
     ...omission,
   };
 }
