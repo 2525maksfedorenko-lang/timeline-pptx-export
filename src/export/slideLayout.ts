@@ -269,6 +269,16 @@ export const MAX_OVERVIEW_BARS_PER_SLIDE = Math.floor(
   (CONTENT_HEIGHT_IN - GROUP_HEADER_HEIGHT_IN) / ROW_HEIGHT_IN,
 );
 
+// Breathing room either side of a slide's own date window, as a fraction of
+// the *widest* window in the export rather than of each slide's own.
+//
+// A fraction of each slide's own span would pad a three-month slide by days
+// and a three-year one by months, so the same clear space would read as a
+// different amount of time on every slide. Taken from the widest window, one
+// ratio produces one identical margin in inches everywhere — which is what
+// "the same axis, drawn at the same density" has to mean visually.
+export const OVERVIEW_WINDOW_PAD_RATIO = 0.02;
+
 export const LIST_ROW_HEIGHT_IN = 0.32;
 export const SECTION_GAP_IN = 0.2;
 // Gap between one parent's whole subtasks/comments block and the next
