@@ -15,7 +15,7 @@ import { measureTextWidthPx } from '../utils/measureTextWidth';
 import { resolveBarColor } from '../utils/barColor';
 import { labelIndent, resolveBarGeometry } from '../utils/barNesting';
 import { getDescendantIds } from '../utils/taskHierarchy';
-import { BAR_HEIGHT_PX } from './ganttLayout';
+import { BAR_HEIGHT_PX, STICKY_TINT_CLASS } from './ganttLayout';
 import { Eye, EyeOff, MessageSquare, Trash2, UserRound } from 'lucide-react';
 
 interface GanttRowProps {
@@ -39,11 +39,13 @@ interface GanttRowProps {
   // with under 90px of timeline. Zone 1 sticks to the right of it, so it
   // needs the number too.
   statusZoneWidth: number;
-  // Zone 3's width: the four-icon desktop zone, or the single-control phone
-  // one (see MOBILE_ZONE3_WIDTH_PX). Passed in rather than read from the
-  // constant here so this row and the day header above it can't end up
-  // reserving different amounts of space for it.
-  zone3Width: number;
+  // The actions column's width: the four-icon desktop one, or the
+  // single-control phone one (see MOBILE_ACTIONS_ZONE_WIDTH_PX). Passed in
+  // rather than read from the constant here so this row and the day header
+  // above it can't end up reserving different amounts of space for it. The
+  // column sticks to the right of zone 1, so its own left offset is
+  // statusZoneWidth + zone1Width.
+  actionsZoneWidth: number;
   // The comment/assignee popup's open/closed state and draft fields live in
   // GanttChart (see PopupDraft there), not here — that's what guarantees
   // only one row's popup can ever be open at once.
@@ -120,7 +122,7 @@ function TrashIcon() {
 /** Plain outline "person" glyph shown as the assignee control when a task
  * has no assignee yet — visible and clickable (opens the same picker as a
  * set assignee's badge), never hidden, so there's always something in that
- * slot of zone 3 to click. */
+ * slot of the actions column to click. */
 function PersonIcon() {
   return <UserRound size={14} strokeWidth={2} />;
 }
@@ -165,7 +167,7 @@ const ROW_DIM_CLASS = 'opacity-40';
 // wash across the sticky columns. This is the half of the treatment the bars
 // can't provide — a related bar is often scrolled out of view, and then the
 // label column is the only place the branch can be seen at all.
-const branchTintClass = (isHighlighted: boolean) => (isHighlighted ? 'bg-muted/50' : 'bg-card');
+const branchTintClass = (isHighlighted: boolean) => (isHighlighted ? STICKY_TINT_CLASS : 'bg-card');
 
 export function GanttRow({
   item,
@@ -175,7 +177,7 @@ export function GanttRow({
   depth,
   zone1Width,
   statusZoneWidth,
-  zone3Width,
+  actionsZoneWidth,
   isPopupOpen,
   popupRef,
   commentText,
@@ -208,7 +210,7 @@ export function GanttRow({
   // open by the time the first would notice.
   const [menuAnchor, setMenuAnchor] = useState<MenuAnchor | null>(null);
 
-  // The zone-3 icons fade with the rest of an unrelated row's contents;
+  // The action icons fade with the rest of an unrelated row's contents;
   // ICON_BUTTON_CLASS itself stays untouched so the sizing rules stay in one
   // place.
   const iconButtonClass = `${ICON_BUTTON_CLASS}${isDimmed ? ` ${ROW_DIM_CLASS}` : ''}`;
@@ -275,7 +277,7 @@ export function GanttRow({
   };
 
   // Split from its click handler because the phone layout offers the same
-  // two actions from inside the task modal (see zone 3) — and there, a
+  // two actions from inside the task modal (see the actions column) — and there, a
   // confirmed delete should also close the modal it was triggered from,
   // which is what the return value is for.
   const confirmAndDelete = () => {
@@ -528,98 +530,28 @@ export function GanttRow({
         </div>
       </div>
 
-      {/* Zone 2: the timeline itself. The bar, plus the one piece of text
-          that belongs on it — the progress percentage. Both live inside the
-          same dragged element so they move together, which is also why the
-          z-index sits here on the zone rather than on the text alone: the
-          percentage can't be lifted out of the dragged element to be layered
-          separately. z-10 puts the whole zone over the date grid (z-0) and
-          the dependency/hierarchy connectors (z-1), so a bracket crossing
-          this row is never drawn across its percentage — matching the
-          shapes-then-text order the exporters use for the same reason — and
-          under the two sticky columns (z-20) either side of it. */}
-      <div className="relative z-10 flex-shrink-0" style={{ width: timelineWidth }}>
-        {/* The dim is a class, not a `style` entry, on purpose: this
-            element's style attribute is written to imperatively during a
-            drag/resize (see beginBarInteraction), so anything React also
-            drives through `style` here risks fighting those writes. */}
-        <div
-          ref={barRef}
-          onMouseDown={handleMouseDown}
-          // The branch highlight's only trigger. This element *is* the drawn
-          // bar — left/width from the task's dates, top/height from
-          // resolveBarGeometry — so the hit area equals the visible bounds on
-          // both axes without a hit layer of its own, at every nesting depth.
-          // Deliberately unpadded: padding out a 24px subtask bar to an
-          // easier target would reintroduce, smaller, exactly the gap between
-          // what lights up and what you are pointing at.
-          //
-          // enter/leave rather than over/out: they don't fire again when the
-          // pointer crosses onto the bar's own children (the track, the
-          // progress text, the two resize strips), so moving along a bar
-          // can't flicker the highlight off and on.
-          onMouseEnter={() => onBarHoverChange(true)}
-          onMouseLeave={() => onBarHoverChange(false)}
-          className={`absolute cursor-grab select-none transition-opacity active:cursor-grabbing ${
-            isDimmed ? 'opacity-30' : ''
-          }`}
-          // top/height join left/width here rather than staying Tailwind
-          // classes because they now vary per row; the drag handler only ever
-          // writes left and width, so React owns these two uncontested.
-          style={{ left, width: barWidth, top: barOffsetY, height: barHeight }}
-        >
-          <div
-            className="h-full overflow-hidden rounded-md shadow-sm"
-            style={{ backgroundColor: BAR_TRACK_COLOR, opacity: 1 }}
-          >
-            <div className="h-full" style={{ width: `${progress}%`, backgroundColor: barColor, opacity: 1 }} />
-          </div>
+      {/* The actions column: assignee, comment, eye, trash. Third of the
+          three sticky columns, so a row reads status, name, then what you can
+          do about it — and the whole block travels together on a horizontal
+          scroll instead of the actions sitting on the far side of the bars.
+          Its left offset is the two columns before it; each column's width
+          includes its own right border (border-box), so the three tile with
+          no seam and no overlap.
 
-          {progressText && (
-            <span
-              className="pointer-events-none absolute top-0 flex h-full items-center whitespace-nowrap text-[11px] font-semibold"
-              style={progressTextStyle}
-            >
-              {progressText}
-            </span>
-          )}
-
-          {/* Resize handles: invisible strips at each edge, drawn after (so
-              stacked above) the fill/progress-text — grabbing one of these
-              narrow zones changes just that end's date instead of moving
-              the whole bar, which is what the wider middle area (still
-              plain cursor-grab, still handleMouseDown="move") continues to
-              do. Width is a class rather than an inline style purely so the
-              phone layout can widen it: w-1.5 is the same 6px a cursor
-              wants, max-md:w-6 the 24px a fingertip does, and the 33% cap
-              keeps both handles off a short bar's move area rather than
-              swallowing it whole. */}
-          <div
-            onMouseDown={handleResizeStartMouseDown}
-            className="absolute inset-y-0 left-0 w-1.5 cursor-ew-resize max-md:w-6 max-md:max-w-[33%]"
-          />
-          <div
-            onMouseDown={handleResizeEndMouseDown}
-            className="absolute inset-y-0 right-0 w-1.5 cursor-ew-resize max-md:w-6 max-md:max-w-[33%]"
-          />
-        </div>
-      </div>
-
-      {/* Zone 3: assignee, comment, eye, trash. Fixed width and fixed set of
-          slots (trash reserves its slot even when hidden) so every row's
-          zone 3 is pixel-identical, never overlapping the row above or below
-          it. Sticky and z-20 for the same reason as zone 1, mirrored: bars
-          scroll under it, never across it.
+          Fixed width and a fixed set of slots (trash reserves its slot even
+          when hidden) so every row's column is pixel-identical, never
+          overlapping the row above or below it. z-20 for the same reason as
+          the other two: bars scroll under it, never across it.
 
           On a phone only the assignee badge survives here, grown to fill the
           row's height as one real touch target. It already opens the task
           modal (same handleTriggerClick as the comment icon), so nothing is
           lost by dropping that icon; the eye and the trash move *into* that
-          modal rather than disappearing — four 16px icons in a 104px column
+          modal rather than disappearing — four 16px icons in a 52px column
           is a mouse-only proposition. */}
       <div
-        className={`sticky right-0 z-20 flex flex-shrink-0 items-center gap-1.5 border-l border-border px-2 max-md:justify-center max-md:px-1.5 ${branchTintClass(isHighlighted)}`}
-        style={{ width: zone3Width }}
+        className={`sticky z-20 flex flex-shrink-0 items-center gap-1.5 border-r border-border px-2 max-md:justify-center max-md:px-1.5 ${branchTintClass(isHighlighted)}`}
+        style={{ width: actionsZoneWidth, left: statusZoneWidth + zone1Width }}
       >
         <button
           type="button"
@@ -719,6 +651,83 @@ export function GanttRow({
             }
           />
         )}
+      </div>
+
+      {/* Zone 2: the timeline itself. The bar, plus the one piece of text
+          that belongs on it — the progress percentage. Both live inside the
+          same dragged element so they move together, which is also why the
+          z-index sits here on the zone rather than on the text alone: the
+          percentage can't be lifted out of the dragged element to be layered
+          separately. z-10 puts the whole zone over the date grid (z-0) and
+          the dependency/hierarchy connectors (z-1), so a bracket crossing
+          this row is never drawn across its percentage — matching the
+          shapes-then-text order the exporters use for the same reason — and
+          under the three sticky columns (z-20) to the left of it. */}
+      <div className="relative z-10 flex-shrink-0" style={{ width: timelineWidth }}>
+        {/* The dim is a class, not a `style` entry, on purpose: this
+            element's style attribute is written to imperatively during a
+            drag/resize (see beginBarInteraction), so anything React also
+            drives through `style` here risks fighting those writes. */}
+        <div
+          ref={barRef}
+          onMouseDown={handleMouseDown}
+          // The branch highlight's only trigger. This element *is* the drawn
+          // bar — left/width from the task's dates, top/height from
+          // resolveBarGeometry — so the hit area equals the visible bounds on
+          // both axes without a hit layer of its own, at every nesting depth.
+          // Deliberately unpadded: padding out a 24px subtask bar to an
+          // easier target would reintroduce, smaller, exactly the gap between
+          // what lights up and what you are pointing at.
+          //
+          // enter/leave rather than over/out: they don't fire again when the
+          // pointer crosses onto the bar's own children (the track, the
+          // progress text, the two resize strips), so moving along a bar
+          // can't flicker the highlight off and on.
+          onMouseEnter={() => onBarHoverChange(true)}
+          onMouseLeave={() => onBarHoverChange(false)}
+          className={`absolute cursor-grab select-none transition-opacity active:cursor-grabbing ${
+            isDimmed ? 'opacity-30' : ''
+          }`}
+          // top/height join left/width here rather than staying Tailwind
+          // classes because they now vary per row; the drag handler only ever
+          // writes left and width, so React owns these two uncontested.
+          style={{ left, width: barWidth, top: barOffsetY, height: barHeight }}
+        >
+          <div
+            className="h-full overflow-hidden rounded-md shadow-sm"
+            style={{ backgroundColor: BAR_TRACK_COLOR, opacity: 1 }}
+          >
+            <div className="h-full" style={{ width: `${progress}%`, backgroundColor: barColor, opacity: 1 }} />
+          </div>
+
+          {progressText && (
+            <span
+              className="pointer-events-none absolute top-0 flex h-full items-center whitespace-nowrap text-[11px] font-semibold"
+              style={progressTextStyle}
+            >
+              {progressText}
+            </span>
+          )}
+
+          {/* Resize handles: invisible strips at each edge, drawn after (so
+              stacked above) the fill/progress-text — grabbing one of these
+              narrow zones changes just that end's date instead of moving
+              the whole bar, which is what the wider middle area (still
+              plain cursor-grab, still handleMouseDown="move") continues to
+              do. Width is a class rather than an inline style purely so the
+              phone layout can widen it: w-1.5 is the same 6px a cursor
+              wants, max-md:w-6 the 24px a fingertip does, and the 33% cap
+              keeps both handles off a short bar's move area rather than
+              swallowing it whole. */}
+          <div
+            onMouseDown={handleResizeStartMouseDown}
+            className="absolute inset-y-0 left-0 w-1.5 cursor-ew-resize max-md:w-6 max-md:max-w-[33%]"
+          />
+          <div
+            onMouseDown={handleResizeEndMouseDown}
+            className="absolute inset-y-0 right-0 w-1.5 cursor-ew-resize max-md:w-6 max-md:max-w-[33%]"
+          />
+        </div>
       </div>
     </div>
   );

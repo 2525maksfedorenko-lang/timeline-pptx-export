@@ -6,10 +6,11 @@ import { DateGridLines } from './DateGridLines';
 import { DependencyConnectors } from './DependencyConnectors';
 import { HierarchyConnectors } from './HierarchyConnectors';
 import {
+  ACTIONS_ZONE_WIDTH_PX,
+  MOBILE_ACTIONS_ZONE_WIDTH_PX,
   MOBILE_ZONE1_MAX_WIDTH_PX,
-  MOBILE_ZONE3_WIDTH_PX,
   STATUS_ZONE_WIDTH_PX,
-  ZONE3_WIDTH_PX,
+  STICKY_TINT_CLASS,
   computeZone1Width,
 } from './ganttLayout';
 import { ZoomControl } from './ZoomControl';
@@ -135,8 +136,8 @@ export function GanttChart() {
     setPopupDraft((current) => (current && current.taskId === taskId ? { ...current, ...patch } : current));
   };
 
-  // The two fixed zones are the only geometry the phone layout changes in JS
-  // rather than in CSS: the row layout, the day header and the three SVG
+  // The fixed columns' widths are the only geometry the phone layout changes
+  // in JS rather than in CSS: the row layout, the day header and the three SVG
   // overlays all position themselves against these numbers, so a width the
   // stylesheet alone knew about would leave the bars and the grid disagreeing
   // about where the timeline starts.
@@ -146,15 +147,17 @@ export function GanttChart() {
     () => computeZone1Width(items, buildDepthMap(items), isMobile ? MOBILE_ZONE1_MAX_WIDTH_PX : undefined),
     [items, isMobile],
   );
-  const zone3Width = isMobile ? MOBILE_ZONE3_WIDTH_PX : ZONE3_WIDTH_PX;
+  const actionsZoneWidth = isMobile ? MOBILE_ACTIONS_ZONE_WIDTH_PX : ACTIONS_ZONE_WIDTH_PX;
   // Zone 0 exists on a desktop only: on a 375px phone it would take 112 of
   // the ~200px the timeline has left after the other two fixed zones, so
   // there the status stays a colored dot in zone 1 and stays editable from
   // the export settings list.
   const statusZoneWidth = isMobile ? 0 : STATUS_ZONE_WIDTH_PX;
-  // Where zone 2 begins: the fixed zones ahead of it, added up once here so
-  // the rows, the day header and all three SVG overlays can't disagree.
-  const timelineStartX = statusZoneWidth + zone1Width;
+  // Where the actions column starts, and where the timeline does: the fixed
+  // columns ahead of each, added up once here so the rows, the day header and
+  // all three SVG overlays can't disagree about any of these edges.
+  const actionsStartX = statusZoneWidth + zone1Width;
+  const timelineStartX = actionsStartX + actionsZoneWidth;
   const sortedItems = useMemo(() => sortItems(items, sortMode), [items, sortMode]);
   // Depth per task, resolved once from the tree and handed to the rows. A row
   // asking "am I nested?" for itself would both scan the whole list per row and
@@ -171,11 +174,13 @@ export function GanttChart() {
     return { minDate: min, days: dayList };
   }, [items]);
 
-  // Zone 2 (the date-scaled timeline) is whatever's left of each row after
-  // the two fixed zones — matches GanttRow's own zone math exactly so bars
-  // line up under the day headers below.
+  // The date-scaled timeline is whatever's left of each row after the three
+  // fixed columns — matches GanttRow's own column math exactly so bars line
+  // up under the day headers below. It ends the row now that the actions
+  // column has moved off the right edge, so a row is exactly as wide as the
+  // date range at this zoom, with nothing after it.
   const timelineWidth = days.length * pxPerDay;
-  const rowWidth = timelineStartX + timelineWidth + zone3Width;
+  const rowWidth = timelineStartX + timelineWidth;
 
   // How much time the chart shows at once: the scroll viewport's own width
   // divided by the current pixels-per-day. This is what makes the zoom
@@ -185,7 +190,7 @@ export function GanttChart() {
   // the whole plan, which errs toward the coarser grid rather than painting
   // one dense frame.
   const viewportWidth = useElementWidth(scrollRef);
-  const visibleDays = viewportWidth > 0 ? (viewportWidth - timelineStartX - zone3Width) / pxPerDay : days.length;
+  const visibleDays = viewportWidth > 0 ? (viewportWidth - timelineStartX) / pxPerDay : days.length;
 
   // Day captions in the header thin out as the columns narrow, for the same
   // reason the grid does: "Aug" needs about 22px, so below that only every
@@ -200,7 +205,18 @@ export function GanttChart() {
   const showDayCellBorders = visibleDays <= MAX_VISIBLE_DAYS_FOR_DAY_LINES;
 
   return (
-    <div>
+    // Hugs the chart instead of the page: the card used to be `w-full` while
+    // the track inside it is exactly the fixed columns plus days x pxPerDay,
+    // so on any plan too short to fill the page the surplus showed up as a
+    // white strip to the right of the last column — sticky `right-0` cannot
+    // reach the card's edge, since a sticky box is clamped to its containing
+    // block (the row), not to the scrollport. Sizing to content removes the
+    // strip at its source rather than papering over it, and keeps the zoom
+    // control honest: the card's width *is* the date range at this zoom.
+    // Wrapping the controls too keeps them aligned to the card's right edge
+    // rather than to the page's. max-w-full so a plan wider than the page
+    // still stops at the page and scrolls, as before.
+    <div className="w-fit max-w-full">
       {/* Title and controls sit on one line until there isn't room for one:
           on a phone the controls take their own full-width row underneath,
           which is also what gives the zoom buttons and the add-task form
@@ -216,17 +232,26 @@ export function GanttChart() {
           <div className="flex border-b border-border bg-muted/50">
             {!isMobile && (
               <div
-                className="sticky left-0 z-20 flex-shrink-0 border-r border-border bg-muted/50 px-2 py-2 text-xs font-medium text-muted-foreground"
+                className={`sticky left-0 z-20 flex-shrink-0 border-r border-border px-2 py-2 text-xs font-medium text-muted-foreground ${STICKY_TINT_CLASS}`}
                 style={{ width: statusZoneWidth }}
               >
                 Status
               </div>
             )}
             <div
-              className="sticky z-20 flex-shrink-0 border-r border-border bg-muted/50 px-2 py-2 text-xs font-medium text-muted-foreground"
+              className={`sticky z-20 flex-shrink-0 border-r border-border px-2 py-2 text-xs font-medium text-muted-foreground ${STICKY_TINT_CLASS}`}
               style={{ width: zone1Width, left: statusZoneWidth }}
             >
               Task
+            </div>
+            {/* Captioned like the two columns before it, but only where the
+                caption fits: the phone column is 52px wide, and "Act…" reads
+                worse than the empty cell this column had on the right. */}
+            <div
+              className={`sticky z-20 flex-shrink-0 border-r border-border px-2 py-2 text-xs font-medium text-muted-foreground ${STICKY_TINT_CLASS}`}
+              style={{ width: actionsZoneWidth, left: actionsStartX }}
+            >
+              {!isMobile && 'Actions'}
             </div>
             <div className="flex flex-shrink-0" style={{ width: timelineWidth }}>
               {days.map((day, index) => (
@@ -246,15 +271,11 @@ export function GanttChart() {
                 </div>
               ))}
             </div>
-            <div
-              className="sticky right-0 z-20 flex-shrink-0 border-l border-border bg-muted/50"
-              style={{ width: zone3Width }}
-            />
           </div>
           {/* Explicit z-stack, back to front: date grid (z-0), the connector
               overlays (z-1), the rows' bars and on-bar text (z-10 — so a
               connector crossing a row can never be drawn over its
-              percentage), and finally the rows' two sticky columns (z-20),
+              percentage), and finally the rows' three sticky columns (z-20),
               which the bars scroll underneath. Without the classes this
               would fall back to DOM order among positioned siblings, which
               is far too easy to break by reordering a line here. */}
@@ -280,7 +301,7 @@ export function GanttChart() {
                   timelineWidth={timelineWidth}
                   zone1Width={zone1Width}
                   statusZoneWidth={statusZoneWidth}
-                  zone3Width={zone3Width}
+                  actionsZoneWidth={actionsZoneWidth}
                   isPopupOpen={isPopupOpen}
                   popupRef={popupRef}
                   commentText={isPopupOpen ? popupDraft.commentText : ''}

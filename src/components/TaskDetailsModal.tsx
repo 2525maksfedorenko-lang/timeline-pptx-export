@@ -23,8 +23,8 @@ interface TaskDetailsModalProps {
   canSave: boolean;
   onSave: () => void;
   onClose: () => void;
-  // The two row actions that don't fit in the phone layout's zone 3 (see
-  // GanttRow) and are hosted here instead — rendered only below the
+  // The two row actions that don't fit in the phone layout's actions column
+  // (see GanttRow) and are hosted here instead — rendered only below the
   // breakpoint, so the desktop dialog is untouched. `onDelete` is undefined
   // exactly when the row's own trash icon is absent (a task with no
   // subtasks), rather than showing a delete the row itself doesn't offer.
@@ -48,7 +48,8 @@ interface TaskDetailsModalProps {
  *   component that could be lifted into another codebase as-is.
  *
  * Portaled to <body> because its trigger lives inside the Gantt row's sticky
- * zone 3, which carries a z-index and therefore its own stacking context: a
+ * actions column, which carries a z-index and therefore its own stacking
+ * context: a
  * `fixed` overlay rendered in place would be trapped in it and painted under
  * the sticky columns of every row below. */
 export function TaskDetailsModal({
@@ -168,7 +169,7 @@ export function TaskDetailsModal({
           />
         </div>
 
-        {/* The row actions that zone 3 gives up on a phone (see GanttRow):
+        {/* The row actions the actions column gives up on a phone (see GanttRow):
             present in the DOM at every width but only displayed below the
             breakpoint, so the desktop dialog renders exactly as it did. */}
         <div className="mt-5 hidden flex-col gap-2 border-t border-border pt-4 max-md:flex">
