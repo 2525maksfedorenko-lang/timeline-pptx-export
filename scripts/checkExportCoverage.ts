@@ -14,7 +14,8 @@
  * would not notice: that a slide break never lands inside a level (a row's
  * parent is always its section's title or a row above it on the same slide),
  * and that the depth indent still steps by the same ratio as the on-screen
- * label column.
+ * label column. And, on the dashboard's own tables, that a list cut down to fit
+ * its slide says how many rows it cut and ends inside the content area.
  *
  * The fixture is deterministic — 100 exportable tasks, four levels, dependencies
  * and markdown comments long enough to force sections to spill — because a check
@@ -186,6 +187,20 @@ function main() {
           `${g.calendarMarks}`,
           `${g.distinctPositions}`,
           `${g.strokes}`,
+        ]),
+      ]);
+    }
+
+    if (report.dashboard.length > 0) {
+      console.log('');
+      printTable([
+        ['dashboard table', 'rows drawn', 'cut', 'table ends', 'footer note'],
+        ...report.dashboard.map((table) => [
+          `${table.slideNumber} ${table.title}`,
+          `${table.rowsDrawn}`,
+          `${table.omittedRowCount}`,
+          `${table.bottomIn.toFixed(2)}in`,
+          table.note ?? '—',
         ]),
       ]);
     }

@@ -47,7 +47,11 @@ import {
   CONTENT_TOP_IN,
   CONTENT_WIDTH_IN,
   CONTENT_X_IN,
+  DASHBOARD_TABLE_GAP_IN,
+  DASHBOARD_TABLE_QR_COLUMN_WIDTH_IN,
+  DASHBOARD_TABLE_QR_SIZE_IN,
   DASHBOARD_TABLE_TOP_IN,
+  DASHBOARD_TABLE_WIDTH_IN,
   STATUS_RIGHT_PADDING_IN,
   DEPENDENCY_LINE_WIDTH_PT,
   FOOTER_HEIGHT_IN,
@@ -783,19 +787,20 @@ function drawSummarySlide(doc: jsPDF, model: SummarySlideModel, qrCodes: QrCodeM
   });
 }
 
-const DASHBOARD_TABLE_QR_COLUMN_WIDTH_IN = 2.0;
-const DASHBOARD_TABLE_GAP_IN = 0.4;
-const DASHBOARD_TABLE_QR_SIZE_IN = 1.5;
-
 function drawDashboardTableSlide(doc: jsPDF, model: DashboardTableSlideModel, qrCodeDataUrl: string) {
   drawChrome(doc, model.title);
+  // The model cut this table to the rows that fit the slide; the note is how
+  // the slide says so — the same footer line the overview announces its own
+  // omissions on, so a reader learns "there is more" in one place per deck.
+  drawOmittedNote(doc, model.note);
 
-  const tableWidth = CONTENT_WIDTH_IN - DASHBOARD_TABLE_QR_COLUMN_WIDTH_IN - DASHBOARD_TABLE_GAP_IN;
+  const tableWidth = DASHBOARD_TABLE_WIDTH_IN;
 
   if (model.table) {
-    // Nothing upstream caps how many delayed/at-risk tasks a plan can have, so
-    // this table can genuinely outgrow a slide — and if it does, it overflows
-    // this one page rather than inserting others (see withoutPageBreaks).
+    // How many rows fit is settled upstream (fitTableRows), measured against
+    // the same row height this renderer draws with. withoutPageBreaks is the
+    // belt to that braces: a table that outgrows its slide anyway overflows
+    // this one page rather than inserting others.
     const table = model.table;
     withoutPageBreaks(doc, () => {
       drawTableBlock(doc, table, CONTENT_X_IN, DASHBOARD_TABLE_TOP_IN, tableWidth);

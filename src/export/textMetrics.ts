@@ -88,3 +88,19 @@ export function measureMonoTextWidthIn(text: string, fontSizePt: number): number
 export function measureLetterSpacingWidthIn(text: string, letterSpacingPt: number): number {
   return ([...text].length * letterSpacingPt) / 72;
 }
+
+// Rough text-wrapping estimate used only to size layout boxes ahead of
+// render: neither pptxgenjs nor jsPDF expose real text measurement before
+// drawing. Assumes an average glyph is ~0.55em wide — a bit wider than a
+// typical sans-serif average, so this skews toward *more* estimated lines
+// rather than fewer, which is the safer direction to be wrong in (extra
+// whitespace instead of overlapping the next block).
+const AVG_CHAR_WIDTH_EM = 0.55;
+
+/** How many lines `text` wraps to in a box `widthIn` wide at `fontSizePt`. */
+export function estimateWrappedLines(text: string, fontSizePt: number, widthIn: number): number {
+  if (!text) return 1;
+  const charWidthIn = (fontSizePt * AVG_CHAR_WIDTH_EM) / 72;
+  const charsPerLine = Math.max(1, Math.floor(widthIn / charWidthIn));
+  return Math.max(1, Math.ceil(text.length / charsPerLine));
+}

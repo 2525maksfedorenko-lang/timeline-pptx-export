@@ -1,4 +1,6 @@
 import { labelIndent } from '../utils/barNesting';
+import { TASK_STATUS_LABELS, TASK_STATUS_VALUES } from '../types/timeline';
+import { estimateWrappedLines, measureLetterSpacingWidthIn, measureTextWidthIn } from './textMetrics';
 
 // Shared page geometry (inches) for both the PPTX (LAYOUT_16x9) and PDF
 // exporters, so a "slide" looks identical in either format.
@@ -113,20 +115,50 @@ export const AXIS_LABEL_GAP_IN = 0.08;
 // timeline; the slide is laid out the same way so a deck reads top-to-bottom
 // like the app instead of having each task's name chase its own bar around.
 // Both exporters take these from here, which is what keeps the two identical.
-//
-// Widths were measured, not guessed (see textMetrics.ts):
-//   - the widest status label, "in progress", is 0.678in at
-//     BAR_STATUS_FONT_SIZE_PT with STATUS_LETTER_SPACING_EM tracking. The chip
-//     around it needs 0.818in, so a 0.95in column clears it with slack.
-//   - a task name averages 0.110in per glyph at BAR_LABEL_FONT_SIZE_PT, so
-//     2.35in holds roughly 21 characters before the ellipsis (see
-//     labelWidth/truncateToWidth in timelineExportModel.ts).
-export const STATUS_COL_WIDTH_IN = 0.95;
-export const TASK_COL_WIDTH_IN = 2.35;
+
 // Left padding inside either column, so no text sits on a column edge and
 // every row starts at the same x — the "same indent on every row" the columns
 // exist to give.
 export const COLUMN_TEXT_INSET_IN = 0.08;
+// The status chip: spans its column (minus the inset either side) exactly as
+// the on-screen chip fills its own, with the label inset from the chip's own
+// edges. No dropdown chevron — nothing on a slide is interactive.
+export const STATUS_CHIP_HEIGHT_IN = 0.18;
+export const STATUS_CHIP_RADIUS_IN = 0.03;
+export const STATUS_CHIP_TEXT_INSET_IN = 0.07;
+export const STATUS_CHIP_BORDER_WIDTH_PT = 0.5;
+
+/** Width of a status word as it is actually drawn: its glyphs plus its
+ * tracking, which neither engine folds into its own metrics. Everything that
+ * has to fit a status into a box measures it through here. */
+export function statusTextWidthIn(text: string, fontSizePt: number): number {
+  return (
+    measureTextWidthIn(text, fontSizePt) +
+    measureLetterSpacingWidthIn(text, letterSpacingPt(fontSizePt, STATUS_LETTER_SPACING_EM))
+  );
+}
+
+// Widths were measured, not guessed (see textMetrics.ts). The Status column is
+// *derived* from the widest label it has to carry rather than picked: the chip
+// spans the column minus COLUMN_TEXT_INSET_IN either side, and the label sits
+// STATUS_CHIP_TEXT_INSET_IN inside that, on both sides. A hardcoded 0.95in
+// looked like it cleared the widest label ("in progress", 0.678in) with slack,
+// but the arithmetic behind it counted only one of the two insets: the label
+// ended up with 0.07in of chip to its left and 0.042in to its right, and one
+// status word a shade wider would have run out of the chip altogether. Derived,
+// the two insets stay equal whatever the font size, the tracking or the status
+// list does next.
+export const STATUS_COL_WIDTH_IN =
+  Math.max(
+    ...TASK_STATUS_VALUES.map((status) =>
+      statusTextWidthIn(TASK_STATUS_LABELS[status], BAR_STATUS_FONT_SIZE_PT),
+    ),
+  ) +
+  (STATUS_CHIP_TEXT_INSET_IN + COLUMN_TEXT_INSET_IN) * 2;
+// A task name averages 0.110in per glyph at BAR_LABEL_FONT_SIZE_PT, so 2.35in
+// holds roughly 21 characters before the ellipsis (see
+// labelWidth/truncateToWidth in timelineExportModel.ts).
+export const TASK_COL_WIDTH_IN = 2.35;
 // Clear space around the divider, split evenly either side of it.
 export const TIMELINE_GUTTER_IN = 0.14;
 export const TIMELINE_X_IN =
@@ -141,14 +173,6 @@ export const COLUMN_DIVIDER_WIDTH_PT = 0.75;
 // captions and at the same size, so the three read as one header row. Sans
 // rather than the mono the dates use — they are words, not dates.
 export const COLUMN_HEADER_FONT_SIZE_PT = AXIS_MONTH_FONT_SIZE_PT;
-// The status chip: spans its column (minus the inset either side) exactly as
-// the on-screen chip fills its own, with the label inset from the left edge.
-// No dropdown chevron — nothing on a slide is interactive.
-export const STATUS_CHIP_HEIGHT_IN = 0.18;
-export const STATUS_CHIP_RADIUS_IN = 0.03;
-export const STATUS_CHIP_TEXT_INSET_IN = 0.07;
-export const STATUS_CHIP_BORDER_WIDTH_PT = 0.5;
-
 // Status names in the summary slide's status-breakdown legend, a notch
 // under the count/percentage they sit next to (10pt) for the same reason as
 // BAR_STATUS_FONT_SIZE_PT.
@@ -175,6 +199,19 @@ export const STATUS_RIGHT_PADDING_IN = 0.12;
 // not. Kept as its own constant rather than raising CONTENT_TOP_IN, which
 // the overview's bars-per-slide ceiling is derived from.
 export const DASHBOARD_TABLE_TOP_IN = CONTENT_TOP_IN + 0.18;
+// The rest of a dashboard slide's two-column split: the table on the left, the
+// QR code into the same list on screen on the right. These were a private copy
+// in each exporter until the model had to know how wide a table's columns are
+// to work out how many of its rows fit (see fitTableRows in dashboardSlides).
+export const DASHBOARD_TABLE_QR_COLUMN_WIDTH_IN = 2.0;
+export const DASHBOARD_TABLE_QR_SIZE_IN = 1.5;
+export const DASHBOARD_TABLE_GAP_IN = 0.4;
+export const DASHBOARD_TABLE_WIDTH_IN =
+  CONTENT_WIDTH_IN - DASHBOARD_TABLE_QR_COLUMN_WIDTH_IN - DASHBOARD_TABLE_GAP_IN;
+// All the height a dashboard table has. Neither engine paginates a table — the
+// PDF is explicitly stopped from trying (withoutPageBreaks) — so rows past this
+// are drawn off the slide unless the model cuts them first.
+export const DASHBOARD_TABLE_MAX_HEIGHT_IN = CONTENT_BOTTOM_IN - DASHBOARD_TABLE_TOP_IN;
 
 // Minimum clear gap always kept between a label and the status text sharing
 // its row, even after the label has been reserved room / truncated against
@@ -341,6 +378,26 @@ export const COMMENT_TABLE_ROW_HEIGHT_IN =
   COMMENT_TABLE_LINE_HEIGHT_IN + COMMENT_TABLE_CELL_PADDING_IN * 2;
 // The header row is the same box in a bold face, not a taller one.
 export const COMMENT_TABLE_HEADER_ROW_HEIGHT_IN = COMMENT_TABLE_ROW_HEIGHT_IN;
+
+/** Text width of one column of a `tableWidthIn`-wide table with `columnCount`
+ * equal columns. Equal columns are what pptxgenjs is told to draw and what
+ * jspdf-autotable converges on at these widths, so one number serves both. */
+export function tableColumnTextWidthIn(tableWidthIn: number, columnCount: number): number {
+  return tableWidthIn / Math.max(columnCount, 1) - COMMENT_TABLE_CELL_PADDING_IN * 2;
+}
+
+/** Height of one table row whose cells wrap at `columnTextWidthIn`. Every cell
+ * is measured and the tallest decides the row: a cell whose text wraps to two
+ * lines makes the whole row two lines tall in either renderer, and a row
+ * assumed to be one line is exactly how a table ends up taller than the space
+ * reserved for it. Shared by a comment's markdown tables and the dashboard's
+ * own, so "how tall is this table" has a single answer. */
+export function tableRowHeightIn(cells: string[], columnTextWidthIn: number): number {
+  const lines = Math.max(
+    ...cells.map((cell) => estimateWrappedLines(cell, COMMENT_TABLE_FONT_SIZE_PT, columnTextWidthIn)),
+  );
+  return lines * COMMENT_TABLE_LINE_HEIGHT_IN + COMMENT_TABLE_CELL_PADDING_IN * 2;
+}
 // Small vertical breathing room between adjacent blocks within one comment,
 // and between one comment's blocks and the next comment's meta line.
 export const COMMENT_BLOCK_GAP_IN = 0.06;
