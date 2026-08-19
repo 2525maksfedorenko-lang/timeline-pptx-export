@@ -37,6 +37,46 @@ relative order at each level. Concretely:
 - Subtasks & Comments: parent sections follow the same root order, and each
   parent's subtask rows follow the sorted child order.
 
+## What status order costs a long plan
+
+Sorting by status pulls tasks from both ends of the timeline onto the same
+slide, and that has a measurable price once a plan runs longer than a slide can
+show at a readable density.
+
+Each overview slide is drawn against a window taken from its own tasks (see
+`buildOverviewAxes` in `timelineExportModel.ts`), at a density shared by every
+slide so equal durations stay equal across the deck. Under `status` those
+per-slide windows barely narrow, because a slide's twelve roots are spread over
+the whole plan. Measured on a 2.8-year plan — 249 tasks, 50 roots, 1036 days,
+five overview slides:
+
+| sortMode | per-slide windows | share of the plan | a 46-day bar |
+| --- | --- | --- | --- |
+| `date` | 256, 292, 262, 240, 86 days | 8–28% | 0.828in |
+| `status` | 982, 756, 980, 771, 67 days | **73–95%** | 0.246in |
+
+So under `status` four of the five slides span nearly the entire plan, the
+widest window sets the density for all of them, and the same task is drawn
+**3.4× shorter** than it would be in date order. The slides are correct and
+comparable; they are simply compressed, and the compression is inherent to the
+ordering rather than to the layout.
+
+What per-slide windows still buy `status` order is real but narrower: bars
+start at the left edge instead of somewhere in the middle, and each slide's
+axis captions name its own months rather than the whole plan's. What they
+cannot buy is resolution.
+
+**Practical reading:** for a plan much longer than a year, `date` order
+produces readable slides and `status` order does not. The tail slide is the
+clearest case — two tasks spanning 67 days, drawn at a density set by a
+1042-day window, occupy 0.47in of the 5.56in timeline zone.
+
+The alternative — paginating the overview by date band and sorting by status
+*within* each band — would give every slide a tight window and keep the status
+reading order on the slide. It changes pagination rather than the axis, and it
+would break the deck-level `done`-block-first reading this document describes,
+so it is deliberately not done here.
+
 ## A `done` parent with an open child
 
 Ranking uses the parent's *own* `status`, never one derived from its children:
