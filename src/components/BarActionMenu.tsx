@@ -2,7 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { getTaskStatus, type TaskStatus, type TimelineItem } from '../types/timeline';
 import { StatusSelect } from './StatusSelect';
+import { ProgressControl } from './ProgressControl';
 import { buildNewTask, isCompleteTask, type NewTaskFields } from '../utils/newTask';
+import { clampProgress } from '../utils/clampProgress';
+import { progressForStatus } from '../utils/progressForStatus';
 
 /** Where the menu opens, in viewport coordinates — the point the pointer
  * was released at. */
@@ -15,6 +18,7 @@ interface BarActionMenuProps {
   item: TimelineItem;
   anchor: MenuAnchor;
   onChangeStatus: (status: TaskStatus) => void;
+  onChangeProgress: (progress: number) => void;
   onAddSubtask: (task: TimelineItem) => void;
   onClose: () => void;
 }
@@ -22,8 +26,9 @@ interface BarActionMenuProps {
 const MENU_WIDTH_PX = 260;
 // The menu is clamped to stay on screen; this is what the clamp assumes it
 // might grow to (the subtask form is the tall state), and the panel scrolls
-// if it somehow exceeds it.
-const MENU_MAX_HEIGHT_PX = 340;
+// if it somehow exceeds it. Raised with the progress row, which adds its 44px
+// slider and a label to every state of the menu.
+const MENU_MAX_HEIGHT_PX = 410;
 const VIEWPORT_MARGIN_PX = 8;
 
 const FIELD_CLASS =
@@ -39,7 +44,14 @@ const FIELD_LABEL_CLASS = 'text-xs font-medium text-muted-foreground';
  * edge. Closing is unconditional (outside click, Escape, Cancel): the
  * subtask draft lives only as long as the menu, and the status change has
  * already been committed by the time it can be lost. */
-export function BarActionMenu({ item, anchor, onChangeStatus, onAddSubtask, onClose }: BarActionMenuProps) {
+export function BarActionMenu({
+  item,
+  anchor,
+  onChangeStatus,
+  onChangeProgress,
+  onAddSubtask,
+  onClose,
+}: BarActionMenuProps) {
   const menuRef = useRef<HTMLDivElement | null>(null);
   const [isAddingSubtask, setIsAddingSubtask] = useState(false);
   // A subtask starts life spanning its parent, which is both a sensible
@@ -75,6 +87,16 @@ export function BarActionMenu({ item, anchor, onChangeStatus, onAddSubtask, onCl
   const setField = <K extends keyof NewTaskFields>(field: K, value: NewTaskFields[K]) =>
     setDraft((current) => ({ ...current, [field]: value }));
 
+  // Picking a status here can carry a progress figure with it — see
+  // progressForStatus for which ones do and why it is this component's rule
+  // rather than the store's. Both writes happen in one event, so the bar
+  // repaints once with the pair already agreeing.
+  const handleChangeStatus = (status: TaskStatus) => {
+    onChangeStatus(status);
+    const implied = progressForStatus(status);
+    if (implied !== null) onChangeProgress(implied);
+  };
+
   const handleAdd = () => {
     if (!isCompleteTask(draft)) return;
     // parentId is what makes this a subtask; no parent picker, because the
@@ -105,7 +127,17 @@ export function BarActionMenu({ item, anchor, onChangeStatus, onAddSubtask, onCl
         <span className={FIELD_LABEL_CLASS}>Change status</span>
         {/* The same chip as the status column and the settings list — a
             pick here commits immediately, no submit step. */}
-        <StatusSelect status={getTaskStatus(item)} onChange={onChangeStatus} label={item.label} />
+        <StatusSelect status={getTaskStatus(item)} onChange={handleChangeStatus} label={item.label} />
+      </div>
+
+      {/* Under the status, because that is the order the two are decided in:
+          a status pick can move this figure, never the other way round. */}
+      <div className="mt-3">
+        <ProgressControl
+          value={clampProgress(item.progress ?? 0)}
+          onChange={onChangeProgress}
+          idPrefix={item.id}
+        />
       </div>
 
       {isAddingSubtask ? (
