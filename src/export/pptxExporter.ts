@@ -52,6 +52,7 @@ import {
   FOOTER_HEIGHT_IN,
   GROUP_HEADER_HEIGHT_IN,
   HEADER_HEIGHT_IN,
+  TITLE_FONT_SIZE_PT,
   LIST_ROW_HEIGHT_IN,
   PAGE_HEIGHT_IN,
   PAGE_WIDTH_IN,
@@ -101,11 +102,17 @@ function drawChrome(slide: PptxSlide, title: string) {
     y: 0,
     w: CONTENT_WIDTH_IN,
     h: HEADER_HEIGHT_IN,
-    fontSize: 24,
+    fontSize: TITLE_FONT_SIZE_PT,
     bold: true,
     color: COLORS.lightText,
     fontFace: PPTX_FONT_FACE,
     valign: 'middle',
+    // Explicit zero insets rather than PowerPoint's defaults (0.05in top and
+    // bottom, 0.1in each side): the vertical pair ate into the clear space the
+    // band is sized to give the title, and the horizontal one pushed the text
+    // 0.1in right of CONTENT_X_IN — where the PDF exporter draws it, and where
+    // every other left edge on the slide sits.
+    margin: 0,
   });
 
   const footerY = PAGE_HEIGHT_IN - FOOTER_HEIGHT_IN;

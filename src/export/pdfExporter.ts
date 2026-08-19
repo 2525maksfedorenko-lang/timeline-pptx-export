@@ -57,6 +57,7 @@ import {
   FOOTER_HEIGHT_IN,
   GROUP_HEADER_HEIGHT_IN,
   HEADER_HEIGHT_IN,
+  TITLE_FONT_SIZE_PT,
   LIST_ROW_HEIGHT_IN,
   PAGE_HEIGHT_IN,
   PAGE_WIDTH_IN,
@@ -172,7 +173,7 @@ function drawChrome(doc: jsPDF, title: string) {
   doc.rect(0, 0, PAGE_WIDTH_IN, HEADER_HEIGHT_IN, 'F');
 
   doc.setFont(PDF_FONT_FACE, 'bold');
-  doc.setFontSize(24);
+  doc.setFontSize(TITLE_FONT_SIZE_PT);
   doc.setTextColor(withHash(COLORS.lightText));
   drawText(doc, title, CONTENT_X_IN, HEADER_HEIGHT_IN / 2, { baseline: 'middle' });
 

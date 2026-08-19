@@ -1,5 +1,6 @@
 import type { SavedPlan } from '../store/planStorage';
-import { DEFAULT_EXPORT_OPTIONS, type ExportOptions } from '../store/timelineStore';
+import { DEFAULT_EXPORT_OPTIONS } from '../store/timelineStore';
+import { normalizeExportOptions } from '../utils/normalizeExportOptions';
 import { parseImportedTasks } from './importTasks';
 
 /** Triggers a browser download of `plan` as a formatted JSON file. */
@@ -53,10 +54,13 @@ export function parsePlanJson(json: string): ParsedPlan {
 
   const { items, warnings } = parseImportedTasks(JSON.stringify(record.items));
 
-  const exportOptions: ExportOptions =
-    typeof record.exportOptions === 'object' && record.exportOptions !== null && !Array.isArray(record.exportOptions)
-      ? ({ ...DEFAULT_EXPORT_OPTIONS, ...record.exportOptions } as ExportOptions)
-      : DEFAULT_EXPORT_OPTIONS;
+  // Merged over the defaults, but not blindly: a flag holding something that
+  // isn't true or false falls back to its default and says so, rather than
+  // being taken at its falsy word (see normalizeExportOptions).
+  const { options: exportOptions, warnings: optionWarnings } = normalizeExportOptions(
+    record.exportOptions,
+    DEFAULT_EXPORT_OPTIONS,
+  );
 
   const now = new Date().toISOString();
 
@@ -69,6 +73,6 @@ export function parsePlanJson(json: string): ParsedPlan {
       createdAt: typeof record.createdAt === 'string' ? record.createdAt : now,
       updatedAt: typeof record.updatedAt === 'string' ? record.updatedAt : now,
     },
-    warnings,
+    warnings: [...warnings, ...optionWarnings],
   };
 }
