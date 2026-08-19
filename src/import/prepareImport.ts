@@ -148,7 +148,9 @@ export async function prepareImport(file: File, existingItems: TimelineItem[]): 
     };
   }
 
-  const { items, errors, warnings: sheetWarnings } = parseSheet(bytes, existingItems);
+  // The format the sniffer settled on is handed to the parser rather than
+  // re-derived from the cells: it decides how a Progress number is read.
+  const { items, errors, warnings: sheetWarnings } = parseSheet(bytes, format, existingItems);
 
   return {
     fileName: file.name,

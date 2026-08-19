@@ -1,3 +1,4 @@
+import { groupedWarnings, type LocatedValue } from './groupedWarnings';
 import {
   DEFAULT_TASK_STATUS,
   TASK_STATUS_LABELS,
@@ -39,39 +40,18 @@ export function normalizeTaskStatus(value: unknown): TaskStatus | null {
 }
 
 /** One task whose status wasn't recognized: what it said, and where it sat. */
-export interface UnknownStatus {
-  /** Named the way the task's own source counts them — "Row 5" for a
-   * spreadsheet, "Task at index 3" for a JSON array. */
-  location: string;
-  value: string;
-}
+export type UnknownStatus = LocatedValue;
 
-/** How many locations a single warning names before it starts counting them. */
-const LOCATIONS_NAMED = 3;
-
-/** One line per distinct unrecognized spelling rather than per task: a file
- * that calls every open task "WIP" has one thing wrong with it, and says so
- * once — the same shape as parseSheet's ambiguous-Parent warning. Up to
- * LOCATIONS_NAMED places are named, which keeps the line actionable without
- * letting one bad column fill the import dialog. */
+/** One line per distinct unrecognized spelling rather than per task — the
+ * grouping itself lives in groupedWarnings, which the Progress rules use too,
+ * so every importer counts and names places the same way. */
 export function unknownStatusWarnings(unknown: UnknownStatus[]): string[] {
-  const locationsByValue = new Map<string, string[]>();
-  unknown.forEach(({ location, value }) => {
-    locationsByValue.set(value, [...(locationsByValue.get(value) ?? []), location]);
-  });
-
-  return [...locationsByValue.entries()].map(([value, locations]) => {
-    const remaining = locations.length - LOCATIONS_NAMED;
-    const where =
-      remaining > 0
-        ? `${locations.slice(0, LOCATIONS_NAMED).join(', ')} and ${remaining} more`
-        : locations.join(', ');
-
-    return (
+  return groupedWarnings(
+    unknown,
+    (value, where) =>
       `"${value}" is not a status (${where}) — imported as ` +
-      `"${TASK_STATUS_LABELS[DEFAULT_TASK_STATUS]}". Expected one of: ${STATUS_HINT}.`
-    );
-  });
+      `"${TASK_STATUS_LABELS[DEFAULT_TASK_STATUS]}". Expected one of: ${STATUS_HINT}.`,
+  );
 }
 
 function withoutStatus(item: TimelineItem): TimelineItem {
