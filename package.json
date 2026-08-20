@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "check:export": "jiti scripts/checkExportCoverage.ts"
+    "check:export": "jiti scripts/checkExportCoverage.ts",
+    "check:design": "jiti scripts/checkDesignSystem.ts"
   },
   "dependencies": {
     "idb": "^8.0.3",
