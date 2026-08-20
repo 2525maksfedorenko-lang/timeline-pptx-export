@@ -581,7 +581,63 @@ The export comparison is the load-bearing one: it is generated from the same
 fixture on both branches and compared stream by stream, so "geometry unchanged"
 is a measurement rather than an assurance.
 
-## 10. Still open
+## 10. The six colours the screen takes from the export palette — settled
 
-- The screen still takes six colours from `src/export/theme.ts`'s `COLORS` — the bar track, the option background, the on-surface text, the assignee fallback and the two connector greys. Four of those are exact token values already (`barTrack #E5E5E5` = `--border`, `optionBg #FFFFFF` = `--background`, `textOnSurface #0A0A0A` = `--foreground`); the two connector greys (`#8A94A0`, `#C7CDD4`) and the four grid-line greys have no token, which `theme.ts` says itself. Moving the screen off that palette means either editing a file the export reads or letting the two surfaces diverge — a decision, not a cleanup, so it is left here rather than taken.
-- The 9px tag pill and the Gantt's own geometry stay off-scale by decision (§7).
+Six colours reach the screen from `src/export/theme.ts`'s `COLORS`: the bar
+track, the option background, the on-surface text, the assignee fallback, and
+the two connector greys. Four are already exact token values (`barTrack #E5E5E5`
+= `--border`, `optionBg #FFFFFF` = `--background`, `textOnSurface #0A0A0A` =
+`--foreground`). The two connector greys (`#8A94A0`, `#C7CDD4`) and the four
+grid-line greys (`#CFCFCF`, `#D6D6D6`, `#B0B0B0`, `#E0E0E0`) have **no token at
+all** — `theme.ts` says so in its own comments.
+
+**Ruled: leave them.** Moving the screen off that palette would mean either
+editing a file the export reads, or letting the screen and the slide draw the
+same line in two different greys. Splitting the two surfaces for the sake of a
+tidy palette is a bad trade: the grid and the connectors are the one thing a
+reader compares between the app and the deck.
+
+The trigger to revisit is specific: **if the design system gains tokens for
+lines** — a rule/grid/connector colour, at any weight — these six become
+expressible and should move. Until then this is a decision, not a backlog item.
+
+The 9px tag pill and the Gantt's own geometry likewise stay off-scale by
+decision (§7).
+
+## 11. Keeping the transcription honest
+
+`systemUi.ts` is a copy, and a copy of a thing that can be re-pulled will go
+stale without anyone noticing. That risk is now mechanically guarded rather than
+merely acknowledged:
+
+    npm run check:design
+
+It does not diff text. It reads the *values* out of `Button.jsx`, `Input.jsx`
+and `Checkbox.jsx` at run time — the object literals carry the contract, and the
+free variables inside a style object (`disabled`, `invalid`, the caller's
+`style`) are stubbed, since the contract does not depend on them — converts each
+value to the Tailwind utility it implies, and asserts that utility is in the
+string we actually hand to a component. **50 values** are checked today.
+
+| It catches | How it reports |
+|---|---|
+| A size moving (default button 40 → 42) | names both values; and 42px is additionally flagged as off the 4px scale |
+| A colour or opacity moving (hover `/0.9` → `/0.85`) | `hover:bg-primary/85` expected, our string printed in full |
+| The system **adding** a variant or size | `MISSING` — "exists in the system but systemUi.ts cannot produce it" |
+| Tailwind renaming a shadow step again | the card-at-rest check resolves `--shadow-sm` against `node_modules/tailwindcss/theme.css` and asserts `CARD_CLASS` uses whichever utility currently emits it |
+| A colour invented into a recipe | every colour class is checked against the token names in `tokens/colors.css` + `status-palette.css` (type sizes are read from `typography.css` so they are not mistaken for colours) |
+| The source becoming unreadable | fails with "could not read … parity is unknown" rather than passing quietly |
+
+All six were exercised against a deliberately mutated copy of `Button.jsx`
+before this was committed, and the vendored files were left clean.
+
+### What it does *not* cover
+
+Worth stating, because a check that is trusted beyond its reach is worse than
+none:
+
+- **Only the three primitives we transcribe.** The system has 33. Transcribing a fourth means adding it here too, or it is unguarded.
+- **Presence, not absence.** It asserts the implied utility *is* in our string; it does not assert nothing else is. An extra utility that happens to use a real token (say `bg-muted` slipped onto the default button) would pass.
+- **The properties that carry the contract**, not every declaration: heights, widths, padding, radius, type size and weight, gap, the variant colours, focus, disabled, the card shadow. Not `display`, `boxSizing`, `whiteSpace`, `lineHeight` or the transition timing.
+- **Not call sites.** The `extra` argument each component passes is layout, and unchecked by construction.
+- **Not the guideline specimens.** The states card and the type/spacing cards are prose and HTML, not machine-readable contracts; the focus ring is checked because `elevation.css` happens to carry it as real tokens.
