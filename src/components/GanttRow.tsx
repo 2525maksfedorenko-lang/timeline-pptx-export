@@ -20,7 +20,7 @@ import {
   resolveBarGeometry,
 } from '../utils/barNesting';
 import { getDescendantIds } from '../utils/taskHierarchy';
-import { BAR_HEIGHT_PX, PROGRESS_FONT_SIZE_PX, STICKY_TINT_CLASS } from './ganttLayout';
+import { BAR_HEIGHT_PX, fitRowTags, PROGRESS_FONT_SIZE_PX, STICKY_TINT_CLASS } from './ganttLayout';
 import { Eye, EyeOff, MessageSquare, Trash2, UserRound } from 'lucide-react';
 
 interface GanttRowProps {
@@ -248,6 +248,14 @@ export function GanttRow({
   const barColor = `#${resolveBarColor(item)}`;
   const progressText = item.progress != null ? `${progress}%` : '';
   const progressTextWidth = progressText === '' ? 0 : measureTextWidthPx(progressText, PROGRESS_FONT);
+  // How this row's tags divide up what its name left of the label column — see
+  // fitRowTags. Memoised on the four things it reads, so a row measures text
+  // again only when one of them actually moves (the column's width changes for
+  // every row at once, on a resize or a plan edit).
+  const tagFit = useMemo(
+    () => fitRowTags(item.label, item.tags, depth, zone1Width),
+    [item.label, item.tags, depth, zone1Width],
+  );
   const fillWidth = (barWidth * progress) / 100;
   // The same three placements the slides use, in the same order and off the
   // same two shared rules — see the note in timelineExportModel's overview bar
@@ -527,13 +535,26 @@ export function GanttRow({
           style={{ backgroundColor: TASK_STATUS_DOT[status] }}
           title={TASK_STATUS_LABELS[status]}
         />
-        {/* On a phone the label column is capped (MOBILE_ZONE1_MAX_WIDTH_PX),
-            so the label ellipsizes instead of setting the column's width, and
-            the tag pills drop out of the row entirely — they'd take the space
-            the label needs, and they're still on the bar's own popup and in
-            every export. */}
+        {/* One line, never two: the column has a ceiling now
+            (MAX_ZONE1_WIDTH_PX, MOBILE_ZONE1_MAX_WIDTH_PX on a phone), so what
+            does not fit has to give way along the row rather than wrap under
+            it and be clipped by the row's fixed height. The name gives way
+            last — it is `truncate`, so it takes the space the pills leave and
+            ellipsizes into it — and the pills give way first, collapsing into
+            the "+N" counter fitRowTags worked out. The tags still drop out
+            entirely on a phone, where the whole column is 96px and they would
+            take the space the name needs; they stay on the bar's own popup and
+            in every export.
+
+            `title` on the name is the full text, always: a row is 40px tall
+            with no room for a second line, and the truncation point moves with
+            the zoom and the viewport. The design system does ship a Tooltip,
+            but it is a specimen for icon-only controls — absolutely positioned
+            inside its own trigger, which this column's `overflow-hidden` would
+            clip exactly where the text was cut. Native `title` is also what
+            every other control on this row already uses. */}
         <div
-          className={`flex min-w-0 flex-1 flex-wrap content-center items-center gap-x-1.5 gap-y-0.5 transition-opacity ${
+          className={`flex min-w-0 flex-1 items-center gap-x-1.5 transition-opacity ${
             isDimmed ? ROW_DIM_CLASS : ''
           }`}
           // The second nesting signal, from the same shared rule the bar height
@@ -541,17 +562,25 @@ export function GanttRow({
           // few pixels' difference and too easy to miss on a busy chart.
           style={{ paddingLeft: labelIndent(BAR_HEIGHT_PX, depth) }}
         >
-          <span className="whitespace-nowrap text-xs font-medium text-foreground max-md:min-w-0 max-md:truncate">
+          <span className="truncate text-xs font-medium text-foreground" title={item.label}>
             {item.label}
           </span>
-          {item.tags?.map((tag) => (
+          {tagFit.visible.map((tag) => (
             <span
               key={tag}
-              className="whitespace-nowrap rounded bg-muted px-1 text-[9px] font-medium leading-[14px] text-muted-foreground max-md:hidden"
+              className="flex-none whitespace-nowrap rounded bg-muted px-1 text-[9px] font-medium leading-[14px] text-muted-foreground max-md:hidden"
             >
               {tag}
             </span>
           ))}
+          {tagFit.hidden.length > 0 && (
+            <span
+              className="flex-none whitespace-nowrap rounded bg-muted px-1 text-[9px] font-medium leading-[14px] text-muted-foreground max-md:hidden"
+              title={tagFit.hidden.join(', ')}
+            >
+              +{tagFit.hidden.length}
+            </span>
+          )}
         </div>
       </div>
 
