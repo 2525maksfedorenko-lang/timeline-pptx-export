@@ -40,6 +40,17 @@ The rules that bite most often:
 - lucide is the only icon system.
 - Hover changes colour only — nothing scales, bounces, or slides for decoration.
 
+## The plan screen and its handoff
+`src/gantt/` is the plan screen, rebuilt from the Gantt design handoff at
+`design_handoff_gantt_chart/` (on the Desktop, outside this repo): two `.dc.html`
+prototypes and a measured README. For that screen the handoff — not the design system
+— is the source of look, layout, geometry and states, which reverses decisions E1/E3/E4/E5
+in `docs/design-system-map.md`; see the Phase 3 section there for exactly what changed
+and what the handoff leaves open. Its palette lives as `--gantt-*` tokens in
+`src/gantt/tokens.css`, the single place hex is written; components reference
+`var(--gantt-*)` and never a literal. Everything outside `src/gantt/` — dashboard,
+settings, import, exports — still follows the design system as before.
+
 `src/export/theme.ts` is a **separate** palette for the PPTX/PDF exporters: hex without `#`
 (pptxgenjs's format), and its grid-line/footer colours have no design-system counterpart. Keep the
 two in their own formats rather than trying to unify them.

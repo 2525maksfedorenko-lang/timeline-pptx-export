@@ -78,14 +78,6 @@ export const TASK_STATUS_CHIP: Record<TaskStatus, { bg: string; fg: string; bord
   },
 };
 
-/** The small status dot, which carries no text and so takes the mid step. */
-export const TASK_STATUS_DOT: Record<TaskStatus, string> = {
-  todo: TASK_STATUS_SCALE.todo.accent,
-  in_progress: TASK_STATUS_SCALE.in_progress.accent,
-  done: TASK_STATUS_SCALE.done.accent,
-  blocked: TASK_STATUS_SCALE.blocked.accent,
-};
-
 // Status words are lowercase throughout the product ("on track", "delayed",
 // "done") — deliberately, unlike first-class object labels which are Title Case.
 export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
@@ -116,11 +108,6 @@ export interface ExportOptions {
   scale: Timeline['scale'];
   showProgress: boolean;
   showDependencies: boolean;
-  // On-screen only (parent→subtask structure lines on the Gantt chart) —
-  // unlike the other fields here, this never reaches the PPTX/PDF exporters;
-  // it lives alongside them because the toggle sits in the same settings
-  // panel as showDependencies.
-  showHierarchyLines: boolean;
   commentMode: 'latest' | 'pinned' | 'all' | 'none';
   sortMode: SortMode;
   // null = use the full date range of the included tasks (no windowing).

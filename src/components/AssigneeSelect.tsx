@@ -1,6 +1,10 @@
 import { usePeopleStore } from '../store/peopleStore';
-import { NEW_PERSON_OPTION } from './assigneeSelection';
 import { INPUT_CLASS } from './systemUi';
+
+/** Sentinel select value for "+ Add new person", distinct from any real
+ * person id (a `crypto.randomUUID()`) and from '' (nothing chosen, which
+ * the caller reads as "no assignee"). */
+export const NEW_PERSON_OPTION = '__new__';
 
 interface AssigneeSelectProps {
   idPrefix: string;
@@ -9,6 +13,10 @@ interface AssigneeSelectProps {
   newPersonName: string;
   onNewPersonNameChange: (name: string) => void;
   placeholderLabel?: string;
+  /** The field's own box. Defaults to the design system's input contract;
+   * the Gantt's Edit Task panel passes the taller 44px field the handoff
+   * sets every panel control at. */
+  fieldClassName?: string;
 }
 
 /** A saved-people dropdown with an inline "+ Add new person" option — shared
@@ -25,6 +33,7 @@ export function AssigneeSelect({
   newPersonName,
   onNewPersonNameChange,
   placeholderLabel = 'Select assignee…',
+  fieldClassName = INPUT_CLASS,
 }: AssigneeSelectProps) {
   const people = usePeopleStore((state) => state.people);
 
@@ -34,7 +43,7 @@ export function AssigneeSelect({
         id={`${idPrefix}-assignee`}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className={INPUT_CLASS}
+        className={fieldClassName}
       >
         <option value="">{placeholderLabel}</option>
         {people.map((person) => (
@@ -51,7 +60,7 @@ export function AssigneeSelect({
           value={newPersonName}
           onChange={(event) => onNewPersonNameChange(event.target.value)}
           placeholder="e.g. Max Fedorenko"
-          className={INPUT_CLASS}
+          className={fieldClassName}
         />
       )}
     </div>

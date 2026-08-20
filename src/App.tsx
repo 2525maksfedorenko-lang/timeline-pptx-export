@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Calendar, LayoutDashboard, Settings, Upload } from 'lucide-react'
-import { GanttChart } from './components/GanttChart'
+import { Settings, Upload } from 'lucide-react'
+import { GanttScreen } from './gantt/GanttScreen'
+import { GanttToolbar } from './gantt/GanttToolbar'
 import { Dashboard, type DashboardSection } from './components/Dashboard'
 import { SettingsFlyout } from './components/SettingsFlyout'
 import { ExportOverflowModal } from './components/ExportOverflowModal'
 import { ImportModal } from './components/ImportModal'
 import { PlanNotice } from './components/PlanNotice'
-import { PlanSwitcher } from './components/PlanSwitcher'
 import { exportTimelineToPptx } from './export/pptxExporter'
 import { exportTimelineToPdf } from './export/pdfExporter'
 import { getExportOverviewItems, planOverview, type ExportMode } from './export/timelineExportModel'
@@ -14,8 +14,7 @@ import { buildExportFilename } from './export/dateScale'
 import { sortItemsForExport } from './utils/sortItemsForExport'
 import { useTimelineStore } from './store/timelineStore'
 import { usePeopleStore } from './store/peopleStore'
-import aicooLogo from '../design-system/assets/aicoo-logo-orbit-darkblue-text.svg'
-import { buttonClass } from './components/systemUi';
+import { buttonBaseClass } from './components/systemUi';
 
 type Tab = 'timeline' | 'dashboard'
 type ExportFormat = 'pptx' | 'pdf'
@@ -86,95 +85,92 @@ function App() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-base-background">
-      {/* The product's app header: 48px, hairline bottom border, white on the
-          pale blue-grey page chrome. Actions sit on the right of the same row
-          until there isn't one to share — on a phone they take their own row
-          and split it evenly, which also gets them to a thumb-sized height. */}
-      <header className="flex-shrink-0 border-b border-border bg-background">
-        <div className="flex min-h-12 items-center gap-3 px-4 py-2 max-md:flex-col max-md:items-stretch max-md:gap-3">
-          <div className="flex items-center gap-3">
-            <img src={aicooLogo} alt="aicoo" className="h-8 w-auto" />
-            <span className="h-5 w-px bg-border max-md:hidden" />
-            {activeTab === 'timeline' ? (
-              <Calendar size={20} strokeWidth={2} className="flex-shrink-0 text-muted-foreground" aria-hidden="true" />
-            ) : (
-              <LayoutDashboard size={20} strokeWidth={2} className="flex-shrink-0 text-muted-foreground" aria-hidden="true" />
-            )}
-            <h1 className="truncate text-lg font-semibold">
-              {activeTab === 'timeline' ? 'Timeline' : 'Dashboard'}
-            </h1>
-          </div>
-          {/* Four actions share this row on a desktop. On a phone they'd each
-              be squeezed to a third of the width they need, so below the
-              breakpoint they become a 2x2 grid instead — every button then
-              keeps a thumb-sized target and its label on one line. */}
-          <div className="ml-auto flex items-center gap-2 max-md:ml-0 max-md:grid max-md:w-full max-md:grid-cols-2">
-            {/* The single way in for a file, in the same row as the two
-                ways out. Outline rather than filled: importing is a step
-                towards the deck, not the thing this app is for. */}
+    <div className="flex h-screen flex-col overflow-hidden bg-base-background">
+      {/* One header for the whole app. The plan's own controls are the
+          handoff's; this app's four actions and its view switch join them at
+          the right of the top row, because there is nowhere else for them to
+          live once the screen is the plan. */}
+      <GanttToolbar
+        showTimelineControls={activeTab === 'timeline'}
+        actions={
+          <>
             <button
               type="button"
               onClick={() => setIsImportOpen(true)}
-              className={buttonClass('outline', 'default', 'gap-2 max-md:min-h-11 max-md:flex-1')}
+              title="Import a plan"
+              aria-label="Import a plan"
+              className={buttonBaseClass('ghost', 'h-8 w-8 flex-none text-muted-foreground')}
             >
               <Upload size={16} strokeWidth={2} aria-hidden="true" />
-              Import
             </button>
             <button
               type="button"
               onClick={() => setIsSettingsOpen(true)}
-              className={buttonClass('ghost', 'default', 'text-muted-foreground gap-2 max-md:min-h-11 max-md:flex-1')}
+              title="Export settings"
+              aria-label="Export settings"
+              className={buttonBaseClass('ghost', 'h-8 w-8 flex-none text-muted-foreground')}
             >
-              <Settings size={16} strokeWidth={2} />
-              Settings
+              <Settings size={16} strokeWidth={2} aria-hidden="true" />
             </button>
+            {/* Two exports, labelled by the file they produce rather than by
+                the verb — the verb is the same for both, and the row has no
+                width to spend saying it twice. */}
             <button
               type="button"
               onClick={() => handleExport('pdf')}
-              className={buttonClass('outline', 'default', 'max-md:min-h-11 max-md:flex-1')}
+              title="Export as PDF"
+              className={buttonBaseClass('outline', 'h-8 whitespace-nowrap px-3 text-xs font-semibold')}
             >
-              Export as PDF
+              PDF
             </button>
             <button
               type="button"
               onClick={() => handleExport('pptx')}
-              className={buttonClass('default', 'default', 'max-md:min-h-11 max-md:flex-1')}
+              title="Export to PowerPoint"
+              className={buttonBaseClass('default', 'h-8 whitespace-nowrap px-3 text-xs font-semibold')}
             >
-              Export to PowerPoint
+              PPTX
             </button>
-          </div>
+            <span className="h-5 w-px flex-none bg-border" />
+            {/* The same tray the scale switch uses, so the two read as one
+                kind of control rather than two. */}
+            <div className="bg-muted flex flex-none gap-0.5 rounded-lg p-0.5">
+              {([['timeline', 'Timeline'], ['dashboard', 'Dashboard']] as const).map(([tab, label]) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setActiveTab(tab)}
+                  aria-pressed={activeTab === tab}
+                  className={buttonBaseClass(
+                    activeTab === tab ? 'default' : 'ghost',
+                    'h-7 whitespace-nowrap px-3 text-[11px] font-semibold',
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </>
+        }
+      />
+
+      <main className="flex min-h-0 flex-1 flex-col">
+        {/* Sits with the plan it describes, above the chart whose order the
+            repair changed — and renders nothing at all when there was none. */}
+        <div className="flex-none empty:hidden [&>*]:mx-6 [&>*]:mt-4 max-md:[&>*]:mx-3">
+          <PlanNotice />
         </div>
-      </header>
 
-      <main className="min-h-0 flex-1 p-6 max-md:p-3">
-      <PlanSwitcher />
-
-      {/* Sits with the plan it describes, above the chart whose order the
-          repair changed — and renders nothing at all when there was none. */}
-      <PlanNotice />
-
-      {/* Tabs, per the design system: a muted pill whose active item is a
-          white card. Labels are Title Case like every other first-class
-          object label in the product, so they are written out rather than
-          capitalised from the value. */}
-      <div className="mb-4 inline-flex h-10 items-center rounded-md bg-muted p-1 text-muted-foreground max-md:flex max-md:w-full">
-        {([['timeline', 'Timeline'], ['dashboard', 'Dashboard']] as const).map(([tab, label]) => (
-          <button
-            key={tab}
-            type="button"
-            onClick={() => setActiveTab(tab)}
-            className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-colors max-md:min-h-11 max-md:flex-1 ${
-              activeTab === tab ? 'bg-background text-foreground shadow-xs' : 'hover:text-foreground'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
-      {activeTab === 'timeline' ? <GanttChart /> : <Dashboard highlightSection={highlightSection} />}
-
+        {/* The plan screen runs edge to edge and owns its own scrolling: its
+            canvas is one scroll container that has to reach the window's
+            edges to be worth scrolling. The dashboard keeps page padding. */}
+        {activeTab === 'timeline' ? (
+          <GanttScreen />
+        ) : (
+          <div className="min-h-0 flex-1 overflow-y-auto p-6 max-md:p-3">
+            <Dashboard highlightSection={highlightSection} />
+          </div>
+        )}
       </main>
 
       {isSettingsOpen && <SettingsFlyout onClose={() => setIsSettingsOpen(false)} />}
