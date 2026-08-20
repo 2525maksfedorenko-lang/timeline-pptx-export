@@ -5,6 +5,7 @@ import { AssigneeSelect } from './AssigneeSelect';
 import { resolveAssignee } from './assigneeSelection';
 import { TASK_STATUS_LABELS, type TaskStatus } from '../types/timeline';
 import { buildNewTask, isCompleteTask } from '../utils/newTask';
+import { buttonClass, INPUT_CLASS } from './systemUi';
 
 const TASK_STATUS_OPTIONS: { value: TaskStatus; label: string }[] = (
   Object.keys(TASK_STATUS_LABELS) as TaskStatus[]
@@ -56,7 +57,7 @@ export function AddTaskForm() {
       <button
         type="button"
         onClick={() => setIsOpen(true)}
-        className="rounded-md border border-dashed border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground max-md:min-h-11 max-md:px-4"
+        className={buttonClass('outline', 'default', 'border-dashed max-md:h-11')}
       >
         + Add task
       </button>
@@ -76,7 +77,7 @@ export function AddTaskForm() {
           value={label}
           onChange={(event) => setLabel(event.target.value)}
           placeholder="Task name"
-          className="rounded-md border border-border px-2 py-1 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          className={INPUT_CLASS}
         />
       </div>
 
@@ -89,7 +90,7 @@ export function AddTaskForm() {
           type="date"
           value={start}
           onChange={(event) => setStart(event.target.value)}
-          className="rounded-md border border-border px-2 py-1 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          className={INPUT_CLASS}
         />
       </div>
 
@@ -102,7 +103,7 @@ export function AddTaskForm() {
           type="date"
           value={end}
           onChange={(event) => setEnd(event.target.value)}
-          className="rounded-md border border-border px-2 py-1 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          className={INPUT_CLASS}
         />
       </div>
 
@@ -114,7 +115,7 @@ export function AddTaskForm() {
           id="add-task-status"
           value={status}
           onChange={(event) => setStatus(event.target.value as TaskStatus)}
-          className="rounded-md border border-border px-2 py-1 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          className={INPUT_CLASS}
         >
           {TASK_STATUS_OPTIONS.map((option) => (
             <option key={option.value} value={option.value}>
@@ -143,14 +144,14 @@ export function AddTaskForm() {
           type="button"
           onClick={() => void handleAdd()}
           disabled={!canAdd}
-          className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-primary"
+          className={buttonClass('default', 'sm')}
         >
           Add
         </button>
         <button
           type="button"
           onClick={handleCancel}
-          className="rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-muted"
+          className={buttonClass('ghost', 'sm', 'text-muted-foreground')}
         >
           Cancel
         </button>

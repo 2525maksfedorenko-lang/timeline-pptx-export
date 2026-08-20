@@ -25,10 +25,19 @@ export const TASK_STATUS_SCALE: Record<
   TaskStatus,
   { surface: string; border: string; accent: string; solid: string }
 > = {
+  // Each value is a design-system token, named here so the provenance is
+  // visible where the value is used. They stay written as hex because the PPTX
+  // exporter consumes them in exactly this form (TASK_STATUS_COLORS below
+  // strips the '#' for pptxgenjs); hsl(var(--x)) would be unreadable to it.
+  //                                                    the token each one is
   todo: { surface: '#F3F4F6', border: '#E5E5E5', accent: '#737373', solid: '#1F2937' },
+  //     --status-neutral-bg  --border/--input  --muted-foreground  --status-neutral-fg
   in_progress: { surface: '#DBEAFE', border: '#BFDBFE', accent: '#3B82F6', solid: '#1E40AF' },
+  //            --kanban-1-bg       --kanban-1-border  --kind-task        --kanban-1-fg
   done: { surface: '#DCFCE7', border: '#BBF7D0', accent: '#22C55E', solid: '#166534' },
+  //     --status-done-bg     --kanban-3-border --status-active-dot --status-done-fg
   blocked: { surface: '#FEE2E2', border: '#FECACA', accent: '#EF4444', solid: '#991B1B' },
+  //        --status-delayed-bg --kanban-4-border --destructive     --status-delayed-fg
 };
 
 const withoutHash = (hex: string) => hex.replace('#', '').toUpperCase();

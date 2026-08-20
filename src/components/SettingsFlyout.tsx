@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { ExportSettingsPanel } from './ExportSettingsPanel';
 import { X } from 'lucide-react';
+import { buttonClass } from './systemUi';
 
 interface SettingsFlyoutProps {
   onClose: () => void;
@@ -25,7 +26,7 @@ export function SettingsFlyout({ onClose }: SettingsFlyoutProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex justify-end bg-black/80"
+      className="fixed inset-0 z-50 flex justify-end bg-overlay-scrim"
       onClick={onClose}
       role="presentation"
     >
@@ -36,14 +37,14 @@ export function SettingsFlyout({ onClose }: SettingsFlyoutProps) {
         role="dialog"
         aria-modal="true"
         aria-label="Export settings"
-        className="flex h-full w-full max-w-md animate-[flyout-in_180ms_ease-out] flex-col border-l border-border bg-background shadow-xl"
+        className="flex h-full w-full max-w-md animate-[flyout-in_180ms_ease-out] flex-col border-l border-border bg-background shadow-lg"
       >
         <div className="flex flex-shrink-0 items-center justify-between border-b border-border px-4 py-3">
           <h2 className="text-sm font-semibold tracking-tight text-foreground">Settings</h2>
           <button
             type="button"
             onClick={onClose}
-            className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground max-md:h-11 max-md:w-11"
+            className={buttonClass('ghost', 'icon', 'text-muted-foreground flex max-md:h-11 max-md:w-11')}
             aria-label="Close settings"
           >
             <X size={16} strokeWidth={2} />

@@ -6,6 +6,7 @@ import { ProgressControl } from './ProgressControl';
 import { buildNewTask, isCompleteTask, type NewTaskFields } from '../utils/newTask';
 import { clampProgress } from '../utils/clampProgress';
 import { progressForStatus } from '../utils/progressForStatus';
+import { buttonClass } from './systemUi';
 
 /** Where the menu opens, in viewport coordinates — the point the pointer
  * was released at. */
@@ -113,7 +114,7 @@ export function BarActionMenu({
       ref={menuRef}
       role="dialog"
       aria-label={`Actions for ${item.label}`}
-      className="fixed z-50 overflow-y-auto rounded-md border border-border bg-popover p-3 shadow-lg"
+      className="fixed z-50 overflow-y-auto rounded-md border border-border bg-popover p-3 shadow-md"
       style={{
         left: Math.max(VIEWPORT_MARGIN_PX, left),
         top: Math.max(VIEWPORT_MARGIN_PX, top),
@@ -198,14 +199,14 @@ export function BarActionMenu({
               type="button"
               onClick={handleAdd}
               disabled={!isCompleteTask(draft)}
-              className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-primary"
+              className={buttonClass('default', 'sm')}
             >
               Add
             </button>
             <button
               type="button"
               onClick={onClose}
-              className="rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted"
+              className={buttonClass('ghost', 'sm', 'text-muted-foreground')}
             >
               Cancel
             </button>

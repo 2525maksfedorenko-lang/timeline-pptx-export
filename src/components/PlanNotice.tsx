@@ -1,11 +1,10 @@
 import { AlertTriangle, X } from 'lucide-react';
 import { useTimelineStore } from '../store/timelineStore';
+import { buttonClass, CARD_CLASS } from './systemUi';
 
 /** Stable empty array, so a plan with nothing to report doesn't hand the
  * selector a new reference on every render. */
 const NO_NOTICES: string[] = [];
-
-const focusRing = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring';
 
 /** What loading this plan had to repair in it, said once, above the chart it
  * changed.
@@ -16,12 +15,13 @@ const focusRing = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-
  * nowhere to say it at all, so the person met a plan that sorted differently
  * than they left it with no way to find out why.
  *
- * Deliberately not a toast, an alert component or a notification queue: this
- * app has no such system and the design system has no primitive for one. It is
- * the card the rest of the app is built from (border, bg-card, rounded-lg), a
- * lucide icon and a ghost icon button — the same three pieces ImportModal
- * already assembles its warnings from — showing one specific message about the
- * open plan. Anything more general would be the start of a second UI system.
+ * Deliberately not a toast, an alert component or a notification queue: the
+ * design system has no primitive for one — no toast, no banner, no inline alert
+ * (its only overlays are AlertDialog and ConfirmationPopover, both of which
+ * interrupt). So this is composed from primitives that do exist: the system's
+ * card at rest (1px --border, 8px radius, --card fill, --shadow-sm), a lucide
+ * icon, and its ghost icon button. Anything more general would be the start of
+ * a second UI system.
  *
  * Session-scoped by construction: `planNotices` is not persisted, so this
  * cannot come back tomorrow for a repair that already happened. It does come
@@ -39,7 +39,7 @@ export function PlanNotice() {
       // Polite rather than assertive: nothing is broken and nothing is
       // waiting on the reader — the plan is already open and already repaired.
       role="status"
-      className="mb-4 flex items-start gap-3 rounded-lg border border-border bg-card p-3"
+      className={`mb-4 flex items-start gap-3 p-3 ${CARD_CLASS}`}
     >
       <AlertTriangle
         size={16}
@@ -66,7 +66,11 @@ export function PlanNotice() {
         type="button"
         onClick={dismissPlanNotices}
         aria-label="Dismiss"
-        className={`-mr-1 -mt-1 inline-flex flex-shrink-0 items-center justify-center rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground max-md:min-h-11 max-md:min-w-11 ${focusRing}`}
+        className={buttonClass(
+          'ghost',
+          'icon',
+          '-mr-1 -mt-1 flex-shrink-0 text-muted-foreground max-md:h-11 max-md:w-11',
+        )}
       >
         <X size={16} strokeWidth={2} aria-hidden="true" />
       </button>

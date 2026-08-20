@@ -284,12 +284,14 @@ export function GanttChart() {
               {days.map((day, index) => (
                 <div
                   key={day.toISOString()}
-                  // The date tier: monospace, a notch smaller than before
-                  // (was text-[11px] in the body face) and tracked out. Still
-                  // wraps to "Aug" / "01" inside the fixed pxPerDay column
-                  // exactly as it did before, since both halves are narrower
-                  // than the column even at the tightest zoom.
-                  className={`flex-shrink-0 py-2 text-center font-mono text-[10px] tracking-[0.02em] text-muted-foreground ${
+                  // The date tier: monospace, a notch smaller than the body
+                  // face, at the scale's 10px step (--text-2xs, exposed here as
+                  // text-micro). Tabular numerals rather than tracking — the
+                  // system's mono specimen names the first and prescribes no
+                  // letter-spacing. Still wraps to "Aug" / "01" inside the fixed
+                  // pxPerDay column, since both halves are narrower than the
+                  // column even at the tightest zoom.
+                  className={`flex-shrink-0 py-2 text-center font-mono text-micro tabular-nums text-muted-foreground ${
                     showDayCellBorders ? 'border-r border-border' : ''
                   }`}
                   style={{ width: pxPerDay }}

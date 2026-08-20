@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import type { ExportMode } from '../export/timelineExportModel';
+import { buttonClass, CARD_CLASS, FOCUS_RING } from './systemUi';
 
 interface ExportOverflowModalProps {
   /** In-range tasks, at every depth — more than `capacity`, or this modal
@@ -24,7 +25,10 @@ function ModeOption({
     <button
       type="button"
       onClick={onClick}
-      className="w-full rounded-md border border-border px-4 py-3 text-left transition-colors hover:bg-accent hover:bg-muted/50"
+      // A two-line choice is the system's clickable card, not a button:
+      // "Clickable cards go to hsl(var(--muted) / 0.5) and --shadow-md on
+      // hover" (readme.md). It carried two conflicting hover fills before.
+      className={`w-full px-4 py-3 text-left transition-colors hover:bg-muted/50 hover:shadow-md ${CARD_CLASS} ${FOCUS_RING}`}
     >
       <span className="block text-sm font-medium text-foreground">{title}</span>
       <span className="mt-0.5 block text-xs text-muted-foreground">{description}</span>
@@ -46,7 +50,7 @@ export function ExportOverflowModal({ totalTasks, capacity, onSelect, onCancel }
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-overlay-scrim p-4"
       onClick={onCancel}
     >
       <div
@@ -54,7 +58,7 @@ export function ExportOverflowModal({ totalTasks, capacity, onSelect, onCancel }
         aria-modal="true"
         aria-labelledby="export-overflow-title"
         onClick={(event) => event.stopPropagation()}
-        className="w-full max-w-md rounded-lg border border-border bg-background p-6 shadow-xl"
+        className="w-full max-w-md rounded-lg border border-border bg-background p-6 shadow-lg"
       >
         <h2 id="export-overflow-title" className="text-lg font-semibold tracking-tight text-foreground">
           More tasks than fit on one slide
@@ -80,7 +84,7 @@ export function ExportOverflowModal({ totalTasks, capacity, onSelect, onCancel }
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted"
+            className={buttonClass('ghost', 'sm', 'text-muted-foreground')}
           >
             Cancel
           </button>

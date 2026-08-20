@@ -20,7 +20,7 @@ interface DashboardProps {
   highlightSection?: DashboardSection | null;
 }
 
-const CARD_CLASSES = 'rounded-lg border border-border bg-card p-4';
+const CARD_CLASSES = 'rounded-lg border border-border bg-card p-4 shadow-xs';
 const HIGHLIGHT_CLASSES = 'ring-2 ring-ring ring-offset-2';
 
 function KpiCard({ label, value, accent }: { label: string; value: string; accent?: string }) {
@@ -137,7 +137,7 @@ function DelayedTable({ items, today }: { items: TimelineItem[]; today: Date }) 
           {items.map((item) => (
             <tr key={item.id} className="border-b border-border last:border-0">
               <td className="py-2 pr-3 font-medium text-foreground">{item.label}</td>
-              <td className="py-2 pr-3 font-mono text-xs tracking-[0.02em] text-muted-foreground">{formatShortDate(new Date(item.end))}</td>
+              <td className="py-2 pr-3 font-mono text-xs tabular-nums text-muted-foreground">{formatShortDate(new Date(item.end))}</td>
               <td className="py-2 pr-3 font-medium text-destructive">{getDaysOverdue(item, today)}</td>
               <td className="py-2 text-muted-foreground">{assigneeText(item)}</td>
             </tr>
@@ -167,7 +167,7 @@ function AtRiskTable({ items }: { items: TimelineItem[] }) {
           {items.map((item) => (
             <tr key={item.id} className="border-b border-border last:border-0">
               <td className="py-2 pr-3 font-medium text-foreground">{item.label}</td>
-              <td className="py-2 pr-3 font-mono text-xs tracking-[0.02em] text-muted-foreground">{formatShortDate(new Date(item.end))}</td>
+              <td className="py-2 pr-3 font-mono text-xs tabular-nums text-muted-foreground">{formatShortDate(new Date(item.end))}</td>
               <td className="py-2 text-muted-foreground">{assigneeText(item)}</td>
             </tr>
           ))}

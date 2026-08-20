@@ -146,7 +146,7 @@ const FALLBACK_ASSIGNEE_COLOR = COLORS.assigneeFallback;
 // the mercy of an inherited Tailwind CSS variable.
 const BAR_TRACK_COLOR = withHash(COLORS.barTrack);
 // Must match how the progress text on the bar is actually styled below
-// (`text-[11px] font-semibold`, app font stack), since it's what the fit
+// (`text-xs font-semibold`, app font stack), since it's what the fit
 // measurement is made against. The size itself lives in ganttLayout, next to
 // the bar height it gets compared against — see PROGRESS_FONT_SIZE_PX.
 const PROGRESS_FONT = `600 ${PROGRESS_FONT_SIZE_PX}px ui-sans-serif, system-ui, sans-serif`;
@@ -749,7 +749,7 @@ export function GanttRow({
           style={{ left, width: barWidth, top: barOffsetY, height: barHeight }}
         >
           <div
-            className="h-full overflow-hidden rounded-md shadow-sm"
+            className="h-full overflow-hidden rounded-md"
             style={{ backgroundColor: BAR_TRACK_COLOR, opacity: 1 }}
           >
             <div className="h-full" style={{ width: `${progress}%`, backgroundColor: barColor, opacity: 1 }} />
@@ -757,7 +757,7 @@ export function GanttRow({
 
           {progressText && (
             <span
-              className="pointer-events-none absolute top-0 flex h-full items-center whitespace-nowrap text-[11px] font-semibold"
+              className="pointer-events-none absolute top-0 flex h-full items-center whitespace-nowrap text-xs font-semibold"
               style={progressTextStyle}
             >
               {progressText}
