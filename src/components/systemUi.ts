@@ -65,6 +65,20 @@ export function buttonClass(
   return `${BUTTON_BASE} ${BUTTON_VARIANT[variant]} ${BUTTON_SIZE[size]}${extra ? ` ${extra}` : ''}`;
 }
 
+/** The same button, minus the size — for the handful of controls that have to
+ * set their own height because the design system has no step at it.
+ *
+ * The Gantt handoff's toolbar is the only caller: its segmented control and
+ * filter chips are 28px and its Today button 32px, against the system's
+ * 36/40/44. Those cannot be layered on top of a size from `buttonClass`,
+ * because `h-7` and `h-9` are then both in the class list and which one wins
+ * is decided by Tailwind's ordering rather than by us. So the size is left
+ * out here and supplied by the caller, deliberately and visibly, rather than
+ * being smuggled in as an override. */
+export function buttonBaseClass(variant: ButtonVariant = 'default', extra = ''): string {
+  return `${BUTTON_BASE} ${BUTTON_VARIANT[variant]}${extra ? ` ${extra}` : ''}`;
+}
+
 /** A text input, select or textarea. h-10, `--radius-md`, 1px `--input`.
  *
  * `max-md:text-base` is the iOS Safari zoom guard and is deliberately part of
@@ -73,6 +87,15 @@ export function buttonClass(
  * choice. It is the one place this file knowingly leaves the 14px control size. */
 export const INPUT_CLASS =
   `h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground max-md:text-base ${FOCUS_RING}`;
+
+/** The input contract with its height and type size left out, for the same
+ * reason `buttonBaseClass` exists: the Gantt handoff's search box is 32px at
+ * 12px type, and stacking `h-8 text-xs` on top of `h-10 text-sm` would leave
+ * two conflicting utilities in one class list. Everything else — the radius,
+ * the 1px `--input` border, the padding, the focus ring — is the system's and
+ * comes along. */
+export const INPUT_SHELL_CLASS =
+  `w-full rounded-md border border-input bg-background px-3 py-2 text-foreground ${FOCUS_RING}`;
 
 /** The same contract for a control that has to size itself to its content
  * (a number field in a row of them), keeping height, border and type. */

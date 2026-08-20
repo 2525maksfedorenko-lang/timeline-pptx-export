@@ -72,7 +72,6 @@ export const DEFAULT_EXPORT_OPTIONS: ExportOptions = {
   scale: 'days',
   showProgress: true,
   showDependencies: true,
-  showHierarchyLines: true,
   commentMode: 'latest',
   sortMode: 'status',
   exportTimeframe: null,

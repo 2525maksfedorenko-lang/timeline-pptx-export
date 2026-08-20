@@ -7,6 +7,11 @@
    product's values; only colour needs bridging into Tailwind's namespace. */
 @import "../design-system/styles.css";
 
+/* The plan screen's own palette, transcribed from the Gantt design handoff —
+   the one surface the design system does not cover (it owns no bar, grid,
+   connector or today-band colour). See the file's header for provenance. */
+@import "./gantt/tokens.css";
+
 @theme {
   /* Colour tokens stay as var() references rather than resolved values, so a
      future `.dark` swap on <html> keeps working without touching utilities. */

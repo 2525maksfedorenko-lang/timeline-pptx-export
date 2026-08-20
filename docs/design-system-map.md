@@ -641,3 +641,34 @@ none:
 - **The properties that carry the contract**, not every declaration: heights, widths, padding, radius, type size and weight, gap, the variant colours, focus, disabled, the card shadow. Not `display`, `boxSizing`, `whiteSpace`, `lineHeight` or the transition timing.
 - **Not call sites.** The `extra` argument each component passes is layout, and unchecked by construction.
 - **Not the guideline specimens.** The states card and the type/spacing cards are prose and HTML, not machine-readable contracts; the focus ring is checked because `elevation.css` happens to carry it as real tokens.
+
+---
+
+# Phase 3 — the plan screen is rebuilt to the handoff
+
+Recorded on the branch `feat/handoff-rebuild`. **This reverses four of the Phase 2
+decisions above, for one screen and no other.**
+
+Phase 2 was a restyling pass: the handoff was treated as a source of geometry and
+intent only, the design system was the sole source of colour, and nothing new was
+built. The instruction for Phase 3 is the opposite one — rebuild the app's screen
+*as* the handoff's prototypes, take a value from the prototype wherever it has
+one, and only ask where the handoff is silent. So:
+
+| # | Phase 2 said | Phase 3 does |
+|---|---|---|
+| E1 | Achromatic. The handoff's slate ramp is not adopted; its 25 tokenless hexes fall to the nearest neutral token. | **The handoff's palette is adopted for the plan screen**, as `--gantt-*` tokens in `src/gantt/tokens.css`. Where a handoff value is identical to a system token the system token is referenced instead of restating the number (`#f1f5f9` *is* `--muted`; white *is* `--card`). No hex is written outside that one file. Every other screen — dashboard, settings, import, the export slides — is untouched and stays achromatic. |
+| E3 | Gantt geometry stays ours: row 40, bar 32, zones 118/292/104; `BASE_PX_PER_DAY` is not touched. | **The handoff's geometry is adopted**: row 52, bar `min(34, row−16)`, list 320, columns 30/15.2/7px per day, panel 348/520. It lives in `src/gantt/geometry.ts` and `src/gantt/scale.ts`. `BASE_PX_PER_DAY` is still not touched — the screen's column width and the slides' inches-per-day are now separate numbers on purpose. |
+| E4 | The system wins on the two contradictions: no inset shadow on a resize handle, radii 3 and 5 round to the 4/6 scale. | **The handoff wins on this screen.** The resize handle's hover keeps its `inset ±2px` hairline, the bar keeps radius 5, the CP badge radius 3. |
+| E5 | Nothing new is built from the handoff — no side panel, no critical path, no search toolbar. | **All of it is built**: the two-row toolbar with search, filter chips and the Links / Critical path switches; roll-up groups with collapse and a sub-task count; the Edit Task side panel; CPM over the leaf tasks; the inline add row; the today band, weekend tint and out-of-range shading. |
+
+E2 (11px → 12px, 9px kept) is untouched and still applies to the export side.
+
+## What the handoff does not answer
+
+Recorded rather than decided silently:
+
+- **The app's own actions.** Import, Settings, the two exports, the Dashboard view and plan switching have no slot in the handoff's toolbar. Per the project owner they were folded into it: icon buttons and short labels at the right of the top row, and the plan's name became the plan menu. The handoff's own README warns that this row overflows below ~950px, which is why the export buttons read "PDF" / "PPTX" rather than spelling the verb twice.
+- **Nesting past two levels.** The handoff models exactly `task` and `group`, so it names exactly three left-indents (6 / 24 / 26). This app's `parentId` allows any depth; depth ≥ 2 reuses the child indent rather than extrapolating a ladder the handoff does not specify.
+- **The canvas's extent.** The prototype's canvas is a fixed 133 days with 7 days of air before the first task and 30 after the last. A canvas derived from the plan takes those two numbers as its padding, and is additionally widened to the viewport so the grid never stops in mid-air.
+- **Author on a comment, description on a task, more than one assignee.** The model has none of the three. The panel's comment row shows its date where the handoff shows an avatar and a name, the Description field is not built, and a bar carries one avatar rather than a stack.

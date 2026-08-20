@@ -3,7 +3,7 @@ import type { ExportOptions } from '../store/timelineStore';
 /** The export options that are plain on/off switches. Spelled out rather than
  * derived from the type, because the rest of ExportOptions is not booleans and
  * each of those fields would need a rule of its own. */
-const FLAG_FIELDS = ['showProgress', 'showDependencies', 'showHierarchyLines'] as const;
+const FLAG_FIELDS = ['showProgress', 'showDependencies'] as const;
 
 type FlagField = (typeof FLAG_FIELDS)[number];
 

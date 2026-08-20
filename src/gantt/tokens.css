@@ -1,0 +1,141 @@
+/* The Gantt handoff's palette, transcribed once.
+ *
+ * Source: design_handoff_gantt_chart/ — "Gantt Chart.dc.html" (the primary
+ * prototype) and its README's "Design Tokens" section. Every value below is
+ * read out of one of those two files; none is chosen here.
+ *
+ * Why these live as tokens rather than as literals at the call sites: the app
+ * writes no raw hex outside a token layer (CLAUDE.md), and this is that layer
+ * for the plan screen. Components reference `var(--gantt-*)` and never a hex.
+ *
+ * Relation to `design-system/`: the handoff paints in Tailwind *slate* where
+ * the design system's neutrals are achromatic. docs/design-system-map.md
+ * recorded decision E1 ("achromatic — the handoff is not a source of colour")
+ * for the earlier restyling pass; this screen is a rebuild *to* the handoff,
+ * so E1 is reversed here and only here — see the note appended to that
+ * document. Where a handoff value is identical to a system token, the system
+ * token is referenced instead of restating the number: `#f1f5f9` is exactly
+ * `--muted`, and white is exactly `--card`.
+ */
+
+:root {
+  /* Surfaces */
+  --gantt-surface: hsl(var(--card));            /* list, header, rows       */
+  --gantt-band: #fafafa;                        /* panel section bands      */
+  --gantt-add-row: #fcfdfe;                     /* the list's add row       */
+  --gantt-row-selected: #f5f9ff;                /* selected list row        */
+  --gantt-weekend: #fafcfd;                     /* weekend column tint      */
+  --gantt-weekend-head: #f8fafc;                /* weekend cell, day zoom   */
+  --gantt-add-button-bg: #eff6ff;
+  --gantt-add-button-fg: #2563eb;
+
+  /* Rules. Soft is exactly the system's --muted. */
+  --gantt-rule-strong: #e2e8f0;                 /* header, list edge, periods */
+  --gantt-rule-soft: hsl(var(--muted));         /* row lines                  */
+  --gantt-rule-faint: #f4f7fa;                  /* day lines, week zoom       */
+
+  /* Text */
+  --gantt-text: #334155;
+  --gantt-text-secondary: #64748b;
+  --gantt-text-muted: #94a3b8;
+  --gantt-text-faint: #cbd5e1;                  /* drag dots, todo icon, links */
+
+  /* Status tones: bar fill, on-bar label, progress overlay + status icon. */
+  --gantt-done-bg: #dcfce7;
+  --gantt-done-text: #166534;
+  --gantt-done-fill: #22c55e;
+  --gantt-active-bg: #dbeafe;
+  --gantt-active-text: #1e3a8a;
+  --gantt-active-fill: #3b82f6;
+  --gantt-todo-bg: hsl(var(--muted));           /* #f1f5f9 */
+  --gantt-todo-text: #475569;
+  --gantt-todo-fill: #94a3b8;
+  --gantt-blocked-bg: #fee2e2;
+  --gantt-blocked-text: #991b1b;
+  --gantt-blocked-fill: #ef4444;
+  --gantt-icon-todo: #cbd5e1;                   /* the outline circle only */
+
+  /* Name pill */
+  --gantt-pill-border: #bfdbfe;
+  --gantt-pill-bg: #f8fbff;
+  --gantt-pill-border-blocked: #fecaca;
+  --gantt-pill-bg-blocked: #fef6f6;
+  --gantt-edit-focus: #60a5fa;
+
+  /* Percent complete */
+  --gantt-pct-complete: #16a34a;
+  --gantt-pct-started: #64748b;
+  --gantt-pct-zero: #cbd5e1;
+
+  /* Badges */
+  --gantt-subcount-bg: #475569;
+  --gantt-cp-bg: #fee2e2;
+  --gantt-cp-fg: #b91c1c;
+
+  /* Timeline overlays */
+  --gantt-today-fill: rgba(254, 240, 138, 0.35);
+  --gantt-today-edge: #fde047;
+  --gantt-out-of-range: linear-gradient(
+    to right,
+    rgba(254, 226, 226, 0.75) 0,
+    rgba(254, 226, 226, 0.55) 220px,
+    rgba(254, 226, 226, 0.28) 100%
+  );
+
+  /* Bar chrome */
+  --gantt-edge-dot: #60a5fa;
+  --gantt-edge-dot-blocked: #f87171;
+  --gantt-edge-dot-ring: hsl(var(--card));
+  --gantt-handle-hover: rgba(15, 23, 42, 0.16);
+  --gantt-handle-hover-inset: rgba(15, 23, 42, 0.35);
+  --gantt-drag-pill-bg: #334155;
+  --gantt-drag-pill-fg: hsl(var(--card));
+
+  /* Connectors */
+  --gantt-link: #cbd5e1;
+  --gantt-link-critical: #ef4444;
+
+  /* The six-person avatar palette. Assigned by position, so a name keeps its
+   * colour across every bar it appears on. */
+  --gantt-avatar-1: #2563eb;
+  --gantt-avatar-2: #7c3aed;
+  --gantt-avatar-3: #059669;
+  --gantt-avatar-4: #d97706;
+  --gantt-avatar-5: #db2777;
+  --gantt-avatar-6: #0891b2;
+  --gantt-avatar-ring: hsl(var(--card));
+
+  /* Comments */
+  --gantt-comment-avatar: #475569;
+}
+
+/* The prototype's own scrollbar, scoped to the plan canvas rather than set on
+ * the document the way the prototype's page-level <style> does it. */
+.gantt-scroll::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+.gantt-scroll::-webkit-scrollbar-thumb {
+  background: var(--gantt-text-faint);
+  border-radius: 8px;
+  border: 3px solid var(--gantt-surface);
+}
+
+/* The resize strips at a bar's ends: invisible until the pointer is on one,
+ * then a dark wash with a hairline pressed against the edge being dragged.
+ * A :hover rule cannot be written inline, which is the only reason these two
+ * are classes and the rest of the bar's geometry is not. */
+.gantt-handle {
+  background: transparent;
+}
+
+.gantt-handle-left:hover {
+  background: var(--gantt-handle-hover);
+  box-shadow: inset 2px 0 0 var(--gantt-handle-hover-inset);
+}
+
+.gantt-handle-right:hover {
+  background: var(--gantt-handle-hover);
+  box-shadow: inset -2px 0 0 var(--gantt-handle-hover-inset);
+}

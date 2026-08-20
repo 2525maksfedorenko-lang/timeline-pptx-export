@@ -8,8 +8,12 @@ import { buildTaskHierarchy } from '../utils/taskHierarchy';
 import { firstDayOfMonthIso, getDateRange, lastDayOfMonthIso } from '../export/dateScale';
 import { ChevronDown, ChevronRight, Pin } from 'lucide-react';
 import { buttonClass, CHECKBOX_CLASS, INPUT_CLASS_AUTO } from './systemUi';
-import { ACTIONS_ZONE_WIDTH_PX, BAR_HEIGHT_PX } from './ganttLayout';
+import { BAR_HEIGHT_PX } from './ganttLayout';
 import { labelIndent } from '../utils/barNesting';
+
+/** How much of each task row the status chip takes. Wide enough for the
+ * longest label ("In progress") plus the chip's padding and caret. */
+const STATUS_CHIP_WIDTH_PX = 104;
 
 const COMMENT_BODY_CLASSES =
   '[&_p]:mb-2 [&_p:last-child]:mb-0 [&_strong]:font-semibold [&_em]:italic ' +
@@ -88,7 +92,6 @@ export function ExportSettingsPanel() {
   const comments = useTimelineStore((state) => state.comments);
   const commentMode = useTimelineStore((state) => state.exportOptions.commentMode);
   const showDependencies = useTimelineStore((state) => state.exportOptions.showDependencies);
-  const showHierarchyLines = useTimelineStore((state) => state.exportOptions.showHierarchyLines);
   const sortMode = useTimelineStore((state) => state.exportOptions.sortMode);
   const exportTimeframe = useTimelineStore((state) => state.exportOptions.exportTimeframe);
   const updateExportOptions = useTimelineStore((state) => state.updateExportOptions);
@@ -234,9 +237,9 @@ export function ExportSettingsPanel() {
                     className={`${CHECKBOX_CLASS} max-md:h-5 max-md:w-5`}
                   />
                   <span className="flex-1 truncate text-sm font-medium text-foreground">{item.label}</span>
-                  {/* The same chip as the chart's status column, not a
-                      second control that means the same thing. */}
-                  <div className="flex-shrink-0" style={{ width: ACTIONS_ZONE_WIDTH_PX }}>
+                  {/* The chip changes the status here as well as in the
+                      plan, rather than being a read-only echo of it. */}
+                  <div className="flex-shrink-0" style={{ width: STATUS_CHIP_WIDTH_PX }}>
                     <StatusSelect
                       status={getTaskStatus(item)}
                       onChange={(next) => updateItem(item.id, { status: next })}
@@ -277,16 +280,6 @@ export function ExportSettingsPanel() {
               className={`${CHECKBOX_CLASS} max-md:h-5 max-md:w-5`}
             />
             Show dependencies
-          </label>
-
-          <label className="mt-2 flex items-center gap-2 text-sm text-foreground max-md:min-h-11">
-            <input
-              type="checkbox"
-              checked={showHierarchyLines}
-              onChange={(event) => updateExportOptions({ showHierarchyLines: event.target.checked })}
-              className={`${CHECKBOX_CLASS} max-md:h-5 max-md:w-5`}
-            />
-            Show hierarchy lines
           </label>
 
           <div className="mt-4 border-t border-border pt-4">

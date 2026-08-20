@@ -81,12 +81,26 @@ export function buildDeck(plan: FixturePlan, scenario: Pick<Scenario, 'exportMod
   return { orderedSlides, links: buildSlideLinks(orderedSlides) };
 }
 
-// --- indent parity with the screen -------------------------------------------
+// --- indent parity with the reference ladder ---------------------------------
+//
+// A note on what "screen" means in the two checks below. They were written when
+// the on-screen Gantt drew the same ladder the slides do, and compared the two
+// directly. That screen has since been rebuilt to the Gantt design handoff (see
+// docs/design-system-map.md, Phase 3) and now has its own geometry in
+// src/gantt/ — 52px rows, 34px bars, no depth-stepped bar heights at all.
+//
+// So the "screen" column below is no longer a second surface: it is the
+// reference ladder in src/components/ganttLayout.ts, expressed in px, which the
+// export settings panel's task list still indents on. What these checks are
+// really asserting is that the slides' own ladder and that reference stay one
+// rule at every depth, in two units. That is still worth asserting — it is the
+// rule the slides are built from — but it is no longer a claim about what the
+// plan screen draws.
 
-/** The two surfaces work in different units (DOM px, slide inches), so parity
- * can only be asserted as a ratio: one indent step, divided by that surface's
- * own bar height. Compared at every level up to the cap, since that is where a
- * ladder that started on a different rung would give itself away. */
+/** The two units (px, slide inches) mean parity can only be asserted as a
+ * ratio: one indent step, divided by that unit's own bar height. Compared at
+ * every level up to the cap, since that is where a ladder that started on a
+ * different rung would give itself away. */
 function checkIndentParity(): { rows: string[][]; failures: string[] } {
   const rows: string[][] = [];
   const failures: string[] = [];
@@ -117,8 +131,8 @@ function checkIndentParity(): { rows: string[][]; failures: string[] } {
   return { rows, failures };
 }
 
-/** The height ladder as each surface actually draws it, and where each rung
- * puts its progress percentage.
+/** The height ladder in each unit, and where each rung puts its progress
+ * percentage.
  *
  * The heights are shared by construction (one ladder, two base units), so what
  * this is really auditing is the *second* rule: the two surfaces set that label
