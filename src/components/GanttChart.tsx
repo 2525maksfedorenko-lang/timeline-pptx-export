@@ -8,6 +8,7 @@ import { HierarchyConnectors } from './HierarchyConnectors';
 import {
   ACTIONS_ZONE_WIDTH_PX,
   MOBILE_ACTIONS_ZONE_WIDTH_PX,
+  MAX_ZONE1_WIDTH_PX,
   MOBILE_ZONE1_MAX_WIDTH_PX,
   STATUS_ZONE_WIDTH_PX,
   STICKY_TINT_CLASS,
@@ -144,7 +145,12 @@ export function GanttChart() {
   const isMobile = useIsMobile();
   const pxPerDay = BASE_PX_PER_DAY * zoomLevel;
   const zone1Width = useMemo(
-    () => computeZone1Width(items, buildDepthMap(items), isMobile ? MOBILE_ZONE1_MAX_WIDTH_PX : undefined),
+    () =>
+      computeZone1Width(
+        items,
+        buildDepthMap(items),
+        isMobile ? MOBILE_ZONE1_MAX_WIDTH_PX : MAX_ZONE1_WIDTH_PX,
+      ),
     [items, isMobile],
   );
   const actionsZoneWidth = isMobile ? MOBILE_ACTIONS_ZONE_WIDTH_PX : ACTIONS_ZONE_WIDTH_PX;
