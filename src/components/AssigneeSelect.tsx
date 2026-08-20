@@ -1,5 +1,6 @@
 import { usePeopleStore } from '../store/peopleStore';
 import { NEW_PERSON_OPTION } from './assigneeSelection';
+import { INPUT_CLASS } from './systemUi';
 
 interface AssigneeSelectProps {
   idPrefix: string;
@@ -33,7 +34,7 @@ export function AssigneeSelect({
         id={`${idPrefix}-assignee`}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="rounded-md border border-border bg-popover px-2 py-1 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        className={INPUT_CLASS}
       >
         <option value="">{placeholderLabel}</option>
         {people.map((person) => (
@@ -50,7 +51,7 @@ export function AssigneeSelect({
           value={newPersonName}
           onChange={(event) => onNewPersonNameChange(event.target.value)}
           placeholder="e.g. Max Fedorenko"
-          className="rounded-md border border-border px-2 py-1 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          className={INPUT_CLASS}
         />
       )}
     </div>

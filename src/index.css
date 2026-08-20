@@ -46,6 +46,12 @@
   --color-status-active-dot: var(--status-active-dot);
   --color-status-inactive-dot: var(--status-inactive-dot);
 
+  /* The modal scrim. The system fixes it at rgb(0 0 0 / 0.8) in
+     tokens/elevation.css and the readme calls it out ("Modal scrims are flat
+     black/80"), so it is a token here rather than Tailwind's own `black/80`
+     — which happens to render the same but is not the system's to change. */
+  --color-overlay-scrim: var(--overlay-scrim);
+
   /* The one size the product uses that Tailwind's scale doesn't carry: the
      10px micro badge. Deliberately not named --text-2xs — that key already
      holds the raw value upstream, and reusing it here would make the

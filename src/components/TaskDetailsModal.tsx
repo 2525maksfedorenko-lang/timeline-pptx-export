@@ -2,6 +2,7 @@ import { createPortal } from 'react-dom';
 import type { TimelineItem } from '../types/timeline';
 import { AssigneeSelect } from './AssigneeSelect';
 import { X, XCircle } from 'lucide-react';
+import { buttonClass, INPUT_CLASS_AUTO } from './systemUi';
 
 interface TaskDetailsModalProps {
   item: TimelineItem;
@@ -80,13 +81,13 @@ export function TaskDetailsModal({
     // 512px dialog on a desktop — one rule, two shapes. The height cap and
     // the shorter textarea keep it inside a 667px screen once the on-screen
     // keyboard has taken its half.
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay-scrim p-4">
       <div
         ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="w-full max-w-lg rounded-lg border border-border bg-background p-6 text-left shadow-xl max-md:max-h-[85vh] max-md:overflow-y-auto max-md:p-4"
+        className="w-full max-w-lg rounded-lg border border-border bg-background p-6 text-left shadow-lg max-md:max-h-[85vh] max-md:overflow-y-auto max-md:p-4"
       >
         <div className="flex items-center justify-between gap-3">
           <h2 id={titleId} className="min-w-0 truncate text-lg font-semibold tracking-tight text-foreground">
@@ -116,7 +117,7 @@ export function TaskDetailsModal({
             value={commentText}
             onChange={(event) => onCommentTextChange(event.target.value)}
             placeholder="Add a note about this task…"
-            className="resize-none rounded-md border border-border px-3 py-2 text-sm leading-relaxed text-foreground max-md:text-base focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-md:h-24"
+            className={`${INPUT_CLASS_AUTO} max-md:text-base max-md:h-24`}
           />
         </div>
 
@@ -165,7 +166,7 @@ export function TaskDetailsModal({
             onChange={(event) => onTagInputChange(event.target.value)}
             onKeyDown={onTagInputKeyDown}
             placeholder="Add a tag, press Enter…"
-            className="rounded-md border border-border px-3 py-2 text-sm text-foreground max-md:text-base focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            className={`${INPUT_CLASS_AUTO} max-md:text-base`}
           />
         </div>
 
@@ -176,7 +177,7 @@ export function TaskDetailsModal({
           <button
             type="button"
             onClick={onToggleIncludeInExport}
-            className="min-h-11 rounded-md border border-border px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted/50"
+            className={buttonClass('outline', 'lg', 'w-full')}
           >
             {includedInExport ? 'Exclude from export' : 'Include in export'}
           </button>
@@ -184,7 +185,7 @@ export function TaskDetailsModal({
             <button
               type="button"
               onClick={onDelete}
-              className="min-h-11 rounded-md border border-destructive px-4 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10"
+              className={buttonClass('outline', 'lg', 'w-full border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive')}
             >
               Delete task and subtasks
             </button>
@@ -195,7 +196,7 @@ export function TaskDetailsModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted max-md:min-h-11 max-md:flex-1"
+            className={buttonClass('ghost', 'sm', 'text-muted-foreground max-md:min-h-11 max-md:flex-1')}
           >
             Cancel
           </button>
@@ -203,7 +204,7 @@ export function TaskDetailsModal({
             type="button"
             onClick={onSave}
             disabled={!canSave}
-            className="rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-primary max-md:min-h-11 max-md:flex-1"
+            className={buttonClass('default', 'default', 'max-md:min-h-11 max-md:flex-1')}
           >
             Save
           </button>

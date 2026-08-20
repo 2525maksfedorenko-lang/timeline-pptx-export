@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTimelineStore } from '../store/timelineStore';
 import { exportPlanToJsonFile } from '../import/planJson';
 import { Download, X } from 'lucide-react';
+import { buttonClass, INPUT_CLASS } from './systemUi';
 
 export function PlanSwitcher() {
   const savedPlans = useTimelineStore((state) => state.savedPlans);
@@ -78,12 +79,12 @@ export function PlanSwitcher() {
               }
             }}
             placeholder="Plan name"
-            className="rounded-md border border-border px-2 py-1 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            className={INPUT_CLASS}
           />
           <button
             type="button"
             onClick={() => void handleCreate()}
-            className="rounded-md bg-primary px-2 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90"
+            className={buttonClass('default', 'sm')}
           >
             Save
           </button>
@@ -93,7 +94,7 @@ export function PlanSwitcher() {
               setIsCreating(false);
               setNewPlanName('');
             }}
-            className="rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted"
+            className={buttonClass('ghost', 'sm', 'text-muted-foreground')}
           >
             Cancel
           </button>
@@ -120,7 +121,7 @@ export function PlanSwitcher() {
           disabled={!activePlan}
           title="Save current plan as JSON"
           aria-label="Save current plan as JSON"
-          className="rounded-md p-1.5 text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent max-md:p-3"
+          className={buttonClass('ghost', 'sm', 'text-muted-foreground max-md:p-3')}
         >
           <Download size={16} strokeWidth={2} aria-hidden="true" />
         </button>

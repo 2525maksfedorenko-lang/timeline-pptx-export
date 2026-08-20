@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { clampProgress } from '../utils/clampProgress';
+import { INPUT_CLASS_AUTO } from './systemUi';
 
 interface ProgressControlProps {
   /** The committed figure, 0-100. */
@@ -112,7 +113,7 @@ export function ProgressControl({ value, onChange, idPrefix }: ProgressControlPr
             onKeyDown={(event) => {
               if (event.key === 'Enter') event.currentTarget.blur();
             }}
-            className="w-14 rounded-md border border-border px-2 py-1 text-sm text-foreground [appearance:textfield] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-md:min-h-11 max-md:text-base [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            className={`${INPUT_CLASS_AUTO} w-14 [appearance:textfield] max-md:min-h-11`}
           />
           <span aria-hidden="true" className="text-xs text-muted-foreground">
             %

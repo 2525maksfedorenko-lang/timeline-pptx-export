@@ -224,6 +224,12 @@ export const STICKY_TINT_CLASS = 'bg-card bg-[linear-gradient(hsl(var(--muted)/0
 // label renders, and whether a bar is tall enough to hold it inside itself
 // (progressLabelFitsInBar). The second is what the export-parity check compares
 // against the slides' own BAR_PROGRESS_FONT_SIZE_PT, and it can only do that
-// from a module that doesn't drag React in. Must match the `text-[11px]` class
-// the label is actually drawn with.
-export const PROGRESS_FONT_SIZE_PX = 11;
+// from a module that doesn't drag React in. Must match the `text-xs` class the
+// label is actually drawn with.
+//
+// 12px, not the 11px this was, because 11 is not on the design system's type
+// scale (10 / 12 / 13 / 14 / …). 12 is the only legal move: at 10px the screen
+// would start claiming a depth-1 bar can hold its label inside while the slide
+// still says it cannot, and checkBarHeightParity in scripts/checkExportCoverage
+// fails. See docs/design-system-map.md.
+export const PROGRESS_FONT_SIZE_PX = 12;

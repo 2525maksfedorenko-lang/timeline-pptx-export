@@ -7,6 +7,9 @@ import { toHtml } from '../utils/renderMarkdown';
 import { buildTaskHierarchy } from '../utils/taskHierarchy';
 import { firstDayOfMonthIso, getDateRange, lastDayOfMonthIso } from '../export/dateScale';
 import { ChevronDown, ChevronRight, Pin } from 'lucide-react';
+import { buttonClass, CHECKBOX_CLASS, INPUT_CLASS_AUTO } from './systemUi';
+import { ACTIONS_ZONE_WIDTH_PX, BAR_HEIGHT_PX } from './ganttLayout';
+import { labelIndent } from '../utils/barNesting';
 
 const COMMENT_BODY_CLASSES =
   '[&_p]:mb-2 [&_p:last-child]:mb-0 [&_strong]:font-semibold [&_em]:italic ' +
@@ -156,7 +159,7 @@ export function ExportSettingsPanel() {
             id="sort-mode-select"
             value={sortMode}
             onChange={(event) => updateExportOptions({ sortMode: event.target.value as SortMode })}
-            className="rounded-md border border-border px-2 py-1 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-md:min-h-11 max-md:flex-1"
+            className={`${INPUT_CLASS_AUTO} max-md:min-h-11 max-md:flex-1`}
           >
             {SORT_MODE_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
@@ -181,7 +184,7 @@ export function ExportSettingsPanel() {
             <button
               type="button"
               onClick={handleToggleAll}
-              className="rounded-md border border-primary px-3 py-1 text-xs font-medium text-primary transition-colors hover:bg-muted/50 max-md:min-h-11"
+              className={buttonClass('outline', 'sm', 'border-primary text-primary max-md:min-h-11')}
             >
               {allIncluded ? 'Deselect all' : 'Select all'}
             </button>
@@ -193,7 +196,7 @@ export function ExportSettingsPanel() {
                 aria-label="Set status for checked tasks"
                 value={bulkStatus}
                 onChange={(event) => setBulkStatus(event.target.value as TaskStatus | '')}
-                className="min-w-0 flex-1 rounded-md border border-border px-2 py-1.5 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-md:min-h-11"
+                className={`${INPUT_CLASS_AUTO} min-w-0 flex-1 max-md:min-h-11`}
               >
                 <option value="">Set status to…</option>
                 {TASK_STATUS_OPTIONS.map((option) => (
@@ -207,7 +210,7 @@ export function ExportSettingsPanel() {
                 onClick={applyBulkStatus}
                 disabled={bulkStatus === '' || includedItems.length === 0}
                 title="Applies to every task checked below"
-                className="flex-shrink-0 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-primary max-md:min-h-11"
+                className={buttonClass('default', 'sm', 'flex-shrink-0 max-md:min-h-11')}
               >
                 Apply to {includedItems.length}
               </button>
@@ -220,7 +223,7 @@ export function ExportSettingsPanel() {
                 <li
                   key={item.id}
                   className="flex items-center gap-2 py-0.5 max-md:py-1.5"
-                  style={{ paddingLeft: depth * 20 }}
+                  style={{ paddingLeft: labelIndent(BAR_HEIGHT_PX, depth) }}
                 >
                   <input
                     type="checkbox"
@@ -228,12 +231,12 @@ export function ExportSettingsPanel() {
                     onChange={(event) =>
                       updateItem(item.id, { includeInExport: event.target.checked })
                     }
-                    className="h-4 w-4 rounded border-border text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-md:h-5 max-md:w-5"
+                    className={`${CHECKBOX_CLASS} max-md:h-5 max-md:w-5`}
                   />
                   <span className="flex-1 truncate text-sm font-medium text-foreground">{item.label}</span>
                   {/* The same chip as the chart's status column, not a
                       second control that means the same thing. */}
-                  <div className="w-[104px] flex-shrink-0">
+                  <div className="flex-shrink-0" style={{ width: ACTIONS_ZONE_WIDTH_PX }}>
                     <StatusSelect
                       status={getTaskStatus(item)}
                       onChange={(next) => updateItem(item.id, { status: next })}
@@ -257,7 +260,7 @@ export function ExportSettingsPanel() {
             onChange={(event) =>
               updateExportOptions({ commentMode: event.target.value as ExportOptions['commentMode'] })
             }
-            className="w-full rounded-md border border-border px-3 py-2 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-md:min-h-11"
+            className={`${INPUT_CLASS_AUTO} w-full max-md:min-h-11`}
           >
             {COMMENT_MODE_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
@@ -271,7 +274,7 @@ export function ExportSettingsPanel() {
               type="checkbox"
               checked={showDependencies}
               onChange={(event) => updateExportOptions({ showDependencies: event.target.checked })}
-              className="h-4 w-4 rounded border-border text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-md:h-5 max-md:w-5"
+              className={`${CHECKBOX_CLASS} max-md:h-5 max-md:w-5`}
             />
             Show dependencies
           </label>
@@ -281,7 +284,7 @@ export function ExportSettingsPanel() {
               type="checkbox"
               checked={showHierarchyLines}
               onChange={(event) => updateExportOptions({ showHierarchyLines: event.target.checked })}
-              className="h-4 w-4 rounded border-border text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-md:h-5 max-md:w-5"
+              className={`${CHECKBOX_CLASS} max-md:h-5 max-md:w-5`}
             />
             Show hierarchy lines
           </label>
@@ -318,7 +321,7 @@ export function ExportSettingsPanel() {
                   aria-label="From month"
                   value={fromMonth}
                   onChange={(event) => setTimeframe(Number(event.target.value), fromYear, toMonth, toYear)}
-                  className="min-w-0 flex-1 rounded-md border border-border px-2 py-1.5 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-md:min-h-11"
+                  className={`${INPUT_CLASS_AUTO} min-w-0 flex-1 max-md:min-h-11`}
                 >
                   {MONTH_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -330,7 +333,7 @@ export function ExportSettingsPanel() {
                   aria-label="From year"
                   value={fromYear}
                   onChange={(event) => setTimeframe(fromMonth, Number(event.target.value), toMonth, toYear)}
-                  className="w-20 flex-shrink-0 rounded-md border border-border px-2 py-1.5 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-md:min-h-11"
+                  className={`${INPUT_CLASS_AUTO} w-20 flex-shrink-0 max-md:min-h-11`}
                 >
                   {yearOptions.map((year) => (
                     <option key={year} value={year}>
@@ -345,7 +348,7 @@ export function ExportSettingsPanel() {
                   aria-label="To month"
                   value={toMonth}
                   onChange={(event) => setTimeframe(fromMonth, fromYear, Number(event.target.value), toYear)}
-                  className="min-w-0 flex-1 rounded-md border border-border px-2 py-1.5 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-md:min-h-11"
+                  className={`${INPUT_CLASS_AUTO} min-w-0 flex-1 max-md:min-h-11`}
                 >
                   {MONTH_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -357,7 +360,7 @@ export function ExportSettingsPanel() {
                   aria-label="To year"
                   value={toYear}
                   onChange={(event) => setTimeframe(fromMonth, fromYear, toMonth, Number(event.target.value))}
-                  className="w-20 flex-shrink-0 rounded-md border border-border px-2 py-1.5 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-md:min-h-11"
+                  className={`${INPUT_CLASS_AUTO} w-20 flex-shrink-0 max-md:min-h-11`}
                 >
                   {yearOptions.map((year) => (
                     <option key={year} value={year}>
@@ -392,7 +395,7 @@ export function ExportSettingsPanel() {
                         <span className="font-medium text-foreground">
                           {task?.label ?? 'Unknown task'}
                         </span>
-                        <span className="font-mono text-[11px] tracking-[0.02em]">
+                        <span className="font-mono text-xs tabular-nums">
                           {comment.isPinned ? <Pin size={11} strokeWidth={2} className="inline align-[-1px]" aria-label="Pinned" /> : null}
                           {new Date(comment.createdAt).toLocaleDateString()}
                         </span>

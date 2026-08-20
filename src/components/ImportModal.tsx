@@ -4,6 +4,7 @@ import { useTimelineStore } from '../store/timelineStore';
 import { formatShortDate } from '../export/dateScale';
 import { IMPORT_ACCEPT, IMPORTABLE_EXTENSIONS } from '../import/detectFormat';
 import { prepareImport, type ImportPreview } from '../import/prepareImport';
+import { buttonClass } from './systemUi';
 import { useApplyImport } from '../import/useApplyImport';
 import { useFocusTrap } from '../utils/useFocusTrap';
 
@@ -96,11 +97,9 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
     if (file) void readFile(file);
   };
 
-  const focusRing = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring';
-
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-overlay-scrim p-4"
       onClick={onClose}
     >
       <div
@@ -122,7 +121,7 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
         }}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        className={`flex max-h-[85vh] w-full max-w-lg flex-col gap-5 rounded-lg border bg-background p-6 shadow-xl transition-colors max-md:p-4 ${
+        className={`flex max-h-[85vh] w-full max-w-lg flex-col gap-5 rounded-lg border bg-background p-6 shadow-lg transition-colors max-md:p-4 ${
           isDraggingFile ? 'border-primary' : 'border-border'
         }`}
       >
@@ -139,7 +138,7 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className={`-mr-1 -mt-1 inline-flex items-center justify-center rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground max-md:min-h-11 max-md:min-w-11 ${focusRing}`}
+            className={buttonClass('ghost', 'icon', '-mr-1 -mt-1 text-muted-foreground max-md:h-11 max-md:w-11')}
           >
             <X size={16} strokeWidth={2} aria-hidden="true" />
           </button>
@@ -162,6 +161,9 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
           <ImportSummary preview={preview} />
         ) : (
           <div
+            // The system's one "add" idiom is a dashed border (readme.md,
+            // "Visual foundations"); there is no file-drop primitive, so the
+            // zone is that border plus a lucide icon and a Button.
             className={`flex flex-col items-center gap-4 rounded-md border border-dashed px-6 py-10 text-center transition-colors max-md:py-6 ${
               isDraggingFile ? 'border-primary bg-primary/5' : 'border-border'
             }`}
@@ -182,11 +184,11 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={isBusy}
-              className={`inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60 max-md:min-h-11 max-md:w-full max-md:text-base ${focusRing}`}
+              className={buttonClass('default', 'default', 'max-md:h-11 max-md:w-full max-md:text-base')}
             >
               {isBusy ? 'Reading...' : 'Choose File'}
             </button>
-            <p className="font-mono text-xs tracking-[0.02em] text-muted-foreground max-md:text-sm">
+            <p className="font-mono text-xs tabular-nums text-muted-foreground max-md:text-sm">
               {IMPORTABLE_EXTENSIONS.join('  ')}
             </p>
           </div>
@@ -206,7 +208,7 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
           <button
             type="button"
             onClick={onClose}
-            className={`inline-flex h-10 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground max-md:min-h-11 max-md:text-base ${focusRing}`}
+            className={buttonClass('outline', 'default', 'max-md:h-11 max-md:text-base')}
           >
             Cancel
           </button>
@@ -215,7 +217,7 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
               type="button"
               onClick={() => void handleConfirm()}
               disabled={isBusy || preview.items.length === 0}
-              className={`inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40 max-md:min-h-11 max-md:text-base ${focusRing}`}
+              className={buttonClass('default', 'default', 'max-md:h-11 max-md:text-base')}
             >
               {preview.action === 'replace-plan' ? 'Replace Plan' : `Import ${preview.items.length} Tasks`}
             </button>
@@ -241,7 +243,7 @@ function ImportSummary({ preview }: { preview: ImportPreview }) {
 
   return (
     <div className="min-h-0 overflow-y-auto">
-      <p className="truncate font-mono text-xs tracking-[0.02em] text-muted-foreground max-md:text-sm">
+      <p className="truncate font-mono text-xs tabular-nums text-muted-foreground max-md:text-sm">
         {preview.fileName}
       </p>
 
@@ -252,7 +254,7 @@ function ImportSummary({ preview }: { preview: ImportPreview }) {
         </SummaryRow>
         <SummaryRow label="Dates">
           {dateRange ? (
-            <span className="font-mono text-xs tracking-[0.02em] max-md:text-sm">
+            <span className="font-mono text-xs tabular-nums max-md:text-sm">
               {formatShortDate(new Date(dateRange.start))} – {formatShortDate(new Date(dateRange.end))}
             </span>
           ) : (

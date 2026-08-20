@@ -15,6 +15,7 @@ import { sortItemsForExport } from './utils/sortItemsForExport'
 import { useTimelineStore } from './store/timelineStore'
 import { usePeopleStore } from './store/peopleStore'
 import aicooLogo from '../design-system/assets/aicoo-logo-orbit-darkblue-text.svg'
+import { buttonClass } from './components/systemUi';
 
 type Tab = 'timeline' | 'dashboard'
 type ExportFormat = 'pptx' | 'pdf'
@@ -115,7 +116,7 @@ function App() {
             <button
               type="button"
               onClick={() => setIsImportOpen(true)}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-input bg-background px-4 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-md:min-h-11 max-md:flex-1"
+              className={buttonClass('outline', 'default', 'gap-2 max-md:min-h-11 max-md:flex-1')}
             >
               <Upload size={16} strokeWidth={2} aria-hidden="true" />
               Import
@@ -123,7 +124,7 @@ function App() {
             <button
               type="button"
               onClick={() => setIsSettingsOpen(true)}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-transparent px-4 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground max-md:min-h-11 max-md:flex-1"
+              className={buttonClass('ghost', 'default', 'text-muted-foreground gap-2 max-md:min-h-11 max-md:flex-1')}
             >
               <Settings size={16} strokeWidth={2} />
               Settings
@@ -131,14 +132,14 @@ function App() {
             <button
               type="button"
               onClick={() => handleExport('pdf')}
-              className="inline-flex h-10 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground max-md:min-h-11 max-md:flex-1"
+              className={buttonClass('outline', 'default', 'max-md:min-h-11 max-md:flex-1')}
             >
               Export as PDF
             </button>
             <button
               type="button"
               onClick={() => handleExport('pptx')}
-              className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 max-md:min-h-11 max-md:flex-1"
+              className={buttonClass('default', 'default', 'max-md:min-h-11 max-md:flex-1')}
             >
               Export to PowerPoint
             </button>
@@ -164,7 +165,7 @@ function App() {
             type="button"
             onClick={() => setActiveTab(tab)}
             className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-colors max-md:min-h-11 max-md:flex-1 ${
-              activeTab === tab ? 'bg-background text-foreground shadow-sm' : 'hover:text-foreground'
+              activeTab === tab ? 'bg-background text-foreground shadow-xs' : 'hover:text-foreground'
             }`}
           >
             {label}
