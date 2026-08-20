@@ -17,10 +17,18 @@ interface TaskListProps {
   onCycleStatus: (id: string) => void;
   onRename: (id: string, name: string) => void;
   onAddTask: (name: string) => void;
+  /** The body's content height. The two panes scroll on one offset, so the
+   * list has to be exactly as tall as the canvas beside it — otherwise the
+   * offset that puts the last bar at the foot of the timeline puts the last
+   * name somewhere else. */
+  minHeight: number;
 }
 
-/** The 320px task column, sticky to the left of the one scroll container so
- * the bars slide underneath it.
+/** The 320px task column.
+ *
+ * Its pane is fixed to the left of the plan and never scrolls sideways; the
+ * shell writes its vertical offset from the body's as the rows scroll (see
+ * useScrollPanes), which is what keeps a name level with its bar.
  *
  * Renaming and adding are the two pieces of text this column collects, and
  * both live here as local state rather than in the view store: they are a
@@ -38,6 +46,7 @@ export function TaskList({
   onCycleStatus,
   onRename,
   onAddTask,
+  minHeight,
 }: TaskListProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
@@ -68,14 +77,9 @@ export function TaskList({
   return (
     <div
       style={{
-        position: 'sticky',
-        left: 0,
-        zIndex: 20,
-        gridColumn: 1,
-        gridRow: 2,
         width: LIST_WIDTH_PX,
+        minHeight,
         background: 'var(--gantt-surface)',
-        borderRight: '1px solid var(--gantt-rule-strong)',
         boxSizing: 'border-box',
       }}
     >

@@ -14,6 +14,7 @@ import type { Span } from './rollup';
 import type { GanttRowModel } from './rows';
 import { STATUS_TONE } from './tone';
 import type { DragState } from './drag';
+import { BAR_HIT_ATTRIBUTE } from './useScrollPanes';
 
 export interface BarAssignee {
   name: string;
@@ -98,6 +99,10 @@ export function TaskBar({
       }}
     >
       <div
+        // Marks the bar as the one thing in the timeline that owns its own
+        // press: a grab-pan of the canvas refuses to start anywhere inside
+        // this element, so moving a bar and panning past it never both run.
+        {...{ [BAR_HIT_ATTRIBUTE]: '' }}
         onPointerDown={(event) => onPointerDownBar(event, 'move')}
         onClick={onSelect}
         title={`${item.label} · ${dateRange} · ${progress}% · ${statusLabel}`}

@@ -4,7 +4,7 @@ import { usePeopleStore } from '../store/peopleStore';
 import { getInitials } from '../utils/initials';
 import { buildNewTask } from '../utils/newTask';
 import { progressForStatus } from '../utils/progressForStatus';
-import { useElementWidth } from '../utils/useElementWidth';
+import { useScrollPanes } from './useScrollPanes';
 import { shiftIsoDate } from '../export/dateScale';
 import type { TaskStatus } from '../types/timeline';
 import {
@@ -53,6 +53,7 @@ export function GanttScreen() {
   const updateItem = useTimelineStore((state) => state.updateItem);
   const addItem = useTimelineStore((state) => state.addItem);
   const showDependencies = useTimelineStore((state) => state.exportOptions.showDependencies);
+  const activePlanId = useTimelineStore((state) => state.activePlanId);
   const people = usePeopleStore((state) => state.people);
 
   const scale = useGanttViewStore((state) => state.scale);
@@ -64,7 +65,6 @@ export function GanttScreen() {
   const select = useGanttViewStore((state) => state.select);
   const toggleCollapsed = useGanttViewStore((state) => state.toggleCollapsed);
 
-  const scrollRef = useRef<HTMLDivElement | null>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
   // Set the moment a drag snaps a whole column, and cleared shortly after the
   // pointer comes up — the flag that tells "pressed a bar" from "moved a bar",
@@ -74,7 +74,10 @@ export function GanttScreen() {
   // One "now" per mount. Re-reading the clock on every render would let the
   // today band and the canvas origin change under a drag.
   const today = useMemo(() => new Date(), []);
-  const { minDate, totalDays, todayIndex } = useMemo(() => planRange(items, today), [items, today]);
+  const { minDate, totalDays, todayIndex, firstTaskIndex, lastTaskIndex } = useMemo(
+    () => planRange(items, today),
+    [items, today],
+  );
   const columnWidth = COLUMN_WIDTH_PX[scale];
 
   const rows = useMemo(
@@ -82,16 +85,20 @@ export function GanttScreen() {
     [items, collapsed, search, filter, people],
   );
 
-  // How many day columns are actually drawn. At least the plan's own span,
-  // and at least enough to reach the right edge of the viewport — otherwise a
-  // plan shorter than the window leaves a bare strip beside a grid that stops
-  // in mid-air. The prototype never meets this: its canvas is a fixed 133
-  // days, wider than any window it was drawn at. A canvas derived from the
-  // plan has to say so itself.
-  const viewportWidth = useElementWidth(scrollRef);
-  const renderedDays = Math.max(totalDays, Math.ceil((viewportWidth - LIST_WIDTH_PX) / columnWidth));
-  const canvasWidth = renderedDays * columnWidth;
   const bodyHeight = Math.max(rows.length * ROW_HEIGHT_PX + ADD_ROW_HEIGHT_PX, MIN_BODY_HEIGHT_PX);
+
+  // The three panes and the one scroller between them. The column width is
+  // all the hook needs from here: it is how it recognises a scale change.
+  const panes = useScrollPanes({ columnWidth });
+
+  // How many day columns are actually drawn. At least the plan's own span,
+  // and at least enough to fill the timeline zone — otherwise a plan shorter
+  // than the zone leaves a bare strip beside a grid that stops in mid-air.
+  // The prototype never meets this: its canvas is a fixed 133 days, wider
+  // than any window it was drawn at. A canvas derived from the plan has to
+  // say so itself.
+  const renderedDays = Math.max(totalDays, Math.ceil(panes.viewportWidth / columnWidth));
+  const canvasWidth = renderedDays * columnWidth;
 
   // Clamped against what is drawn rather than against the plan's own extent:
   // a bar can be dragged anywhere on the canvas the eye can see.
@@ -148,13 +155,8 @@ export function GanttScreen() {
   );
 
   const scrollToToday = useCallback(
-    (behavior: ScrollBehavior) => {
-      scrollRef.current?.scrollTo({
-        left: Math.max(0, todayIndex * columnWidth - TODAY_SCROLL_LEAD_PX),
-        behavior,
-      });
-    },
-    [todayIndex, columnWidth],
+    (behavior: ScrollBehavior) => panes.scrollToDay(todayIndex, columnWidth, TODAY_SCROLL_LEAD_PX, behavior),
+    [panes, todayIndex, columnWidth],
   );
 
   // The toolbar's Today button, which lives outside this component now (see
@@ -168,16 +170,30 @@ export function GanttScreen() {
     scrollToToday('smooth');
   }, [todayNonce, scrollToToday]);
 
-  // Open on today rather than on the plan's first day: what is happening now
-  // is what the view is usually opened to find.
+  // Where the view opens.
+  //
+  // Today, when today is somewhere inside the plan — what is happening now is
+  // what the view is usually opened to find. But a plan is not always around
+  // today: a file can carry a root left behind in 2025 and another one out in
+  // 2027, and then the canvas is two years wide with almost all of it empty.
+  // Opening such a plan on today would land on bare grid, so it opens on its
+  // first task instead — the first thing there is to see.
+  const opensOn = todayIndex >= firstTaskIndex && todayIndex <= lastTaskIndex ? todayIndex : firstTaskIndex;
+  // Once per plan, not once per mount: switching plans, or importing one over
+  // the top of another, lands on a canvas of a different width where the old
+  // scroll offset means a different date — usually a stretch of empty grid.
+  const openedPlanRef = useRef<string | null>(null);
   useEffect(() => {
-    scrollToToday('auto');
-    // Only on mount — re-running this on a scale change would yank the view
-    // back to today every time someone switched to Month.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    // Waits for the zone to have been measured, since the target is worked
+    // out against its width.
+    if (panes.viewportWidth === 0) return;
+    const planKey = activePlanId ?? '';
+    if (openedPlanRef.current === planKey) return;
+    openedPlanRef.current = planKey;
+    panes.scrollToDay(opensOn, columnWidth, TODAY_SCROLL_LEAD_PX, 'auto');
+  }, [panes, opensOn, columnWidth, activePlanId]);
 
-  /** Writes a finished drag onto the plan. */
+/** Writes a finished drag onto the plan. */
   const commitDrag = useCallback(
     (finished: DragState) => {
       const dragged = items.find((item) => item.id === finished.id);
@@ -298,47 +314,68 @@ export function GanttScreen() {
 
   return (
     <div style={{ display: 'flex', flex: 1, minHeight: 0, background: 'var(--gantt-surface)' }}>
+      {/* The frame. Two fixed tracks by two: the list's width and the header's
+          height are constants, and the timeline zone takes whatever the window
+          leaves. Nothing here scrolls — the frame is what the three panes
+          inside it scroll *within*, which is what keeps the zone the same
+          width at every scale and keeps the scrollbar in view. */}
       <div
-        ref={scrollRef}
-        className="gantt-scroll"
-        style={{ flex: 1, minWidth: 0, overflow: 'auto', position: 'relative' }}
+        style={{
+          flex: 1,
+          minWidth: 0,
+          display: 'grid',
+          gridTemplateColumns: `${LIST_WIDTH_PX}px minmax(0, 1fr)`,
+          gridTemplateRows: `${HEADER_HEIGHT_PX}px minmax(0, 1fr)`,
+          overflow: 'hidden',
+        }}
       >
+        {/* The corner. It follows neither axis, so it is the one pane that is
+            simply a box. */}
         <div
           style={{
-            display: 'grid',
-            gridTemplateColumns: `${LIST_WIDTH_PX}px ${canvasWidth}px`,
-            // The body row is at least as tall as the rows it holds, and
-            // takes the rest of the viewport when there are fewer rows than
-            // that — which is what the grid's own `minHeight: 100%` is for.
-            // Without the minmax, a short plan would leave the grid, the
-            // weekend tint and the today band stopping in mid-air with bare
-            // white under them.
-            gridTemplateRows: `${HEADER_HEIGHT_PX}px minmax(${bodyHeight}px, 1fr)`,
-            width: LIST_WIDTH_PX + canvasWidth,
-            minHeight: '100%',
+            gridColumn: 1,
+            gridRow: 1,
+            background: 'var(--gantt-surface)',
+            borderRight: '1px solid var(--gantt-rule-strong)',
+            borderBottom: '1px solid var(--gantt-rule-strong)',
+            boxSizing: 'border-box',
+          }}
+        />
+
+        {/* The header pane: follows the body sideways, never moves up or
+            down. Its right padding is the width of the body's vertical
+            scrollbar, so the two show the same span of days rather than the
+            header running a scrollbar's width further. */}
+        <div
+          ref={panes.headerRef}
+          style={{
+            gridColumn: 2,
+            gridRow: 1,
+            overflow: 'hidden',
+            background: 'var(--gantt-surface)',
+            borderBottom: '1px solid var(--gantt-rule-strong)',
+            boxSizing: 'border-box',
+            paddingRight: panes.gutter.vertical,
           }}
         >
-          {/* The corner: stuck to both edges, so it stays over the list's
-              header space whichever way the canvas is scrolled. */}
-          <div
-            style={{
-              position: 'sticky',
-              top: 0,
-              left: 0,
-              zIndex: 40,
-              gridColumn: 1,
-              gridRow: 1,
-              width: LIST_WIDTH_PX,
-              height: HEADER_HEIGHT_PX,
-              background: 'var(--gantt-surface)',
-              borderRight: '1px solid var(--gantt-rule-strong)',
-              borderBottom: '1px solid var(--gantt-rule-strong)',
-              boxSizing: 'border-box',
-            }}
-          />
-
           <TimelineHeader cells={headerCells} columnWidth={columnWidth} width={canvasWidth} />
+        </div>
 
+        {/* The list pane: follows the body down, never moves sideways. Its
+            bottom padding matches the body's horizontal scrollbar for the
+            same reason the header's right padding matches the vertical one. */}
+        <div
+          ref={panes.listRef}
+          style={{
+            gridColumn: 1,
+            gridRow: 2,
+            overflow: 'hidden',
+            background: 'var(--gantt-surface)',
+            borderRight: '1px solid var(--gantt-rule-strong)',
+            boxSizing: 'border-box',
+            paddingBottom: panes.gutter.horizontal,
+          }}
+        >
           <TaskList
             rows={rows}
             progressById={progressById}
@@ -346,13 +383,32 @@ export function GanttScreen() {
             selectedId={selectedId}
             criticalIds={critical}
             showCriticalPath={showCriticalPath}
+            minHeight={bodyHeight}
             onSelect={select}
             onToggleCollapse={toggleCollapsed}
             onCycleStatus={cycleStatus}
             onRename={(id, name) => updateItem(id, { label: name })}
             onAddTask={addTask}
           />
+        </div>
 
+        {/* The body: the only scroller on the screen. Both bars belong to it,
+            which puts the horizontal one along the bottom of the timeline and
+            nowhere near the task names. `overflow-x: scroll` rather than
+            `auto` so the bar is a standing part of the zone instead of
+            something that appears and disappears under the pointer. */}
+        <div
+          ref={panes.bodyRef}
+          className="gantt-scroll"
+          style={{
+            gridColumn: 2,
+            gridRow: 2,
+            overflowX: 'scroll',
+            overflowY: 'auto',
+            position: 'relative',
+            cursor: 'grab',
+          }}
+        >
           <TimelineBody
             rows={rows}
             spans={spans}
@@ -374,7 +430,9 @@ export function GanttScreen() {
             dragLabel={dragLabel}
             onPointerDownBar={beginDrag}
             onSelectBar={(id) => {
-              if (!movedRef.current) select(id);
+              // A pan ends in a click too, and selecting a task because
+              // someone dragged the canvas past it would be a surprise.
+              if (!movedRef.current && !panes.isPanningRef.current) select(id);
             }}
           />
         </div>
