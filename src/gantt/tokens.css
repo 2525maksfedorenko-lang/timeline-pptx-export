@@ -110,16 +110,33 @@
 }
 
 /* The prototype's own scrollbar, scoped to the plan canvas rather than set on
- * the document the way the prototype's page-level <style> does it. */
+ * the document the way the prototype's page-level <style> does it.
+ *
+ * Declaring these at all is also what makes the bar a standing part of the
+ * zone: a styled scrollbar in Chromium is a classic one that takes real
+ * layout space, where the platform default is an overlay that fades in under
+ * the pointer and out again. The timeline's horizontal bar is a reading of
+ * how much plan there is either side of the view, so it has to be there
+ * before anyone reaches for it. */
 .gantt-scroll::-webkit-scrollbar {
   width: 12px;
   height: 12px;
+}
+
+.gantt-scroll::-webkit-scrollbar-track {
+  background: var(--gantt-surface);
 }
 
 .gantt-scroll::-webkit-scrollbar-thumb {
   background: var(--gantt-text-faint);
   border-radius: 8px;
   border: 3px solid var(--gantt-surface);
+}
+
+/* Where the two bars meet. Left to itself it paints a flat platform-grey
+   square against the app's white. */
+.gantt-scroll::-webkit-scrollbar-corner {
+  background: var(--gantt-surface);
 }
 
 /* The resize strips at a bar's ends: invisible until the pointer is on one,

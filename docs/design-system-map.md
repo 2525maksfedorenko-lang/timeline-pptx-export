@@ -672,3 +672,30 @@ Recorded rather than decided silently:
 - **Nesting past two levels.** The handoff models exactly `task` and `group`, so it names exactly three left-indents (6 / 24 / 26). This app's `parentId` allows any depth; depth ≥ 2 reuses the child indent rather than extrapolating a ladder the handoff does not specify.
 - **The canvas's extent.** The prototype's canvas is a fixed 133 days with 7 days of air before the first task and 30 after the last. A canvas derived from the plan takes those two numbers as its padding, and is additionally widened to the viewport so the grid never stops in mid-air.
 - **Author on a comment, description on a task, more than one assignee.** The model has none of the three. The panel's comment row shows its date where the handoff shows an avatar and a name, the Description field is not built, and a bar carries one avatar rather than a stack.
+
+## Where the plan screen leaves the handoff's scrolling model
+
+The handoff builds the canvas as **one** `overflow: auto` box with the list
+`sticky left` and the header `sticky top`, and states the reason: *"vertical
+alignment between list and bars is structural, not synchronised in JS."* That is
+the better architecture and it was built that way first.
+
+It has one consequence that ruled it out. A single scroller's horizontal
+scrollbar spans the whole box — so it runs under the task list as well as under
+the bars — and it sits at the bottom of the *content*, which on a plan taller
+than the window is off-screen. The bar is a reading of how much plan lies either
+side of the view, so it has to belong to the timeline zone alone and stay in it.
+
+So the canvas is four panes in a fixed 2×2 frame — corner, header, list, body —
+and only the body scrolls. `src/gantt/useScrollPanes.ts` writes the header's
+horizontal offset and the list's vertical offset from the body's, in a `scroll`
+listener that touches the DOM directly rather than going through React state.
+Three things follow from the split and live in the same hook: a grab-to-pan on
+the body (which refuses to start inside `[data-gantt-bar]`, so panning and moving
+a bar can never both run on one press), shift-wheel for horizontal travel and
+wheel forwarding from the `overflow: hidden` list pane, and a scale change that
+holds the day at the middle of the zone — anchored on every scroll, because by
+the time a layout effect could read `scrollLeft` the browser has already clamped
+it into the new canvas's range.
+
+The handoff describes none of those three: it has no wheel handler and no pan.

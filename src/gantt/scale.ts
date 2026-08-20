@@ -56,10 +56,15 @@ export interface PlanRange {
   minDate: Date;
   /** Columns drawn, i.e. the handoff's `TOTAL`. */
   totalDays: number;
-  /** Which column carries the today band, or -1 when today falls outside the
-   * plan (it cannot, given how the range is built, but callers shouldn't
-   * have to know that). */
+  /** Which column carries the today band. Always inside the canvas, since
+   * the range is widened to include today. */
   todayIndex: number;
+  /** The first and last columns any task actually occupies — the plan's own
+   * extent, without the padding and without today's pull on it. What "a
+   * sensible place to open at" is measured against: today is only worth
+   * opening on if it falls between these two. */
+  firstTaskIndex: number;
+  lastTaskIndex: number;
 }
 
 /** The canvas the plan is drawn on: the items' own extent, widened to include
@@ -78,10 +83,14 @@ export function planRange(items: TimelineItem[], today: Date): PlanRange {
   const minDate = new Date(first.getTime() - CANVAS_LEAD_DAYS * MS_PER_DAY);
   const maxDate = new Date(last.getTime() + CANVAS_TRAIL_DAYS * MS_PER_DAY);
 
+  const taskStamps = stamps.length > 0 ? stamps : [todayMidnight.getTime()];
+
   return {
     minDate,
     totalDays: daysBetween(minDate, maxDate) + 1,
     todayIndex: daysBetween(minDate, todayMidnight),
+    firstTaskIndex: daysBetween(minDate, new Date(Math.min(...taskStamps))),
+    lastTaskIndex: daysBetween(minDate, new Date(Math.max(...taskStamps))),
   };
 }
 

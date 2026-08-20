@@ -10,24 +10,17 @@ interface TimelineHeaderProps {
 /** The period strip above the bars: one cell per week (or day, or month),
  * each captioned twice — "Week 31" over "Aug 17 '26".
  *
- * Sticky to the top of the one scroll container, which is what keeps it in
- * place while the rows scroll under it without any scroll being mirrored in
- * JS. Its left edge is the list column's right edge, so a cell's x is a
+ * The strip itself never moves: it is the content of a pane the shell keeps
+ * fixed at the top of the timeline zone, whose horizontal offset is written
+ * from the body's as it scrolls (see useScrollPanes). So a cell's x is a
  * column index times the column width and nothing else. */
 export function TimelineHeader({ cells, columnWidth, width }: TimelineHeaderProps) {
   return (
     <div
       style={{
-        position: 'sticky',
-        top: 0,
-        zIndex: 30,
-        gridColumn: 2,
-        gridRow: 1,
         display: 'flex',
         width,
         height: HEADER_HEIGHT_PX,
-        background: 'var(--gantt-surface)',
-        borderBottom: '1px solid var(--gantt-rule-strong)',
         boxSizing: 'border-box',
       }}
     >

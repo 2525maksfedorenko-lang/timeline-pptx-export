@@ -87,8 +87,6 @@ export function TimelineBody({
     <div
       style={{
         position: 'relative',
-        gridColumn: 2,
-        gridRow: 2,
         width,
         minHeight: height,
         height: '100%',
