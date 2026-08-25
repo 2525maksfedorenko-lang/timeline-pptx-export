@@ -2,7 +2,13 @@ import { useState } from 'react';
 import { StatusSelect } from './StatusSelect';
 import { useIsMobile } from '../utils/useIsMobile';
 import { useTimelineStore, type ExportOptions } from '../store/timelineStore';
-import { getTaskStatus, TASK_STATUS_LABELS, type SortMode, type TaskStatus } from '../types/timeline';
+import {
+  getTaskStatus,
+  SELECTABLE_TASK_STATUS_VALUES,
+  TASK_STATUS_LABELS,
+  type SortMode,
+  type TaskStatus,
+} from '../types/timeline';
 import { toHtml } from '../utils/renderMarkdown';
 import { buildTaskHierarchy } from '../utils/taskHierarchy';
 import { firstDayOfMonthIso, getDateRange, lastDayOfMonthIso } from '../export/dateScale';
@@ -29,9 +35,11 @@ const COMMENT_MODE_OPTIONS: { value: ExportOptions['commentMode']; label: string
   { value: 'none', label: 'No comments' },
 ];
 
-const TASK_STATUS_OPTIONS: { value: TaskStatus; label: string }[] = (
-  Object.keys(TASK_STATUS_LABELS) as TaskStatus[]
-).map((value) => ({ value, label: TASK_STATUS_LABELS[value] }));
+// The bulk setter offers what a person can choose, which no longer includes
+// blocked — see SELECTABLE_TASK_STATUS_VALUES. The per-row chips below use
+// statusOptionsFor instead, so a task that is already blocked still says so.
+const TASK_STATUS_OPTIONS: { value: TaskStatus; label: string }[] =
+  SELECTABLE_TASK_STATUS_VALUES.map((value) => ({ value, label: TASK_STATUS_LABELS[value] }));
 
 const SORT_MODE_OPTIONS: { value: SortMode; label: string }[] = [
   { value: 'status', label: 'Status' },

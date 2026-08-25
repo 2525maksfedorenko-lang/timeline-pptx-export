@@ -3,7 +3,7 @@ import { PanelRightOpen, Trash2, X } from 'lucide-react';
 import { MultiSelect, type MultiSelectOption } from '../components/MultiSelect';
 import { buttonBaseClass, CHECKBOX_CLASS, INPUT_SHELL_CLASS } from '../components/systemUi';
 import { useTimelineStore } from '../store/timelineStore';
-import { getTaskStatus, TASK_STATUS_VALUES, type TaskStatus, type TimelineItem } from '../types/timeline';
+import { getTaskStatus, statusOptionsFor, type TaskStatus, type TimelineItem } from '../types/timeline';
 import { progressForStatus } from '../utils/progressForStatus';
 import { toHtml } from '../utils/renderMarkdown';
 import { PANEL_WIDE_WIDTH_PX, PANEL_WIDTH_PX } from './geometry';
@@ -223,7 +223,7 @@ export function EditTaskPanel({ item, minDate, spans }: EditTaskPanelProps) {
               title={isGroup ? 'Sub-tasks decide the status shown on the plan' : undefined}
               className={PANEL_FIELD_CLASS}
             >
-              {TASK_STATUS_VALUES.map((status) => (
+              {statusOptionsFor(getTaskStatus(item)).map((status) => (
                 <option key={status} value={status}>
                   {STATUS_LABEL[status]}
                 </option>

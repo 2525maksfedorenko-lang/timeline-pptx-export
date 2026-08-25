@@ -1,4 +1,4 @@
-import type { TaskStatus } from '../types/timeline';
+import { SELECTABLE_TASK_STATUS_VALUES, type TaskStatus } from '../types/timeline';
 
 /** The four tones a status is drawn in on this screen: the bar's pale fill,
  * the label that sits on it, and the solid the progress overlay and the row's
@@ -44,5 +44,8 @@ export const STATUS_LABEL: Record<TaskStatus, string> = {
   blocked: 'Blocked',
 };
 
-/** Clicking a row's status icon walks this ring. */
-export const STATUS_CYCLE: TaskStatus[] = ['todo', 'in_progress', 'done', 'blocked'];
+/** Clicking a row's status icon walks this ring — which is exactly the set a
+ * picker offers, in the order a task moves through it, so the two can never
+ * disagree about what can be set. A row that arrives blocked leaves the ring
+ * at its first click and cannot re-enter it. */
+export const STATUS_CYCLE: TaskStatus[] = [...SELECTABLE_TASK_STATUS_VALUES];

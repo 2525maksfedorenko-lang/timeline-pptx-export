@@ -1,15 +1,15 @@
 import { ChevronDown } from 'lucide-react';
 import { COLORS, withHash } from '../export/theme';
 import {
+  statusOptionsFor,
   TASK_STATUS_CHIP,
   TASK_STATUS_LABELS,
-  TASK_STATUS_VALUES,
   type TaskStatus,
 } from '../types/timeline';
 
 // The OS paints the option list and inherits the select's own colours, so a
-// tinted dropdown would leave three of the four looking mislabelled. Both
-// come from the token file rather than being written inline.
+// tinted dropdown would leave the others looking mislabelled. Both come from
+// the token file rather than being written inline.
 const OPTION_BG = withHash(COLORS.optionBg);
 const OPTION_FG = withHash(COLORS.textOnSurface);
 
@@ -22,7 +22,7 @@ interface StatusSelectProps {
 }
 
 /** A task's status as the control that changes it: the product's status chip —
- * a tinted background with dark text and a hairline border — opening the four
+ * a tinted background with dark text and a hairline border — opening its
  * options on click and committing the pick immediately.
  *
  * A native select rather than a hand-built menu — it opens on click, is
@@ -42,10 +42,10 @@ export function StatusSelect({ status, onChange, label }: StatusSelectProps) {
         style={{ backgroundColor: chip.bg, color: chip.fg, borderColor: chip.border }}
         aria-label={label ? `Status: ${label}` : `Status: ${TASK_STATUS_LABELS[status]}`}
       >
-        {TASK_STATUS_VALUES.map((value) => (
+        {statusOptionsFor(status).map((value) => (
           // Options are painted by the OS menu, which inherits the select's
-          // own colors — a tinted dropdown would leave three of the four
-          // looking mislabelled, so each option resets them.
+          // own colors — a tinted dropdown would leave the rest looking
+          // mislabelled, so each option resets them.
           <option key={value} value={value} style={{ backgroundColor: OPTION_BG, color: OPTION_FG }}>
             {TASK_STATUS_LABELS[value]}
           </option>
