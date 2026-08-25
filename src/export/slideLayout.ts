@@ -15,8 +15,8 @@ import { estimateWrappedLines, measureLetterSpacingWidthIn, measureTextWidthIn }
 // Both exporters already read one computed model (timelineExportModel.ts), which
 // resolves bar fills through resolveBarColor and text colours through
 // readableTextOn, so pptxExporter and pdfExporter cannot drift apart: neither
-// picks a colour of its own, they only render `bar.statusColor`,
-// `bar.progressColor` and `row.statusColor`.
+// picks a colour of its own, they only render `bar.statusColor` and
+// `row.statusColor`.
 
 export const PAGE_WIDTH_IN = 10;
 export const PAGE_HEIGHT_IN = 5.625;
