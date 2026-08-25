@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { GanttScreen } from './gantt/GanttScreen'
 import { GanttToolbar } from './gantt/GanttToolbar'
 import { Dashboard, type DashboardSection } from './components/Dashboard'
@@ -12,6 +12,9 @@ import { exportTimelineToPdf } from './export/pdfExporter'
 import { getExportOverviewItems, planOverview, type ExportMode } from './export/timelineExportModel'
 import { buildExportFilename } from './export/dateScale'
 import { sortItemsForExport } from './utils/sortItemsForExport'
+import { itemsForFilter } from './gantt/rows'
+import { STATUS_LABEL } from './gantt/tone'
+import { useGanttViewStore } from './gantt/viewStore'
 import { useTimelineStore } from './store/timelineStore'
 import { buttonBaseClass } from './components/systemUi';
 
@@ -40,6 +43,18 @@ function App() {
   const items = useTimelineStore((state) => state.items)
   const exportOptions = useTimelineStore((state) => state.exportOptions)
   const comments = useTimelineStore((state) => state.comments)
+  const filter = useGanttViewStore((state) => state.filter)
+
+  // What the deck is made of: the plan as the status chip left it, which is
+  // the plan as it is on screen. Filtering to Done and exporting is how a
+  // "what we finished" deck is made — the alternative was to take the whole
+  // plan out and delete slides afterwards.
+  //
+  // Only the chip narrows it. The search box and the focus bar are ways of
+  // looking at a plan rather than statements about it, and a deck quietly
+  // shaped by a half-typed query would be a trap; a branch worth its own deck
+  // has its own plan now (see createPlanFromBranch).
+  const exportItems = useMemo(() => itemsForFilter(items, filter), [items, filter])
 
   const [highlightSection] = useState<DashboardSection | null>(readDashboardViewParam)
   // Fixed at startup, not switched: the toolbar no longer offers the two
@@ -57,7 +72,7 @@ function App() {
   const runExport = (format: ExportFormat, exportMode: ExportMode) => {
     const fileName = buildExportFilename(exportOptions.exportTimeframe, format)
     const exportTimeline = format === 'pptx' ? exportTimelineToPptx : exportTimelineToPdf
-    void exportTimeline(items, exportOptions, comments, fileName, exportMode)
+    void exportTimeline(exportItems, exportOptions, comments, fileName, exportMode)
   }
 
   // More tasks in the effective date range than fit on one overview slide is a
@@ -68,7 +83,7 @@ function App() {
   // Counted over every exportable task, not just the roots: the overview draws
   // subtasks as bars too, so the roots alone would under-count what has to fit.
   const handleExport = (format: ExportFormat) => {
-    const overviewItems = getExportOverviewItems(sortItemsForExport(items, exportOptions.sortMode))
+    const overviewItems = getExportOverviewItems(sortItemsForExport(exportItems, exportOptions.sortMode))
     const plan = planOverview(overviewItems, exportOptions.exportTimeframe)
 
     if (plan.inRange.length <= plan.capacity) {
@@ -100,7 +115,17 @@ function App() {
             >
               Import
             </button>
-            <ExportMenu onExport={handleExport} />
+            <ExportMenu
+              onExport={handleExport}
+              scope={
+                filter === 'all'
+                  ? null
+                  : {
+                      label: STATUS_LABEL[filter],
+                      count: getExportOverviewItems(exportItems).length,
+                    }
+              }
+            />
           </>
         }
       />

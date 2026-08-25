@@ -89,3 +89,24 @@ export function visibleRows(items: TimelineItem[], options: RowFilter): GanttRow
     .filter((item) => item.parentId === undefined || !ids.has(item.parentId))
     .flatMap((item) => build(item, 0));
 }
+
+/** The plan a status chip leaves, as items rather than as rows.
+ *
+ * The same keep-rule visibleRows applies: a task survives when its own
+ * effective status matches, a group when it matches or anything under it
+ * does — so a kept task always keeps the groups it hangs from, and nothing
+ * comes out orphaned.
+ *
+ * Search, focus and folds are deliberately left out. Those describe a moment
+ * of looking — a half-typed query, a branch opened to read it — while a chip
+ * is a statement about which part of the plan is being worked with, and it is
+ * the one the export is asked to follow (see App's handleExport).
+ */
+export function itemsForFilter(items: TimelineItem[], filter: StatusFilter): TimelineItem[] {
+  if (filter === 'all') return items;
+
+  const keep = (item: TimelineItem): boolean =>
+    statusOf(items, item) === filter || childrenOf(items, item.id).some(keep);
+
+  return items.filter(keep);
+}
