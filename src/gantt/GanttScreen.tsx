@@ -42,6 +42,11 @@ import type { BarAssignee } from './TaskBar';
  * short enough that the next real click lands. */
 const CLICK_SUPPRESS_MS = 30;
 
+/** What a sub-task is called for the moment between being created and being
+ * named. The name field opens on it immediately, so this is what stands if
+ * the rename is abandoned rather than a placeholder anyone types over. */
+const NEW_SUBTASK_LABEL = 'New sub-task';
+
 /** The plan screen: toolbar, then one scroll container holding the task list,
  * the period header and the timeline, then the Edit Task panel.
  *
@@ -320,6 +325,36 @@ export function GanttScreen() {
     select(task.id);
   };
 
+  /** A sub-task under `parentId`, spanning its parent.
+   *
+   * The defaults are the ones the bar menu used before this screen was
+   * rebuilt: the parent's own span (which is always a valid range), status
+   * "not started", nothing else set. What has changed is where the naming
+   * happens — the old menu collected a name, two dates and a status in a
+   * popup before creating anything, and this screen has an inline name field
+   * on every row already, so the task is created first and named in place.
+   * The span comes from the drawn spans rather than the parent's stored
+   * dates, so a group's sub-task starts out matching the bar on screen. */
+  const addSubtask = (parentId: string) => {
+    const parent = items.find((item) => item.id === parentId);
+    if (!parent) return null;
+
+    const span = spans.get(parentId);
+    const task = buildNewTask(
+      {
+        label: NEW_SUBTASK_LABEL,
+        start: span ? isoAtIndex(minDate, span.start) : parent.start,
+        end: span ? isoAtIndex(minDate, span.start + span.len - 1) : parent.end,
+        status: 'todo',
+      },
+      { parentId },
+    );
+    addItem(task);
+    // A collapsed parent would swallow the row that is about to be renamed.
+    if (collapsed[parentId]) toggleCollapsed(parentId);
+    return { id: task.id, label: task.label };
+  };
+
   const dragSpan = drag ? spans.get(drag.id) : undefined;
   const dragLabel = dragSpan
     ? `${formatDayLabel(minDate, dragSpan.start)} → ${formatDayLabel(minDate, dragSpan.start + dragSpan.len - 1)}  (${dragSpan.len}d)`
@@ -453,6 +488,7 @@ export function GanttScreen() {
               onRename={(id, name) => updateItem(id, { label: name })}
               onAddTask={addTask}
               onOpenFocus={setFocus}
+            onAddSubtask={addSubtask}
             />
           </div>
 

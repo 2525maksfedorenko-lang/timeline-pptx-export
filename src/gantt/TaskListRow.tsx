@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, Layers } from 'lucide-react';
+import { ChevronDown, ChevronRight, Layers, Plus } from 'lucide-react';
 import { rowPaddingLeft, ROW_HEIGHT_PX } from './geometry';
 import type { GanttRowModel } from './rows';
 import { STATUS_LABEL } from './tone';
@@ -24,6 +24,8 @@ interface TaskListRowProps {
   /** Narrow the plan to this row's sub-tasks. Only ever called from a group's
    * count badge, which is the one row element that names them. */
   onOpenFocus: () => void;
+  /** Create a sub-task under this row and start renaming it. */
+  onAddSubtask: () => void;
 }
 
 /** The drag-to-reorder grip: a 2×3 grid of 3px dots.
@@ -72,6 +74,7 @@ export function TaskListRow({
   onToggleCollapse,
   onCycleStatus,
   onOpenFocus,
+  onAddSubtask,
 }: TaskListRowProps) {
   const { item, depth, isGroup, childCount, status } = row;
   const blocked = status === 'blocked';
@@ -108,6 +111,7 @@ export function TaskListRow({
   return (
     <div
       onClick={onSelect}
+      className="gantt-row"
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -182,6 +186,11 @@ export function TaskListRow({
           type="text"
           value={editText}
           autoFocus
+          // Selected, not just focused: a row that was created a moment ago
+          // opens this field on a placeholder name, and typing has to replace
+          // it rather than run on the end of it. A rename works the same way,
+          // which is what an inline rename does everywhere else.
+          onFocus={(event) => event.target.select()}
           onClick={(event) => event.stopPropagation()}
           onChange={(event) => onEditTextChange(event.target.value)}
           onKeyDown={(event) => {
@@ -290,6 +299,36 @@ export function TaskListRow({
           CP
         </span>
       )}
+
+      {/* Any row can take a sub-task — a task with one is simply a group from
+          then on — so the control is on every row rather than on the groups
+          that already have children. Out of the way until the pointer is on
+          the row: at rest the column is names, not controls. */}
+      <button
+        type="button"
+        className="gantt-row-add"
+        onClick={(event) => {
+          event.stopPropagation();
+          onAddSubtask();
+        }}
+        title="Add sub-task"
+        aria-label={`Add a sub-task under ${item.label}`}
+        style={{
+          width: 18,
+          height: 18,
+          flex: 'none',
+          border: 'none',
+          borderRadius: 4,
+          background: 'transparent',
+          padding: 0,
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Plus size={14} strokeWidth={2.2} aria-hidden="true" />
+      </button>
     </div>
   );
 }

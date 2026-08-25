@@ -168,3 +168,22 @@
 .gantt-subcount:hover {
   background: var(--gantt-text);
 }
+
+/* The row's "add sub-task" control. Present in the layout at all times so a
+ * row does not change width under the pointer; visible only while the row is
+ * hovered or the button itself has keyboard focus, because at rest this
+ * column is names rather than controls. */
+.gantt-row-add {
+  opacity: 0;
+  color: var(--gantt-text-muted);
+  transition: opacity 150ms, color 150ms;
+}
+
+.gantt-row:hover .gantt-row-add,
+.gantt-row-add:focus-visible {
+  opacity: 1;
+}
+
+.gantt-row-add:hover {
+  color: var(--gantt-text-secondary);
+}
