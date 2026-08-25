@@ -66,9 +66,6 @@ import {
   STATUS_CHIP_BORDER_WIDTH_PT,
   DATE_LETTER_SPACING_EM,
   letterSpacingPt,
-  TAG_PILL_FONT_SIZE_PT,
-  TAG_PILL_HEIGHT_IN,
-  TAG_PILL_RADIUS_IN,
 } from './slideLayout';
 import { DATE_GRID_STYLES } from './dateGrid';
 
@@ -353,39 +350,6 @@ function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel, links: S
       margin: 0,
       wrap: false,
       ...barJump(bar),
-    });
-
-    // Mini gray pills for item.tags, right after the label (which the model
-    // has already truncated to leave room for them) — same mini-pill
-    // pattern as the bar/track itself (a filled roundRect), just much
-    // smaller, with the tag text centered on top.
-    bar.tags.forEach((tag) => {
-      slide.addShape('roundRect', {
-        x: tag.x,
-        y: bar.y + (BAR_HEIGHT_IN - TAG_PILL_HEIGHT_IN) / 2,
-        w: tag.width,
-        h: TAG_PILL_HEIGHT_IN,
-        rectRadius: TAG_PILL_RADIUS_IN,
-        fill: { color: COLORS.border },
-        line: { color: COLORS.border },
-      });
-      slide.addText(tag.text, {
-        x: tag.x,
-        y: bar.y,
-        w: tag.width,
-        h: BAR_HEIGHT_IN,
-        fontSize: TAG_PILL_FONT_SIZE_PT,
-        bold: true,
-        color: COLORS.navy,
-        fontFace: PPTX_FONT_FACE,
-        align: 'center',
-        valign: 'middle',
-        // Zero inset for the same reason the name above it has one: the box is
-        // the pill, measured to the glyph, and pptxgenjs's default 0.05in would
-        // be a third of a 7pt pill's own padding.
-        margin: 0,
-        wrap: false,
-      });
     });
 
     // The status chip in the Status column: the app's own chip — pale surface,

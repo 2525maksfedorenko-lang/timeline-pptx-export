@@ -276,34 +276,6 @@ export const SUBTASK_META_STATUS_GAP_IN = 0.05;
 // the dashes would just be noise.
 export const SUBTASK_META_GAP_IN = 0.09;
 
-// An overview bar's tag pills (item.tags — see TimelineItem) sit right
-// after its label, in the rest of the Task column: mini gray pills, small
-// enough not to compete with the name for attention. They take the width the
-// name does not want rather than reserving their own out of it — the name is
-// the last thing on the row to give way, and the pills are what compresses
-// first (see buildOverviewSlides in timelineExportModel.ts).
-//
-// They run at the bottom rung of the slide's type scale, one step under the
-// status text and four under the name they sit beside — the same rung the
-// week-level date captions use, which is the tier this deck reserves for
-// reference detail. At 8pt, set bold in a filled pill, they carried as much
-// weight on the row as the 11pt name did, and a tag is a qualifier: it should
-// be legible when looked for and quiet when not.
-//
-// The pill's own padding and height are held in em of its own type rather than
-// in inches, so "proportional to the size" is a property of the definition
-// instead of an arithmetic step someone has to remember to repeat. The two
-// em figures are exactly what the old inch values were at the old 8pt
-// (0.04in = 0.36em, 0.16in = 1.44em), so the pill's proportions are unchanged
-// — it is the same chip, drawn one size down.
-export const TAG_PILL_FONT_SIZE_PT = AXIS_WEEK_FONT_SIZE_PT;
-const TAG_PILL_PADDING_EM = 0.36;
-const TAG_PILL_HEIGHT_EM = 1.44;
-export const TAG_PILL_PADDING_IN = (TAG_PILL_FONT_SIZE_PT * TAG_PILL_PADDING_EM) / 72;
-export const TAG_PILL_HEIGHT_IN = (TAG_PILL_FONT_SIZE_PT * TAG_PILL_HEIGHT_EM) / 72;
-export const TAG_PILL_RADIUS_IN = 0.03;
-export const TAG_PILL_GAP_IN = 0.05;
-export const LABEL_TAG_GAP_IN = 0.08;
 // The whole subtask block's inset from a detail slide's content edge: what
 // separates the rows from the section title above them, before any nesting is
 // taken into account. Every row gets it whatever its depth — the levels are

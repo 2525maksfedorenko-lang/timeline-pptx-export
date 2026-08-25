@@ -63,7 +63,6 @@ import {
   CONTENT_WIDTH_IN,
   DEPENDENCY_JOG_IN,
   GROUP_HEADER_HEIGHT_IN,
-  LABEL_TAG_GAP_IN,
   LIST_ROW_HEIGHT_IN,
   MAX_OVERVIEW_BARS_PER_SLIDE,
   MIN_BAR_WIDTH_IN,
@@ -88,9 +87,6 @@ import {
   subtaskRowIndent,
   tableColumnTextWidthIn,
   tableRowHeightIn,
-  TAG_PILL_FONT_SIZE_PT,
-  TAG_PILL_GAP_IN,
-  TAG_PILL_PADDING_IN,
 } from './slideLayout';
 
 /** Shortens `text` with a trailing "..." until it measures at or under
@@ -113,16 +109,6 @@ function truncateToWidth(text: string, fontSizePt: number, maxWidthIn: number): 
   return end > 0 ? text.slice(0, end) + ellipsis : ellipsis;
 }
 
-// One tag pill drawn right after an overview bar's label, before its status
-// text — position and width are already resolved here so a renderer just
-// draws a rounded rect (TAG_PILL_HEIGHT_IN tall) and centers `text` in it,
-// the same way it draws the bar's own track.
-export interface OverviewBarTagModel {
-  text: string;
-  x: number;
-  width: number;
-}
-
 export interface OverviewColumnHeaderModel {
   text: string;
   x: number;
@@ -135,7 +121,6 @@ export interface OverviewBarModel {
   // the Task column plus its inset, on every row, however the bar moves.
   labelX: number;
   labelWidth: number;
-  tags: OverviewBarTagModel[];
   color: string;
   // The status chip in the Status column: the same pale-surface / dark-text /
   // hairline-border chip the app draws, minus the dropdown chevron, which
@@ -803,73 +788,20 @@ function buildOverviewSlide(
       const statusText = TASK_STATUS_LABELS[status];
       const statusScale = TASK_STATUS_SCALE[status];
 
-      // The name and the tag pills share the Task column, and inside that
-      // column the name outranks them.
-      //
-      // It used to be the other way round: every pill's measured width was
-      // reserved first and the name was cut against whatever survived. Three
-      // tags is ~1.0in of pills, so a name at the third nesting level was left
-      // the column minus its depth indent minus all of that — which is how an
-      // overview came to read "M...", "C...", "Arc...". A tag qualifies a name;
-      // it cannot be worth more of the row than the name it qualifies.
-      //
-      // So the order of giving way is: pills drop from the end of the row
-      // first, and only once a single pill is left does the name itself start
-      // to truncate. Concretely, the name is measured against the column less
-      // one pill's reservation, and the pills are then laid out from where the
-      // name actually ends — so a short name keeps all three, a longer one
-      // pushes the third and then the second off the row, and the longest one
-      // truncates beside the one pill that is always kept.
-      //
-      // Pills are dropped whole rather than truncated to "Bil...": a slide
-      // cannot be hovered to see the rest, so a half-tag spends the same width
-      // on a word that no longer says anything.
-      const tagTexts = item.tags ?? [];
-      const tagPillWidth = (text: string) =>
-        measureTextWidthIn(text, TAG_PILL_FONT_SIZE_PT) + TAG_PILL_PADDING_IN * 2;
-      // What the name gives up for the pill that is always kept — and the cap
-      // that stops it giving up too much. A pill may never take more of the
-      // column than it leaves the name: at the deepest indent, with a long tag,
-      // reserving unconditionally would starve the name exactly the way the old
-      // rule did. Past that point the tags go entirely and the name takes the
-      // column, which is the priority this whole block exists to state.
-      const tagReservedWidth = tagTexts.length > 0 ? tagPillWidth(tagTexts[0]) + LABEL_TAG_GAP_IN : 0;
-      const labelMaxWidth =
-        tagReservedWidth * 2 <= labelBoxWidth ? labelBoxWidth - tagReservedWidth : labelBoxWidth;
-
-      const label = truncateToWidth(item.label, BAR_LABEL_FONT_SIZE_PT, labelMaxWidth);
-      const labelTextWidth = Math.min(measureTextWidthIn(label, BAR_LABEL_FONT_SIZE_PT), labelMaxWidth);
-
-      // Pills start right after the name's own actual (already truncated)
-      // text, not at the edge of its reserved box — otherwise a short name
-      // would leave a visible gap before the first pill.
-      const tagsEndX = labelX + labelBoxWidth;
-      let tagX = labelX + labelTextWidth + LABEL_TAG_GAP_IN;
-      const tags: OverviewBarTagModel[] = [];
-      for (const text of tagTexts) {
-        const width = tagPillWidth(text);
-        // Strictly inside the column: a pill is a filled shape, so one
-        // overhanging by a rounding error shows in a way a glyph's side
-        // bearing does not.
-        if (tagX + width > tagsEndX) break;
-        tags.push({ text, x: tagX, width });
-        tagX += width + TAG_PILL_GAP_IN;
-      }
-
-      // The box the name is drawn in and clicked on: up to the first pill when
-      // the row has one, otherwise the whole rest of the column. Not the
-      // measured text width in both cases, because this is also the PDF's link
-      // target for the task — an untagged row has nothing to its right to
-      // avoid, and a name of five letters should still be as easy to hit as
+      // The name has the Task column to itself: nothing else is drawn in it,
+      // so it truncates against the whole width rather than against what a
+      // row of tag pills left over.
+      const label = truncateToWidth(item.label, BAR_LABEL_FONT_SIZE_PT, labelBoxWidth);
+      // Not the measured text width: this is also the PDF's link target for
+      // the task, and a name of five letters should still be as easy to hit as
       // the bar beside it.
-      const labelWidth = tags.length > 0 ? labelTextWidth : labelBoxWidth;
+      const labelWidth = labelBoxWidth;
 
       bars.push({
         id: item.id,
         label,
         labelX,
         labelWidth,
-        tags,
         color: barColor,
         statusText,
         statusColor: TASK_STATUS_COLORS[status],

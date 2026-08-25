@@ -18,11 +18,6 @@ interface EditTaskPanelProps {
   spans: Map<string, Span>;
 }
 
-/** The tag vocabulary the handoff offers. Widened at render time with
- * whatever tags the plan already carries, so a tag typed before this screen
- * existed is still selectable rather than quietly unrepresentable. */
-const HANDOFF_TAGS = ['phase', 'frontend', 'backend', 'design', 'qa', 'blocked'];
-
 /** A panel field: its label above its control, the pair 8px apart.
  *
  * A real `<label for>` rather than the prototype's bare `<span>` — it looks
@@ -47,7 +42,7 @@ function Field({
   );
 }
 
-/** A section heading. Four of these stack up as the body scrolls, each
+/** A section heading. Three of these stack up as the body scrolls, each
  * sticking under the one before it — which is what the descending z-index is
  * for: a band that scrolled up must pass *under* the bands still above it,
  * not over them. */
@@ -103,9 +98,9 @@ const DATE_FIELD_STYLE: React.CSSProperties = {
 /** Everything about one work item, in a column beside the plan.
  *
  * Opens on a bar click and on a list-row click, and every control commits as
- * it is changed — there is no Save. Four sections in the order a task is
- * usually reasoned about: what it is, when it happens, how it is labelled,
- * and what has been said about it.
+ * it is changed — there is no Save. Three sections in the order a task is
+ * usually reasoned about: what it is, when it happens, and what has been said
+ * about it.
  */
 export function EditTaskPanel({ item, minDate, spans }: EditTaskPanelProps) {
   const items = useTimelineStore((state) => state.items);
@@ -124,10 +119,6 @@ export function EditTaskPanel({ item, minDate, spans }: EditTaskPanelProps) {
   const span = spans.get(item.id);
   const included = item.includeInExport !== false;
   const itemComments = comments.filter((comment) => comment.taskId === item.id);
-
-  const tagOptions: MultiSelectOption[] = [
-    ...new Set([...HANDOFF_TAGS, ...items.flatMap((candidate) => candidate.tags ?? [])]),
-  ].map((tag) => ({ value: tag, label: tag }));
 
   const predecessorOptions: MultiSelectOption[] = items
     .filter((candidate) => candidate.id !== item.id)
@@ -331,23 +322,7 @@ export function EditTaskPanel({ item, minDate, spans }: EditTaskPanelProps) {
           </div>
         </div>
 
-        <Band label="TAGS" zIndex={4} topBorder />
-        <div style={{ ...SECTION_STYLE, gap: 8 }}>
-          <label htmlFor={`panel-${item.id}-tags`} style={{ fontSize: 16, fontWeight: 500 }}>
-            Tags
-          </label>
-          <MultiSelect
-            id={`panel-${item.id}-tags`}
-            options={tagOptions}
-            value={item.tags ?? []}
-            onValueChange={(value) => updateItem(item.id, { tags: value })}
-            placeholder="Select tags"
-            ariaLabel="Tags"
-            className="min-h-11 text-[15px]"
-          />
-        </div>
-
-        <Band label="COMMENTS" zIndex={3} topBorder />
+        <Band label="COMMENTS" zIndex={4} topBorder />
         <div style={{ ...SECTION_STYLE, padding: '18px 16px 28px', gap: 12 }}>
           <label htmlFor={`panel-${item.id}-comment`} style={{ fontSize: 16, fontWeight: 500 }}>
             Comments
