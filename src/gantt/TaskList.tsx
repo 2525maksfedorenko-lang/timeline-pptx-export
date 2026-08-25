@@ -3,6 +3,7 @@ import { Plus } from 'lucide-react';
 import { ADD_ROW_HEIGHT_PX, LIST_WIDTH_PX } from './geometry';
 import type { GanttRowModel } from './rows';
 import { TaskListRow } from './TaskListRow';
+import { useGanttViewStore } from './viewStore';
 
 interface TaskListProps {
   rows: GanttRowModel[];
@@ -18,10 +19,12 @@ interface TaskListProps {
   onRename: (id: string, name: string) => void;
   onAddTask: (name: string) => void;
   onOpenFocus: (id: string) => void;
-  /** Creates a sub-task under `parentId` and hands back the row to rename —
-   * the column opens its name for editing straight away, so the task is named
-   * where it will live rather than in a form somewhere else. */
-  onAddSubtask: (parentId: string) => { id: string; label: string } | null;
+  /** Creates a sub-task under `parentId`. The screen opens the new row's name
+   * for editing as it goes, so the task is named where it will live rather
+   * than in a form somewhere else. */
+  onAddSubtask: (parentId: string) => void;
+  /** A right-click on a row, with the pointer's viewport position. */
+  onContextMenu: (id: string, event: React.MouseEvent) => void;
   /** The body's content height. The two panes scroll on one offset, so the
    * list has to be exactly as tall as the canvas beside it — otherwise the
    * offset that puts the last bar at the foot of the timeline puts the last
@@ -53,19 +56,23 @@ export function TaskList({
   onAddTask,
   onOpenFocus,
   onAddSubtask,
+  onContextMenu,
   minHeight,
 }: TaskListProps) {
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editText, setEditText] = useState('');
+  const renamingId = useGanttViewStore((state) => state.renamingId);
+  const renameDraft = useGanttViewStore((state) => state.renameDraft);
+  const beginRename = useGanttViewStore((state) => state.beginRename);
+  const setRenameDraft = useGanttViewStore((state) => state.setRenameDraft);
+  const endRename = useGanttViewStore((state) => state.endRename);
+
   const [isAdding, setIsAdding] = useState(false);
   const [addText, setAddText] = useState('');
 
   const commitEdit = () => {
-    if (editingId === null) return;
-    const trimmed = editText.trim();
-    if (trimmed !== '') onRename(editingId, trimmed);
-    setEditingId(null);
-    setEditText('');
+    if (renamingId === null) return;
+    const trimmed = renameDraft.trim();
+    if (trimmed !== '') onRename(renamingId, trimmed);
+    endRename();
   };
 
   const commitAdd = () => {
@@ -98,28 +105,18 @@ export function TaskList({
           isSelected={selectedId === row.item.id}
           isCollapsed={collapsed[row.item.id] === true}
           showsCriticalBadge={showCriticalPath && criticalIds.has(row.item.id)}
-          isEditing={editingId === row.item.id}
-          editText={editText}
-          onEditTextChange={setEditText}
+          isEditing={renamingId === row.item.id}
+          editText={renameDraft}
+          onEditTextChange={setRenameDraft}
           onCommitEdit={commitEdit}
-          onCancelEdit={() => {
-            setEditingId(null);
-            setEditText('');
-          }}
-          onBeginEdit={() => {
-            setEditingId(row.item.id);
-            setEditText(row.item.label);
-          }}
+          onCancelEdit={endRename}
+          onBeginEdit={() => beginRename(row.item.id, row.item.label)}
           onSelect={() => onSelect(row.item.id)}
           onToggleCollapse={() => onToggleCollapse(row.item.id)}
           onCycleStatus={() => onCycleStatus(row.item.id)}
           onOpenFocus={() => onOpenFocus(row.item.id)}
-          onAddSubtask={() => {
-            const created = onAddSubtask(row.item.id);
-            if (created === null) return;
-            setEditingId(created.id);
-            setEditText(created.label);
-          }}
+          onAddSubtask={() => onAddSubtask(row.item.id)}
+          onContextMenu={(event) => onContextMenu(row.item.id, event)}
         />
       ))}
 

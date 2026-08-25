@@ -26,6 +26,7 @@ interface TaskListRowProps {
   onOpenFocus: () => void;
   /** Create a sub-task under this row and start renaming it. */
   onAddSubtask: () => void;
+  onContextMenu: (event: React.MouseEvent) => void;
 }
 
 /** The drag-to-reorder grip: a 2×3 grid of 3px dots.
@@ -75,6 +76,7 @@ export function TaskListRow({
   onCycleStatus,
   onOpenFocus,
   onAddSubtask,
+  onContextMenu,
 }: TaskListRowProps) {
   const { item, depth, isGroup, childCount, status } = row;
   const blocked = status === 'blocked';
@@ -111,6 +113,7 @@ export function TaskListRow({
   return (
     <div
       onClick={onSelect}
+      onContextMenu={onContextMenu}
       className="gantt-row"
       style={{
         display: 'flex',

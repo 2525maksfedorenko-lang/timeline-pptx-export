@@ -44,6 +44,10 @@ import {
   DISABLED,
   FOCUS_RING,
   INPUT_CLASS,
+  MENU_ITEM_CLASS,
+  MENU_ITEM_DESTRUCTIVE_CLASS,
+  MENU_SEPARATOR_CLASS,
+  MENU_SURFACE_CLASS,
   type ButtonSize,
   type ButtonVariant,
 } from '../src/components/systemUi';
@@ -269,6 +273,101 @@ function checkCheckbox() {
   if (border) expect('Checkbox border colour', String(style.border), `border-${border}`, cls);
 }
 
+/** Tailwind's spacing scale carries half steps (`py-1.5` is 6px), so a value
+ * that is even has a utility even when it is off the 4px scale. The menu row's
+ * 6px padding is the only place in the system that needs one. */
+function halfStep(px: number, what: string): string | null {
+  if (px % 2 !== 0) {
+    fail(`${what}: ${px}px is not on Tailwind's half-step scale`);
+    return null;
+  }
+  const value = px / 4;
+  return Number.isInteger(value) ? `${value}` : `${value}`;
+}
+
+function checkDropdownMenu() {
+  const rel = 'components/overlays/DropdownMenu.jsx';
+  const src = source(rel);
+  // Both style objects are written inline with free variables in them — the
+  // surface's position depends on `side`/`align`, the row's fill on `hover`.
+  // Neither affects the values being read here, so they are stubbed.
+  const surface = objectAfter(src, 'role="menu" style={{', rel, {
+    minWidth: 224,
+    side: 'bottom',
+    align: 'start',
+  }) as unknown as Record<string, string | number>;
+  // Sliced to the row component first: `style={{` alone would find the
+  // wrapper's, which is three objects earlier in the file.
+  const itemSrc = src.slice(src.indexOf('export function DropdownMenuItem'));
+  const item = objectAfter(itemSrc, 'style={{', rel, {
+    hover: true,
+    disabled: false,
+  }) as unknown as Record<string, string | number>;
+
+  const min = step(Number(surface.minWidth), 'DropdownMenu minimum width');
+  if (min !== null) {
+    expect('Menu min width', `${surface.minWidth}px`, `min-w-${min}`, MENU_SURFACE_CLASS);
+  }
+  const surfaceRadius = tokenSuffix(String(surface.borderRadius));
+  if (surfaceRadius) {
+    expect(
+      'Menu radius',
+      String(surface.borderRadius),
+      `rounded-${surfaceRadius.replace('radius-', '')}`,
+      MENU_SURFACE_CLASS,
+    );
+  }
+  const surfaceBorder = tokenSuffix(String(surface.border));
+  if (surfaceBorder) {
+    expect('Menu border colour', String(surface.border), `border-${surfaceBorder}`, MENU_SURFACE_CLASS);
+  }
+  const surfaceBg = tokenSuffix(String(surface.background));
+  if (surfaceBg) expect('Menu fill', String(surface.background), `bg-${surfaceBg}`, MENU_SURFACE_CLASS);
+  const surfaceFg = tokenSuffix(String(surface.color));
+  if (surfaceFg) expect('Menu text', String(surface.color), `text-${surfaceFg}`, MENU_SURFACE_CLASS);
+  const surfacePadding = step(Number(surface.padding), 'DropdownMenu padding');
+  if (surfacePadding !== null) {
+    expect('Menu padding', `${surface.padding}px`, `p-${surfacePadding}`, MENU_SURFACE_CLASS);
+  }
+  const shadow = /boxShadow:\s*"var\(--shadow-([a-z0-9]+)\)"/.exec(src);
+  if (shadow) expect('Menu elevation', `var(--shadow-${shadow[1]})`, `shadow-${shadow[1]}`, MENU_SURFACE_CLASS);
+
+  const itemRadius = tokenSuffix(String(item.borderRadius));
+  if (itemRadius) {
+    expect(
+      'Menu row radius',
+      String(item.borderRadius),
+      `rounded-${itemRadius.replace('radius-', '')}`,
+      MENU_ITEM_CLASS,
+    );
+  }
+  const itemSize = tokenSuffix(String(item.fontSize));
+  if (itemSize) expect('Menu row type size', String(item.fontSize), itemSize, MENU_ITEM_CLASS);
+  const itemGap = step(Number(item.gap), 'DropdownMenu row gap');
+  if (itemGap !== null) expect('Menu row gap', `${item.gap}px`, `gap-${itemGap}`, MENU_ITEM_CLASS);
+  const [padY, padX] = String(item.padding).split(/\s+/).map((part) => Number.parseFloat(part));
+  const y = halfStep(padY, 'DropdownMenu row vertical padding');
+  if (y !== null) expect('Menu row padding', String(item.padding), `py-${y}`, MENU_ITEM_CLASS);
+  const x = halfStep(padX, 'DropdownMenu row horizontal padding');
+  if (x !== null) expect('Menu row padding', String(item.padding), `px-${x}`, MENU_ITEM_CLASS);
+
+  // The row's hover fill and text are written as a ternary on `hover`, which
+  // the stub above pins to true — so what comes back is the hovered state.
+  const hoverBg = tokenSuffix(String(item.background));
+  if (hoverBg) expect('Menu row hover fill', String(item.background), `hover:bg-${hoverBg}`, MENU_ITEM_CLASS);
+  const hoverFg = tokenSuffix(String(item.color));
+  if (hoverFg) expect('Menu row hover text', String(item.color), `hover:text-${hoverFg}`, MENU_ITEM_CLASS);
+
+  const separator = /separator\s*\n?\s*\? <div key=\{"sep" \+ i\} style=\{\{([^}]*)\}\}/.exec(src);
+  if (separator) {
+    const colour = tokenSuffix(separator[1]);
+    if (colour) expect('Menu separator colour', `hsl(var(--${colour}))`, `bg-${colour}`, MENU_SEPARATOR_CLASS);
+    expect('Menu separator weight', 'height 1', 'h-px', MENU_SEPARATOR_CLASS);
+  } else {
+    fail(`could not read ${rel}: the separator is no longer a one-line style object`);
+  }
+}
+
 function checkFocusRing() {
   const rel = 'tokens/elevation.css';
   const css = source(rel);
@@ -312,6 +411,9 @@ function checkCardShadow() {
   expect('Card shadow at rest', `--shadow-sm = ${normalise(wanted[1])}`, `shadow-${match[1]}`, CARD_CLASS);
 }
 
+/** `text-` utilities that set alignment rather than a colour or a size. */
+const TEXT_ALIGNMENTS = new Set(['left', 'center', 'right', 'justify', 'start', 'end']);
+
 /** Nothing in the recipes may name a colour the system does not define. */
 function checkColourVocabulary() {
   const colours = source('tokens/colors.css');
@@ -339,6 +441,10 @@ function checkColourVocabulary() {
     ['INPUT_CLASS', INPUT_CLASS],
     ['CHECKBOX_CLASS', CHECKBOX_CLASS],
     ['CARD_CLASS', CARD_CLASS],
+    ['MENU_SURFACE_CLASS', MENU_SURFACE_CLASS],
+    ['MENU_ITEM_CLASS', MENU_ITEM_CLASS],
+    ['MENU_ITEM_DESTRUCTIVE_CLASS', MENU_ITEM_DESTRUCTIVE_CLASS],
+    ['MENU_SEPARATOR_CLASS', MENU_SEPARATOR_CLASS],
   ];
   let checked = 0;
   for (const [recipe, cls] of recipes) {
@@ -350,8 +456,10 @@ function checkColourVocabulary() {
       const [, property, name] = colour;
       // `border` on its own, and sizes like `outline-2`, are not colours.
       if (/^\d+$/.test(name)) continue;
-      // A `text-` utility that names a step of the type scale is a size.
+      // A `text-` utility that names a step of the type scale is a size, and
+      // one that names an alignment is neither a size nor a colour.
       if (property === 'text' && typeSizes.has(name)) continue;
+      if (property === 'text' && TEXT_ALIGNMENTS.has(name)) continue;
       checked += 1;
       if (!allowed.has(name)) {
         fail(`${recipe}: \`${token}\` names "${name}", which is not a token in the design system`);
@@ -379,6 +487,7 @@ function main() {
     checkButton();
     checkInput();
     checkCheckbox();
+    checkDropdownMenu();
     checkFocusRing();
     checkCardShadow();
     checkColourVocabulary();

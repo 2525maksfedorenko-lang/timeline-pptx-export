@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, Layers } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Layers, Pencil, Plus, Trash2 } from 'lucide-react';
 import { buttonBaseClass } from '../components/systemUi';
+import { ContextMenu, type ContextMenuAction } from '../components/ContextMenu';
 import { useTimelineStore } from '../store/timelineStore';
 import { usePeopleStore } from '../store/peopleStore';
 import { getInitials } from '../utils/initials';
@@ -25,7 +26,7 @@ import {
   planRange,
   weekendStarts,
 } from './scale';
-import { progressOf } from './rollup';
+import { childrenOf, progressOf } from './rollup';
 import { visibleRows } from './rows';
 import { criticalPath } from './criticalPath';
 import { descendantLeafIds, groupMoveDays, previewSpans, type DragState } from './drag';
@@ -59,6 +60,7 @@ export function GanttScreen() {
   const items = useTimelineStore((state) => state.items);
   const updateItem = useTimelineStore((state) => state.updateItem);
   const addItem = useTimelineStore((state) => state.addItem);
+  const deleteTaskCascade = useTimelineStore((state) => state.deleteTaskCascade);
   const showDependencies = useTimelineStore((state) => state.exportOptions.showDependencies);
   const activePlanId = useTimelineStore((state) => state.activePlanId);
   const people = usePeopleStore((state) => state.people);
@@ -71,6 +73,8 @@ export function GanttScreen() {
   const showCriticalPath = useGanttViewStore((state) => state.showCriticalPath);
   const select = useGanttViewStore((state) => state.select);
   const toggleCollapsed = useGanttViewStore((state) => state.toggleCollapsed);
+  const collapseBranch = useGanttViewStore((state) => state.collapseBranch);
+  const beginRename = useGanttViewStore((state) => state.beginRename);
   const focusId = useGanttViewStore((state) => state.focusId);
   const setFocus = useGanttViewStore((state) => state.setFocus);
 
@@ -80,6 +84,8 @@ export function GanttScreen() {
   const focusItem = focusId === null ? null : (items.find((item) => item.id === focusId) ?? null);
   const activeFocusId = focusItem?.id ?? null;
 
+  // The row a right-click opened a menu on, and where the pointer was.
+  const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
   // Set the moment a drag snaps a whole column, and cleared shortly after the
   // pointer comes up — the flag that tells "pressed a bar" from "moved a bar",
@@ -352,7 +358,79 @@ export function GanttScreen() {
     addItem(task);
     // A collapsed parent would swallow the row that is about to be renamed.
     if (collapsed[parentId]) toggleCollapsed(parentId);
-    return { id: task.id, label: task.label };
+    beginRename(task.id, task.label);
+  };
+
+  /** This item and every group under it — what "the branch" means to the two
+   * actions that act on one. */
+  const branchGroupIds = (id: string): string[] => {
+    const children = childrenOf(items, id);
+    if (children.length === 0) return [];
+    return [id, ...children.flatMap((child) => branchGroupIds(child.id))];
+  };
+
+  const deleteTask = (id: string) => {
+    const item = items.find((candidate) => candidate.id === id);
+    if (!item) return;
+    // Same question, same words as the Edit Task panel's own delete — one
+    // action asked about one way, wherever it is reached from.
+    const descendants = childrenOf(items, id).length;
+    const confirmed = window.confirm(
+      descendants > 0
+        ? `Delete '${item.label}' and its sub-tasks? This can't be undone.`
+        : `Delete '${item.label}'? This can't be undone.`,
+    );
+    if (!confirmed) return;
+    deleteTaskCascade(id);
+    if (selectedId === id) select(null);
+  };
+
+  /** The rows a right-click offers. Five actions at most, and two of them
+   * only where they mean anything: a task with no sub-tasks has no branch to
+   * fold away and none to focus on. */
+  const menuActions = (id: string): ContextMenuAction[] => {
+    const isGroup = childrenOf(items, id).length > 0;
+    return [
+      {
+        label: 'Add sub-task',
+        icon: <Plus size={14} strokeWidth={2} aria-hidden="true" />,
+        onSelect: () => addSubtask(id),
+      },
+      {
+        label: 'Rename',
+        icon: <Pencil size={14} strokeWidth={2} aria-hidden="true" />,
+        onSelect: () => {
+          const item = items.find((candidate) => candidate.id === id);
+          if (item) beginRename(item.id, item.label);
+        },
+      },
+      ...(isGroup
+        ? [
+            {
+              label: 'Show only sub-tasks',
+              icon: <Layers size={14} strokeWidth={2} aria-hidden="true" />,
+              onSelect: () => setFocus(id),
+            },
+            {
+              label: 'Hide sub-tasks',
+              icon: <ChevronRight size={14} strokeWidth={2} aria-hidden="true" />,
+              onSelect: () => collapseBranch(branchGroupIds(id)),
+            },
+          ]
+        : []),
+      {
+        label: 'Delete',
+        icon: <Trash2 size={14} strokeWidth={2} aria-hidden="true" />,
+        destructive: true,
+        onSelect: () => deleteTask(id),
+      },
+    ];
+  };
+
+  const openMenu = (id: string, event: React.MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setMenu({ id, x: event.clientX, y: event.clientY });
   };
 
   const dragSpan = drag ? spans.get(drag.id) : undefined;
@@ -361,6 +439,9 @@ export function GanttScreen() {
     : '';
 
   const selectedItem = items.find((item) => item.id === selectedId) ?? null;
+  // Resolved for the same reason the focus is: the row a menu is open on can
+  // be deleted by that very menu.
+  const menuItem = menu === null ? null : (items.find((item) => item.id === menu.id) ?? null);
 
   return (
     <div style={{ display: 'flex', flex: 1, minHeight: 0, background: 'var(--gantt-surface)' }}>
@@ -489,6 +570,7 @@ export function GanttScreen() {
               onAddTask={addTask}
               onOpenFocus={setFocus}
             onAddSubtask={addSubtask}
+            onContextMenu={openMenu}
             />
           </div>
 
@@ -529,6 +611,7 @@ export function GanttScreen() {
               drag={drag}
               dragLabel={dragLabel}
               onPointerDownBar={beginDrag}
+            onContextMenuBar={openMenu}
               onSelectBar={(id) => {
                 // A pan ends in a click too, and selecting a task because
                 // someone dragged the canvas past it would be a surprise.
@@ -538,6 +621,16 @@ export function GanttScreen() {
           </div>
         </div>
       </div>
+
+      {menuItem && menu && (
+        <ContextMenu
+          x={menu.x}
+          y={menu.y}
+          label={menuItem.label}
+          actions={menuActions(menuItem.id)}
+          onClose={() => setMenu(null)}
+        />
+      )}
 
       {selectedItem && (
         <EditTaskPanel

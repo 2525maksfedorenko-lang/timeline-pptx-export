@@ -40,6 +40,7 @@ interface TaskBarProps {
   statusLabel: string;
   onPointerDownBar: (event: React.PointerEvent, mode: DragState['mode']) => void;
   onSelect: () => void;
+  onContextMenu: (event: React.MouseEvent) => void;
 }
 
 /** One bar: a pale block in its status' tint, its own name set on it in the
@@ -68,6 +69,7 @@ export function TaskBar({
   statusLabel,
   onPointerDownBar,
   onSelect,
+  onContextMenu,
 }: TaskBarProps) {
   const { item, isGroup, status } = row;
   const tone = STATUS_TONE[status];
@@ -105,6 +107,7 @@ export function TaskBar({
         {...{ [BAR_HIT_ATTRIBUTE]: '' }}
         onPointerDown={(event) => onPointerDownBar(event, 'move')}
         onClick={onSelect}
+        onContextMenu={onContextMenu}
         title={`${item.label} · ${dateRange} · ${progress}% · ${statusLabel}`}
         style={{
           position: 'absolute',

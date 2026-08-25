@@ -27,10 +27,24 @@ interface GanttViewStore {
   /** Group ids folded away. Absent means expanded. */
   collapsed: Record<string, boolean>;
   toggleCollapsed: (id: string) => void;
+  /** Folds several groups away at once — a whole branch, rather than the one
+   * level a caret folds. */
+  collapseBranch: (ids: string[]) => void;
 
   /** The row the Edit Task panel is open on. */
   selectedId: string | null;
   select: (id: string | null) => void;
+
+  /** The row whose name is being edited in the list, and the text in its
+   * field. Here rather than in the list itself because a rename now starts
+   * from three places — a double-click on the name, the row's context menu,
+   * and a sub-task the moment it is created — and only the first is inside
+   * the column. */
+  renamingId: string | null;
+  renameDraft: string;
+  beginRename: (id: string, label: string) => void;
+  setRenameDraft: (text: string) => void;
+  endRename: () => void;
 
   /** The parent whose sub-tasks the plan is narrowed to, or null for the
    * whole plan. A way of looking at the current plan and nothing more — no
@@ -67,9 +81,19 @@ export const useGanttViewStore = create<GanttViewStore>()((set) => ({
   collapsed: {},
   toggleCollapsed: (id) =>
     set((state) => ({ collapsed: { ...state.collapsed, [id]: !state.collapsed[id] } })),
+  collapseBranch: (ids) =>
+    set((state) => ({
+      collapsed: { ...state.collapsed, ...Object.fromEntries(ids.map((id) => [id, true])) },
+    })),
 
   selectedId: null,
   select: (selectedId) => set({ selectedId }),
+
+  renamingId: null,
+  renameDraft: '',
+  beginRename: (renamingId, label) => set({ renamingId, renameDraft: label }),
+  setRenameDraft: (renameDraft) => set({ renameDraft }),
+  endRename: () => set({ renamingId: null, renameDraft: '' }),
 
   focusId: null,
   // Entering a focus closes the Edit Task panel: the row it was open on is

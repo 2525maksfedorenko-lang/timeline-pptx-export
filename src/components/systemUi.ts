@@ -113,3 +113,38 @@ export const CHECKBOX_CLASS =
  * card-at-rest shadow — which in Tailwind v4 is `shadow-xs`, not `shadow-sm`
  * (the v3 → v4 rename, see docs/design-system-map.md §6). */
 export const CARD_CLASS = 'rounded-lg border border-border bg-card shadow-xs';
+
+/** A menu surface, from design-system/components/overlays/DropdownMenu.jsx:
+ * 224px at its narrowest, `--radius-md`, a 1px `--border` hairline, the
+ * `--popover` fill and 4px of padding around the rows, on `--shadow-md`.
+ *
+ * The system's own menu is a trigger plus a list; only the surface and its
+ * rows are contract, since where a menu opens is the caller's business — a
+ * dropdown hangs off its button, a context menu opens at the pointer. */
+export const MENU_SURFACE_CLASS =
+  'z-50 min-w-56 overflow-hidden rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md';
+
+// A menu row's geometry, shared by both its colourways.
+const MENU_ITEM_BASE =
+  `flex w-full cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm ${DISABLED} ${FOCUS_RING}`;
+
+/** One row of a menu: 6px by 8px, `--radius-sm`, 14px type, and the system's
+ * one hover treatment for a row — filled with `--accent`. */
+export const MENU_ITEM_CLASS = `${MENU_ITEM_BASE} hover:bg-accent hover:text-accent-foreground`;
+
+/** The same row for an action that cannot be undone.
+ *
+ * The system's DropdownMenu has one row treatment and no destructive variant,
+ * so this pairs its geometry with the destructive treatment the system does
+ * define and this app already uses on its delete button: the label in
+ * `--destructive`, hover filling with a tenth of it. Recorded as a deviation
+ * in docs/design-system-map.md rather than passed off as the system's own. */
+export const MENU_ITEM_DESTRUCTIVE_CLASS =
+  `${MENU_ITEM_BASE} text-destructive hover:bg-destructive/10`;
+
+/** The hairline between groups of rows: 1px of `--muted`, pulled out through
+ * the surface's own padding so it reaches both edges. */
+export const MENU_SEPARATOR_CLASS = '-mx-1 my-1 h-px bg-muted';
+
+/** A menu's heading — what the rows below it act on. */
+export const MENU_LABEL_CLASS = 'px-2 py-1.5 text-sm font-semibold';

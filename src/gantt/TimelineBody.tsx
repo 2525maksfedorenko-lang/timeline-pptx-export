@@ -29,6 +29,7 @@ interface TimelineBodyProps {
   /** The pill's text while a drag is in flight, e.g. "Aug 13 → Aug 18  (6d)". */
   dragLabel: string;
   onPointerDownBar: (id: string, event: React.PointerEvent, mode: DragState['mode']) => void;
+  onContextMenuBar: (id: string, event: React.MouseEvent) => void;
   onSelectBar: (id: string) => void;
 }
 
@@ -64,6 +65,7 @@ export function TimelineBody({
   drag,
   dragLabel,
   onPointerDownBar,
+  onContextMenuBar,
   onSelectBar,
 }: TimelineBodyProps) {
   const period = columnWidth * PERIOD_DAYS[scale];
@@ -177,6 +179,7 @@ export function TimelineBody({
             statusLabel={statusLabelById.get(row.item.id) ?? ''}
             onPointerDownBar={(event, mode) => onPointerDownBar(row.item.id, event, mode)}
             onSelect={() => onSelectBar(row.item.id)}
+            onContextMenu={(event) => onContextMenuBar(row.item.id, event)}
           />
         );
       })}
