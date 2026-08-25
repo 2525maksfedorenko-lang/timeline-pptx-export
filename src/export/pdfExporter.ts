@@ -49,7 +49,6 @@ import {
   DASHBOARD_TABLE_TOP_IN,
   DASHBOARD_TABLE_WIDTH_IN,
   STATUS_RIGHT_PADDING_IN,
-  DEPENDENCY_LINE_WIDTH_PT,
   FOOTER_HEIGHT_IN,
   GROUP_HEADER_HEIGHT_IN,
   HEADER_HEIGHT_IN,
@@ -202,16 +201,10 @@ function drawOmittedNote(doc: jsPDF, note: string | null) {
 /** Painted strictly back to front, because jsPDF has no z-index — draw order
  * *is* z-order:
  *   1. the three date-grid densities (palest first)
- *   2. the dependency connectors
- *   3. the bar tracks and fills, over the connectors — the same order the
- *      on-screen chart uses (connectors z-1, bars z-10; see GanttChart), so
- *      a line passing a row it has no business in disappears behind that
- *      row's bar instead of being drawn across it. The connectors are
- *      anchored on bar edges besides (see buildDependencyConnectors), so
- *      what this hides is incidental crossings, not their own endpoints.
- *   4. every piece of text, over both, so nothing can cut through a label,
- *      percentage or status
- * Splitting the bars into a shapes pass and a text pass is what buys step 4;
+ *   2. the bars, over the grid
+ *   3. every piece of text, over both, so nothing can cut through a label or
+ *      a status
+ * Splitting the bars into a shapes pass and a text pass is what buys step 3;
  * drawing each bar's shapes and text together would put the first bars' text
  * under the later bars again. Mirrors pptxExporter.ts's identical ordering. */
 function drawOverviewSlide(doc: jsPDF, model: OverviewSlideModel, links: SlideLinks) {
@@ -264,17 +257,6 @@ function drawOverviewSlide(doc: jsPDF, model: OverviewSlideModel, links: SlideLi
       doc.setDrawColor(withHash(style.color));
       doc.setLineWidth(style.widthPt * PT_TO_IN);
       levelLines.forEach((gridLine) => doc.line(gridLine.x, axisLineY, gridLine.x, CONTENT_BOTTOM_IN));
-    });
-  }
-
-  if (model.dependencyConnectors.length > 0) {
-    doc.setDrawColor(withHash(COLORS.dependencyLine));
-    doc.setLineWidth(DEPENDENCY_LINE_WIDTH_PT * PT_TO_IN);
-
-    model.dependencyConnectors.forEach((connector) => {
-      connector.segments.forEach((segment) => {
-        doc.line(segment.x1, segment.y1, segment.x2, segment.y2);
-      });
     });
   }
 
@@ -762,7 +744,6 @@ export async function exportTimelineToPdf(
     comments,
     exportOptions.commentMode,
     exportOptions.exportTimeframe,
-    exportOptions.showDependencies,
     exportMode,
   );
   const dashboardSlides = buildDashboardSlides(sortedItems, new Date());

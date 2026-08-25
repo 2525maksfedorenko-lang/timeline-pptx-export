@@ -65,7 +65,6 @@ export function buildDeck(plan: FixturePlan, scenario: Pick<Scenario, 'exportMod
     plan.comments,
     scenario.commentMode,
     scenario.timeframe,
-    true,
     scenario.exportMode,
   );
   const dashboardSlides = buildDashboardSlides(sortedItems, new Date('2026-08-18T00:00:00Z'));

@@ -1,6 +1,5 @@
 import { buttonBaseClass, INPUT_SHELL_CLASS } from '../components/systemUi';
 import { PlanMenu } from '../components/PlanMenu';
-import { Switch } from '../components/Switch';
 import { useTimelineStore } from '../store/timelineStore';
 import { SELECTABLE_TASK_STATUS_VALUES } from '../types/timeline';
 import { TIME_SCALE_LABELS, TIME_SCALES } from './scale';
@@ -63,11 +62,6 @@ export function GanttToolbar({ actions, showTimelineControls, onOpenSettings }: 
   const setSearch = useGanttViewStore((state) => state.setSearch);
   const filter = useGanttViewStore((state) => state.filter);
   const setFilter = useGanttViewStore((state) => state.setFilter);
-
-  // "Links" is the same setting the export slides read, not a second copy of
-  // it — turning the arrows off on screen turns them off in the deck.
-  const showDependencies = useTimelineStore((state) => state.exportOptions.showDependencies);
-  const updateExportOptions = useTimelineStore((state) => state.updateExportOptions);
 
   // A group is an item something else calls its parent; everything else is a
   // work item. Two passes over the list rather than one, because the counts
@@ -199,21 +193,6 @@ export function GanttToolbar({ actions, showTimelineControls, onOpenSettings }: 
             ))}
           </div>
 
-          <div style={{ flex: '1 1 auto', minWidth: 8 }} />
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14, flex: '0 0 auto' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-              <Switch
-                id="gantt-links"
-                checked={showDependencies}
-                onCheckedChange={(checked) => updateExportOptions({ showDependencies: checked })}
-                label="Links"
-              />
-              <label htmlFor="gantt-links" className="text-[11px] font-medium text-muted-foreground">
-                Links
-              </label>
-            </div>
-          </div>
         </div>
       )}
     </div>

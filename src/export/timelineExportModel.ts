@@ -61,7 +61,6 @@ import {
   CONTENT_BOTTOM_IN,
   CONTENT_X_IN,
   CONTENT_WIDTH_IN,
-  DEPENDENCY_JOG_IN,
   GROUP_HEADER_HEIGHT_IN,
   LIST_ROW_HEIGHT_IN,
   MAX_OVERVIEW_BARS_PER_SLIDE,
@@ -181,25 +180,6 @@ export interface OverviewAxisLabelModel {
   x: number;
 }
 
-// One straight (horizontal or vertical) leg of a dependency connector's
-// elbow path — drawn as its own line by both exporters, since neither
-// pptxgenjs nor jsPDF can draw an arbitrary multi-segment path directly.
-export interface DependencyConnectorSegment {
-  x1: number;
-  y1: number;
-  x2: number;
-  y2: number;
-}
-
-export interface OverviewConnectorModel {
-  id: string;
-  // A polyline from one bar's edge to another's, as its individual legs:
-  // 1 segment for a same-row (straight) connector, otherwise up to 5 for the
-  // stub/gutter/approach route (see buildDependencyConnectors), with any
-  // zero-length leg already dropped.
-  segments: DependencyConnectorSegment[];
-}
-
 export interface OverviewSlideModel {
   kind: 'overview';
   title: string;
@@ -220,11 +200,6 @@ export interface OverviewSlideModel {
   dividerTop: number;
   dividerBottom: number;
   bars: OverviewBarModel[];
-  // Empty when exportOptions.showDependencies is off, or for any dependency
-  // whose predecessor/successor didn't make it onto this slide (excluded
-  // from export, outside the timeframe window, or truncated by overflow) —
-  // silently omitted rather than drawn as a bracket to nowhere.
-  dependencyConnectors: OverviewConnectorModel[];
   // The date span this slide's axis covers, yyyy-mm-dd, or null when the slide
   // draws nothing. Carried for the same reason the grid lines carry their
   // dates: it is what an audit needs to say whether the grid matches the
@@ -669,7 +644,6 @@ function buildOverviewSlide(
   axis: OverviewAxis | null,
   title: string,
   omission: OverviewOmission,
-  showDependencies: boolean,
   depthById: ReadonlyMap<string, number>,
 ): OverviewSlideModel {
   const bars: OverviewBarModel[] = [];
@@ -824,8 +798,6 @@ function buildOverviewSlide(
     });
   }
 
-  const dependencyConnectors = showDependencies ? buildDependencyConnectors(items, bars) : [];
-
   return {
     kind: 'overview',
     title,
@@ -838,7 +810,6 @@ function buildOverviewSlide(
     dividerTop: dateAxisY,
     dividerBottom: CONTENT_BOTTOM_IN,
     bars,
-    dependencyConnectors,
     windowStart,
     windowEnd,
     windowTierDays,
@@ -899,7 +870,6 @@ function buildOverviewSlides(
   plan: OverviewPlan,
   timeframe: ExportTimeframe | null,
   exportMode: ExportMode,
-  showDependencies: boolean,
   candidateItems: TimelineItem[],
   sectionedIds: ReadonlySet<string>,
 ): OverviewSlideModel[] {
@@ -941,7 +911,7 @@ function buildOverviewSlides(
 
   if (!isPaged) {
     return [
-      buildOverviewSlide(drawnItems, axes[0], 'Timeline Overview', omission, showDependencies, depthById),
+      buildOverviewSlide(drawnItems, axes[0], 'Timeline Overview', omission, depthById),
     ];
   }
 
@@ -954,120 +924,9 @@ function buildOverviewSlides(
       // repeated under every page — and the counts go with it so they stay
       // summable across the deck.
       index === pages.length - 1 ? omission : NO_OMISSION,
-      showDependencies,
       depthById,
     ),
   );
-}
-
-/** One connector per (successor, predecessor-id) pair, reusing each bar's
- * already-computed position — never recomputed from item dates. A
- * predecessor/successor missing from `barById` means it isn't on this slide
- * (excluded from export, outside the timeframe window, cut by compact-mode
- * truncation, or sitting on another page in 'full' mode), so that connector
- * is dropped rather than drawn to nowhere.
- *
- * Both ends land on a bar's vertical *edge*, and the path is routed to stay
- * off the bars in between — the exporters draw connectors under the bars
- * (matching the on-screen z-stack), but "hidden behind the bar" is a weaker
- * guarantee than "never there in the first place": a line emerging from the
- * middle of a bar still reads as crossing it.
- *
- * The path is a polyline through five points, degenerate legs dropped:
- *   1. out of the predecessor's right edge by one jog — the width of
- *      BAR_LABEL_PADDING_IN, so the stub sits in the gap before the label;
- *   2. off that row entirely, into the gutter between it and the next
- *      (ROW_GAP_IN), which is the one horizontal band with no bar, label,
- *      tag pill or status text in it;
- *   3. along that gutter to the successor's approach column;
- *   4. down/up that column to the successor's row;
- *   5. one jog back into the successor's edge.
- * Travelling along a row's own center line instead — the obvious elbow, and
- * what this used to do — draws a strikethrough right across whichever
- * label shares that row.
- *
- * Which edge of the successor the line arrives at depends on where that bar
- * sits, since a successor's bar is very often *not* to the right of its
- * predecessor's (overlapping date spans are normal, and any bar can be
- * clipped to the timeframe window, or a sliver at its right edge):
- * approach the left edge when there's room to drop in front of it, and the
- * right edge otherwise — never a point in between. */
-function buildDependencyConnectors(items: TimelineItem[], bars: OverviewBarModel[]): OverviewConnectorModel[] {
-  const barById = new Map(bars.map((bar) => [bar.id, bar]));
-
-  // Every leg is pinned inside the timeline zone. Two of the x's a connector
-  // derives are outside the bars themselves — the stub past the predecessor's
-  // right edge and the approach column in front of the successor — and either
-  // can fall outside the zone now that a bar may end at the zone's right edge
-  // (nothing reserves label room after it any more) or start at its left edge.
-  // Unclamped, the stub would run into the slide's right margin and the
-  // approach column into the Task column, drawing a dependency line straight
-  // through the task names.
-  //
-  // This matters far more with the export sorted by status than it did sorted
-  // by date: rows are no longer in time order, so a connector routinely runs
-  // upwards and diagonally across many rows instead of one step down.
-  const clampX = (x: number) =>
-    Math.min(Math.max(x, TIMELINE_X_IN), TIMELINE_X_IN + TIMELINE_WIDTH_IN);
-  // Vertically the gutter between two rows is always inside the content area,
-  // except for a connector leaving the very first row, whose "gutter above"
-  // would sit a hair above the header rule.
-  const clampY = (y: number) =>
-    Math.min(Math.max(y, CONTENT_TOP_IN + GROUP_HEADER_HEIGHT_IN), CONTENT_BOTTOM_IN);
-
-  return items.flatMap((item) => {
-    const successorBar = barById.get(item.id);
-    if (!successorBar) return [];
-
-    return (item.dependencies ?? []).flatMap((depId) => {
-      const predecessorBar = barById.get(depId);
-      if (!predecessorBar) return [];
-
-      const x1 = clampX(predecessorBar.barX + predecessorBar.barWidth);
-      const y1 = predecessorBar.y + BAR_HEIGHT_IN / 2;
-      const y2 = successorBar.y + BAR_HEIGHT_IN / 2;
-
-      const successorLeft = successorBar.barX;
-      const successorRight = successorBar.barX + successorBar.barWidth;
-      // Room to drop in front of the successor means room for the approach
-      // column too, i.e. a full jog either side of the predecessor's stub.
-      const approachFromLeft = successorLeft - DEPENDENCY_JOG_IN >= x1 + DEPENDENCY_JOG_IN;
-
-      const x2 = clampX(approachFromLeft ? successorLeft : successorRight);
-      const stubX = clampX(x1 + DEPENDENCY_JOG_IN);
-      const approachX = clampX(
-        approachFromLeft
-          ? successorLeft - DEPENDENCY_JOG_IN
-          : Math.max(stubX, successorRight + DEPENDENCY_JOG_IN),
-      );
-
-      if (y1 === y2) return [{ id: `${depId}->${item.id}`, segments: [{ x1, y1, x2, y2 }] }];
-
-      const gutterY = clampY(
-        y2 > y1
-          ? predecessorBar.y + BAR_HEIGHT_IN + ROW_GAP_IN / 2
-          : predecessorBar.y - ROW_GAP_IN / 2,
-      );
-
-      const points: [number, number][] = [
-        [x1, y1],
-        [stubX, y1],
-        [stubX, gutterY],
-        [approachX, gutterY],
-        [approachX, y2],
-        [x2, y2],
-      ];
-
-      const segments: DependencyConnectorSegment[] = points
-        .slice(1)
-        .map(([x, y], index) => ({ x1: points[index][0], y1: points[index][1], x2: x, y2: y }))
-        // A zero-length leg (the two columns coinciding, say) is nothing to
-        // draw, and pptxgenjs would still emit a shape for it.
-        .filter((segment) => segment.x1 !== segment.x2 || segment.y1 !== segment.y2);
-
-      return [{ id: `${depId}->${item.id}`, segments }];
-    });
-  });
 }
 
 /** One task listed under a parent's "Subtasks" heading, with its nesting
@@ -1598,7 +1457,6 @@ export function buildExportSlides(
   comments: TaskComment[],
   commentMode: ExportOptions['commentMode'],
   exportTimeframe: ExportTimeframe | null,
-  showDependencies: boolean,
   exportMode: ExportMode = 'compact',
 ): ExportSlideModel[] {
   const exportableItems = items.filter((item) => item.includeInExport !== false);
@@ -1652,7 +1510,6 @@ export function buildExportSlides(
       overviewPlan,
       exportTimeframe,
       exportMode,
-      showDependencies,
       exportableItems,
       sectionedIds,
     ),

@@ -99,7 +99,6 @@ export function ExportSettingsPanel() {
   const updateItem = useTimelineStore((state) => state.updateItem);
   const comments = useTimelineStore((state) => state.comments);
   const commentMode = useTimelineStore((state) => state.exportOptions.commentMode);
-  const showDependencies = useTimelineStore((state) => state.exportOptions.showDependencies);
   const sortMode = useTimelineStore((state) => state.exportOptions.sortMode);
   const exportTimeframe = useTimelineStore((state) => state.exportOptions.exportTimeframe);
   const updateExportOptions = useTimelineStore((state) => state.updateExportOptions);
@@ -279,16 +278,6 @@ export function ExportSettingsPanel() {
               </option>
             ))}
           </select>
-
-          <label className="mt-3 flex items-center gap-2 text-sm text-foreground max-md:min-h-11">
-            <input
-              type="checkbox"
-              checked={showDependencies}
-              onChange={(event) => updateExportOptions({ showDependencies: event.target.checked })}
-              className={`${CHECKBOX_CLASS} max-md:h-5 max-md:w-5`}
-            />
-            Show dependencies
-          </label>
 
           <div className="mt-4 border-t border-border pt-4">
             <div className="mb-1 flex items-center justify-between">

@@ -3,7 +3,6 @@ import { PERIOD_DAYS, type TimeScale } from './scale';
 import type { Span } from './rollup';
 import type { GanttRowModel } from './rows';
 import type { DragState } from './drag';
-import { DependencyArrows } from './DependencyArrows';
 import { TaskBar } from './TaskBar';
 
 interface TimelineBodyProps {
@@ -20,7 +19,6 @@ interface TimelineBodyProps {
   dateRangeById: Map<string, string>;
   statusLabelById: Map<string, string>;
   selectedId: string | null;
-  showDependencies: boolean;
   drag: DragState | null;
   /** The pill's text while a drag is in flight, e.g. "Aug 13 → Aug 18  (6d)". */
   dragLabel: string;
@@ -53,7 +51,6 @@ export function TimelineBody({
   dateRangeById,
   statusLabelById,
   selectedId,
-  showDependencies,
   drag,
   dragLabel,
   onPointerDownBar,
@@ -140,15 +137,6 @@ export function TimelineBody({
           zIndex: 2,
         }}
       />
-
-      {showDependencies && (
-        <DependencyArrows
-          rows={rows}
-          spans={spans}
-          columnWidth={columnWidth}
-          width={width}
-        />
-      )}
 
       {rows.map((row, index) => {
         const span = spans.get(row.item.id);

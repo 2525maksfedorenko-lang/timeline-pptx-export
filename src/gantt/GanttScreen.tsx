@@ -57,7 +57,6 @@ export function GanttScreen() {
   const updateItem = useTimelineStore((state) => state.updateItem);
   const addItem = useTimelineStore((state) => state.addItem);
   const deleteTaskCascade = useTimelineStore((state) => state.deleteTaskCascade);
-  const showDependencies = useTimelineStore((state) => state.exportOptions.showDependencies);
   const activePlanId = useTimelineStore((state) => state.activePlanId);
 
   const scale = useGanttViewStore((state) => state.scale);
@@ -575,7 +574,6 @@ export function GanttScreen() {
               dateRangeById={dateRangeById}
               statusLabelById={statusLabelById}
               selectedId={selectedId}
-              showDependencies={showDependencies}
               drag={drag}
               dragLabel={dragLabel}
               onPointerDownBar={beginDrag}

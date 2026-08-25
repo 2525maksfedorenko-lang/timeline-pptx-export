@@ -44,7 +44,6 @@ import {
   DASHBOARD_TABLE_QR_SIZE_IN,
   DASHBOARD_TABLE_TOP_IN,
   DASHBOARD_TABLE_WIDTH_IN,
-  DEPENDENCY_LINE_WIDTH_PT,
   FOOTER_HEIGHT_IN,
   GROUP_HEADER_HEIGHT_IN,
   HEADER_HEIGHT_IN,
@@ -186,16 +185,10 @@ function drawBackToOverviewLink(slide: PptxSlide, overviewSlideNumber: number | 
 /** Painted strictly back to front, because pptxgenjs has no z-index — shape
  * order *is* z-order:
  *   1. the three date-grid densities (palest first)
- *   2. the dependency connectors
- *   3. the bar tracks and fills, over the connectors — the same order the
- *      on-screen chart uses (connectors z-1, bars z-10; see GanttChart), so
- *      a line passing a row it has no business in disappears behind that
- *      row's bar instead of being drawn across it. The connectors are
- *      anchored on bar edges besides (see buildDependencyConnectors), so
- *      what this hides is incidental crossings, not their own endpoints.
- *   4. every piece of text, over both, so nothing can cut through a label,
- *      percentage or status
- * Splitting the bars into a shapes pass and a text pass is what buys step 4;
+ *   2. the bars, over the grid
+ *   3. every piece of text, over both, so nothing can cut through a label or
+ *      a status
+ * Splitting the bars into a shapes pass and a text pass is what buys step 3;
  * drawing each bar's shapes and text together would put the first bars' text
  * under the later bars again. */
 function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel, links: SlideLinks) {
@@ -273,18 +266,6 @@ function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel, links: S
       });
     });
   }
-
-  model.dependencyConnectors.forEach((connector) => {
-    connector.segments.forEach((segment) => {
-      slide.addShape('line', {
-        x: Math.min(segment.x1, segment.x2),
-        y: Math.min(segment.y1, segment.y2),
-        w: Math.abs(segment.x2 - segment.x1),
-        h: Math.abs(segment.y2 - segment.y1),
-        line: { color: COLORS.dependencyLine, width: DEPENDENCY_LINE_WIDTH_PT },
-      });
-    });
-  });
 
   model.bars.forEach((bar) => {
     // barJump() is called per object rather than shared between the two
@@ -826,7 +807,6 @@ export async function exportTimelineToPptx(
     comments,
     exportOptions.commentMode,
     exportOptions.exportTimeframe,
-    exportOptions.showDependencies,
     exportMode,
   );
   const dashboardSlides = buildDashboardSlides(sortedItems, new Date());

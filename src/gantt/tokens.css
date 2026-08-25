@@ -38,7 +38,7 @@
   --gantt-text: #334155;
   --gantt-text-secondary: #64748b;
   --gantt-text-muted: #94a3b8;
-  --gantt-text-faint: #cbd5e1;                  /* drag dots, todo icon, links */
+  --gantt-text-faint: #cbd5e1;                  /* drag dots, todo icon */
 
   /* Status tones: bar fill, on-bar label, progress overlay + status icon. */
   --gantt-done-bg: #dcfce7;
@@ -83,9 +83,6 @@
   --gantt-handle-hover-inset: rgba(15, 23, 42, 0.35);
   --gantt-drag-pill-bg: #334155;
   --gantt-drag-pill-fg: hsl(var(--card));
-
-  /* Connectors */
-  --gantt-link: #cbd5e1;
 
   /* Comments */
   --gantt-comment-avatar: #475569;

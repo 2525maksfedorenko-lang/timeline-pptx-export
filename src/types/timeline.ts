@@ -129,6 +129,12 @@ export interface ExportTimeframe {
 export interface ExportOptions {
   theme: string;
   scale: Timeline['scale'];
+  // Two switches nothing reads any more: progress and dependency connectors
+  // were taken off both the screen and the slides. They stay in the shape
+  // because they are part of the plan *file* — one written by an older build,
+  // by hand or by another tool still carries them, and normalizeExportOptions
+  // still has to answer for a malformed one rather than a plan failing to
+  // open. Nothing sets them; nothing draws from them.
   showProgress: boolean;
   showDependencies: boolean;
   commentMode: 'latest' | 'pinned' | 'all' | 'none';

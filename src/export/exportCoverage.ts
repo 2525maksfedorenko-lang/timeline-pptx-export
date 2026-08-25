@@ -335,9 +335,8 @@ export function analyzeExportCoverage(
 
         // The row pitch is what every overlay, the date grid and the
         // bars-per-slide ceiling are pinned to, so a shortened bar has to give
-        // its height back evenly to both sides. Off-center by even a little and
-        // the dependency connectors — which aim at the row's center line — stop
-        // meeting the bars they connect.
+        // its height back evenly to both sides: a bar drifting off its row's
+        // center line reads as a row of a different height.
         const rowCenter = bar.y + BAR_HEIGHT_IN / 2;
         const barCenter = bar.barY + bar.barHeight / 2;
         if (Math.abs(barCenter - rowCenter) > EPSILON_IN) {

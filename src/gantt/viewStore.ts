@@ -8,11 +8,6 @@ import type { TimeScale } from './scale';
  * none of it is part of a plan. A search box, a collapsed group and a
  * selected row describe this session's view, and reopening the app should
  * show the whole plan again rather than someone's half-finished filter.
- *
- * `showDependencies` is the one view flag that is *not* here — the toolbar's
- * "Links" switch drives `exportOptions.showDependencies`, which the export
- * slides read too, and splitting it in two would let the screen and the file
- * disagree about the same setting.
  */
 interface GanttViewStore {
   scale: TimeScale;

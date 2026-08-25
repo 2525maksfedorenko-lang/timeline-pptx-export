@@ -317,16 +317,6 @@ export const ROW_HEIGHT_IN = BAR_HEIGHT_IN + ROW_GAP_IN;
 // table next to the geometry that produces them — see DATE_GRID_STYLES in
 // dateGrid.ts.
 
-// Dependency connector: a bracket line ("┐" + "└", no arrowhead) from a
-// predecessor bar's right edge to the nearest reachable edge of the
-// successor's bar — a short stub out, down/up, then back in to that edge,
-// stopping at it rather than continuing into the bar. Drawn under the bars
-// in both exporters, as on screen. DEPENDENCY_JOG_IN is how far clear of a
-// bar's edge the vertical leg runs; see buildDependencyConnectors for which
-// edge each end lands on.
-export const DEPENDENCY_LINE_WIDTH_PT = 0.75;
-export const DEPENDENCY_JOG_IN = 0.06;
-
 // Small heading-weight row, reused for the overview slide's date-scale axis
 // row. = 0.22 + 0.04 = 0.26in
 export const GROUP_HEADER_HEIGHT_IN = ROW_LABEL_HEIGHT_IN + ROW_GAP_IN;

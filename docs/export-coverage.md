@@ -271,8 +271,7 @@ comment mode, with and without a timeframe — and fails when:
   same slide (a level torn across a slide break);
 - a row's drawn depth or indent disagrees with `buildDepthMap` / `subtaskRowIndent`;
 - an overview bar's height is no rung of `BAR_HEIGHT_RATIO_BY_DEPTH`, or the bar
-  is not centered on its row's center line (which is where the dependency
-  connectors aim);
+  is not centered on its row's center line;
 - a continuation is unlabelled, or a first section claims to be one;
 - content is laid out past `CONTENT_BOTTOM_IN` — including a dashboard table,
   re-measured from the rows it actually drew rather than taken from the model;

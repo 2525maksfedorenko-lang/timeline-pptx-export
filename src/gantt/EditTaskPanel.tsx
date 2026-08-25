@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { PanelRightOpen, Trash2, X } from 'lucide-react';
-import { MultiSelect, type MultiSelectOption } from '../components/MultiSelect';
 import { buttonBaseClass, CHECKBOX_CLASS, INPUT_SHELL_CLASS } from '../components/systemUi';
 import { useTimelineStore } from '../store/timelineStore';
 import { getTaskStatus, statusOptionsFor, type TaskStatus, type TimelineItem } from '../types/timeline';
@@ -119,10 +118,6 @@ export function EditTaskPanel({ item, minDate, spans }: EditTaskPanelProps) {
   const span = spans.get(item.id);
   const included = item.includeInExport !== false;
   const itemComments = comments.filter((comment) => comment.taskId === item.id);
-
-  const predecessorOptions: MultiSelectOption[] = items
-    .filter((candidate) => candidate.id !== item.id)
-    .map((candidate) => ({ value: candidate.id, label: candidate.label }));
 
   const handleDelete = () => {
     const descendants = childrenOf(items, item.id).length;
@@ -261,18 +256,6 @@ export function EditTaskPanel({ item, minDate, spans }: EditTaskPanelProps) {
                 updateItem(item.id, { end: event.target.value });
               }}
               style={{ ...DATE_FIELD_STYLE, opacity: isGroup ? 0.5 : 1 }}
-            />
-          </Field>
-
-          <Field label="Predecessors" htmlFor={`panel-${item.id}-predecessors`}>
-            <MultiSelect
-              options={predecessorOptions}
-              value={item.dependencies ?? []}
-              onValueChange={(value) => updateItem(item.id, { dependencies: value })}
-              placeholder="Select predecessors"
-              ariaLabel="Predecessors"
-              id={`panel-${item.id}-predecessors`}
-              className="min-h-11 text-[15px]"
             />
           </Field>
 
