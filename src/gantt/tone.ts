@@ -46,21 +46,3 @@ export const STATUS_LABEL: Record<TaskStatus, string> = {
 
 /** Clicking a row's status icon walks this ring. */
 export const STATUS_CYCLE: TaskStatus[] = ['todo', 'in_progress', 'done', 'blocked'];
-
-const AVATAR_COLOR_COUNT = 6;
-
-/** An assignee's badge colour, by their position in the saved people list, so
- * one person keeps one colour across every bar they appear on.
- *
- * The handoff's palette is six fixed colours against six fixed people. This
- * app's people list is open-ended, so the palette repeats; a name that
- * matches nobody saved (assigned before the person was removed) falls back to
- * a stable slot derived from the name itself rather than to a shared "unknown"
- * colour, which would make two such people look like one. */
-export function avatarColor(peopleIndex: number, name: string): string {
-  const slot =
-    peopleIndex >= 0
-      ? peopleIndex % AVATAR_COLOR_COUNT
-      : [...name].reduce((sum, character) => sum + character.charCodeAt(0), 0) % AVATAR_COLOR_COUNT;
-  return `var(--gantt-avatar-${slot + 1})`;
-}

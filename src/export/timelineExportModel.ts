@@ -1,5 +1,4 @@
 import type { ExportOptions, ExportTimeframe } from '../store/timelineStore';
-import type { Person } from '../store/peopleStore';
 import {
   getTaskStatus,
   TASK_STATUS_COLORS,
@@ -41,7 +40,6 @@ import {
   measureMonoTextWidthIn,
   measureTextWidthIn,
 } from './textMetrics';
-import { COLORS } from './theme';
 import {
   BAR_HEIGHT_IN,
   BAR_LABEL_FONT_SIZE_PT,
@@ -331,17 +329,6 @@ export interface DetailSectionModel {
   parentTitleY: number;
   subtasksHeadingY?: number;
   subtasks: SubtaskRowModel[];
-  // Present on a parent's first section (absent on its "(continued)"
-  // overflow sections), whether or not the task actually has an assignee —
-  // an unassigned task gets a "No assignee" placeholder instead, drawn in a
-  // muted color via `assigneeMuted` so the gap is visible but not shouty.
-  assigneeText?: string;
-  assigneeY?: number;
-  assigneeMuted?: boolean;
-  // Hex without a leading '#' (theme.ts convention), resolved by matching
-  // the assignee's name against peopleStore — undefined exactly when
-  // assigneeMuted is true (no assignee, so nothing to swatch).
-  assigneeColor?: string;
   commentsHeadingY?: number;
   commentsHeadingText?: string;
   comments: CommentModel[];
@@ -1211,7 +1198,7 @@ interface CommentFragment {
 }
 
 /** One self-contained chunk of a parent's detail content: a slice of its
- * subtree's rows + assignee + a slice of its comments' fragments. One chunk
+ * subtree's rows + a slice of its comments' fragments. One chunk
  * per parent whenever everything fits on a slide; otherwise the content
  * spills into "(continued)" chunks that repeat the parent's title, so
  * nothing is ever cut off instead of continuing on a new slide:
@@ -1224,13 +1211,6 @@ interface DetailChunk {
   taskId: string;
   parentTitle: string;
   rows: DetailDescendant[];
-  // Whether this chunk carries the parent's assignee row at all — true only
-  // for a parent's first chunk, like its subtasks. Distinct from `assignee`
-  // being undefined, which means the task genuinely has nobody assigned: a
-  // "(continued)" chunk repeating "No assignee" would read as the
-  // continuation itself being unassigned rather than as a repeat.
-  showAssignee: boolean;
-  assignee?: TimelineItem['assignee'];
   commentFragments: CommentFragment[];
   commentsHeadingText: string;
 }
@@ -1296,7 +1276,6 @@ function layoutMarkdownBlocks(blocks: MarkdownBlock[], startY: number): { rows: 
 function buildDetailSection(
   chunk: DetailChunk,
   startY: number,
-  people: Person[],
 ): { section: DetailSectionModel; endY: number } {
   let y = startY;
   const parentTitleY = y;
@@ -1376,24 +1355,6 @@ function buildDetailSection(
     y += SECTION_GAP_IN;
   }
 
-  let assigneeText: string | undefined;
-  let assigneeY: number | undefined;
-  let assigneeMuted: boolean | undefined;
-  let assigneeColor: string | undefined;
-
-  if (chunk.showAssignee) {
-    assigneeText = chunk.assignee ? `Assigned to: ${chunk.assignee.name}` : 'No assignee';
-    assigneeMuted = !chunk.assignee;
-    // Matched by name (see the Person.color doc comment) — a real person's
-    // color when one's found, COLORS.assigneeFallback for a name that no
-    // longer matches anyone in peopleStore, nothing at all when unassigned.
-    assigneeColor = chunk.assignee
-      ? (people.find((person) => person.name === chunk.assignee?.name)?.color ?? COLORS.assigneeFallback)
-      : undefined;
-    assigneeY = y;
-    y += LIST_ROW_HEIGHT_IN + SECTION_GAP_IN;
-  }
-
   const comments: CommentModel[] = [];
   let commentsHeadingY: number | undefined;
 
@@ -1429,10 +1390,6 @@ function buildDetailSection(
       parentTitleY,
       subtasksHeadingY,
       subtasks,
-      assigneeText,
-      assigneeY,
-      assigneeMuted,
-      assigneeColor,
       commentsHeadingY,
       commentsHeadingText: chunk.commentFragments.length > 0 ? chunk.commentsHeadingText : undefined,
       comments,
@@ -1475,7 +1432,7 @@ function buildCommentsHeading(shown: number, total: number): string {
 }
 
 /** Splits one parent's detail content into one or more chunks so nothing is
- * silently cut off: if the parent's whole subtree, assignee and comments fit
+ * silently cut off: if the parent's whole subtree and comments fit
  * within one slide's content height, there's a single chunk; otherwise the
  * content spills into "(continued)" chunks that repeat the parent's title.
  *
@@ -1490,15 +1447,13 @@ function buildCommentsHeading(shown: number, total: number): string {
  * the content area. Chunks (possibly from different parents) are then
  * packed onto slides by buildDetailSlides exactly like whole sections used
  * to be. */
-function expandCandidateToChunks(candidate: DetailCandidate, people: Person[]): DetailChunk[] {
+function expandCandidateToChunks(candidate: DetailCandidate): DetailChunk[] {
   const { parent, descendants, relevantComments, totalComments } = candidate;
 
   const makeChunk = (isFirst: boolean): DetailChunk => ({
     taskId: parent.id,
     parentTitle: isFirst ? parent.label : `${parent.label} (continued)`,
     rows: [],
-    showAssignee: isFirst,
-    assignee: isFirst ? parent.assignee : undefined,
     commentFragments: [],
     commentsHeadingText: buildCommentsHeading(relevantComments.length, totalComments),
   });
@@ -1506,12 +1461,12 @@ function expandCandidateToChunks(candidate: DetailCandidate, people: Person[]): 
   const chunks: DetailChunk[] = [];
   let current = makeChunk(true);
 
-  const fits = (chunk: DetailChunk) => buildDetailSection(chunk, 0, people).endY <= CONTENT_HEIGHT_IN;
+  const fits = (chunk: DetailChunk) => buildDetailSection(chunk, 0).endY <= CONTENT_HEIGHT_IN;
   // "Nothing on it yet", not "no comments yet": a chunk already carrying
   // subtree rows has no room to spare, so the best-effort fallbacks below must
   // not mistake it for a blank slate and let oversized content through.
   const isEmpty = (chunk: DetailChunk) =>
-    chunk.rows.length === 0 && chunk.commentFragments.length === 0 && !chunk.showAssignee;
+    chunk.rows.length === 0 && chunk.commentFragments.length === 0;
   const withRows = (chunk: DetailChunk, rows: DetailDescendant[]): DetailChunk => ({
     ...chunk,
     rows: [...chunk.rows, ...rows],
@@ -1549,8 +1504,8 @@ function expandCandidateToChunks(candidate: DetailCandidate, people: Person[]): 
     }
 
     // Doesn't fit here — a chunk of its own may still hold it, since a
-    // continuation carries neither the assignee row nor a full-height title
-    // block. Worth retrying before resorting to breaking the branch up.
+    // continuation carries no full-height title block. Worth retrying before
+    // resorting to breaking the branch up.
     if (!isEmpty(current)) {
       startNewChunk();
       if (fits(withRows(current, branch))) {
@@ -1625,15 +1580,15 @@ function expandCandidateToChunks(candidate: DetailCandidate, people: Person[]): 
  * (not a fixed count per slide — sections vary a lot depending on how many
  * subtasks/comments a parent has), so several chunks share a slide whenever
  * they fit within CONTENT_HEIGHT_IN. */
-function buildDetailSlides(candidates: DetailCandidate[], people: Person[]): DetailSlideModel[] {
-  const chunks = candidates.flatMap((candidate) => expandCandidateToChunks(candidate, people));
+function buildDetailSlides(candidates: DetailCandidate[]): DetailSlideModel[] {
+  const chunks = candidates.flatMap((candidate) => expandCandidateToChunks(candidate));
   if (chunks.length === 0) return [];
 
   const withHeight = chunks.map((chunk) => ({
     chunk,
     // Height is independent of the starting Y (the layout math is purely
     // additive), so probing at startY = 0 gives the chunk's own height.
-    heightIn: buildDetailSection(chunk, 0, people).endY,
+    heightIn: buildDetailSection(chunk, 0).endY,
   }));
 
   const groups: DetailChunk[][] = [];
@@ -1658,7 +1613,7 @@ function buildDetailSlides(candidates: DetailCandidate[], people: Person[]): Det
   return groups.map((group, index) => {
     let y = CONTENT_TOP_IN;
     const sections = group.map((chunk) => {
-      const { section, endY } = buildDetailSection(chunk, y, people);
+      const { section, endY } = buildDetailSection(chunk, y);
       y = endY + PARENT_SECTION_GAP_IN;
       return section;
     });
@@ -1709,7 +1664,6 @@ export function getExportOverviewItems(items: TimelineItem[]): TimelineItem[] {
 export function buildExportSlides(
   items: TimelineItem[],
   comments: TaskComment[],
-  people: Person[],
   commentMode: ExportOptions['commentMode'],
   exportTimeframe: ExportTimeframe | null,
   showDependencies: boolean,
@@ -1770,7 +1724,7 @@ export function buildExportSlides(
       exportableItems,
       sectionedIds,
     ),
-    ...buildDetailSlides(detailCandidates, people),
+    ...buildDetailSlides(detailCandidates),
   ];
 
   slides.push(buildSummarySlide(exportableItems));

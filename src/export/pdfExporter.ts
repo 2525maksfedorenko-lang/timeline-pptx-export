@@ -2,7 +2,6 @@ import { jsPDF } from 'jspdf';
 import type { TextOptionsLight } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import type { ExportOptions } from '../store/timelineStore';
-import type { Person } from '../store/peopleStore';
 import type { TaskComment, TimelineItem } from '../types/timeline';
 import { sortItemsForExport } from '../utils/sortItemsForExport';
 import {
@@ -25,8 +24,6 @@ import { orderExportSlides } from './slideOrder';
 import { COLORS, FOOTER_TEXT, PDF_FONT_FACE, PDF_MONO_FONT_FACE, withHash } from './theme';
 import { measureLetterSpacingWidthIn, measureTextWidthIn } from './textMetrics';
 import {
-  ASSIGNEE_SWATCH_GAP_IN,
-  ASSIGNEE_SWATCH_SIZE_IN,
   BACK_LINK_FONT_SIZE_PT,
   BACK_LINK_HEIGHT_IN,
   BACK_LINK_TEXT,
@@ -581,34 +578,6 @@ function drawDetailSlide(doc: jsPDF, model: DetailSlideModel, links: SlideLinks)
       );
     });
 
-    if (section.assigneeText !== undefined && section.assigneeY !== undefined) {
-      // Swatch only when there's an actual person color to show (i.e. not
-      // the "No assignee" placeholder) — text starts right after it instead
-      // of at the row's usual left edge.
-      const textX = section.assigneeColor
-        ? CONTENT_X_IN + ASSIGNEE_SWATCH_SIZE_IN + ASSIGNEE_SWATCH_GAP_IN
-        : CONTENT_X_IN;
-
-      if (section.assigneeColor) {
-        doc.setFillColor(withHash(section.assigneeColor));
-        doc.circle(
-          CONTENT_X_IN + ASSIGNEE_SWATCH_SIZE_IN / 2,
-          section.assigneeY + LIST_ROW_HEIGHT_IN / 2,
-          ASSIGNEE_SWATCH_SIZE_IN / 2,
-          'F',
-        );
-      }
-
-      // Centered on the same line the swatch above is centered on — that
-      // pairing is the whole reason this line can't be top-aligned.
-      doc.setFont(PDF_FONT_FACE, 'bold');
-      doc.setFontSize(12);
-      doc.setTextColor(withHash(section.assigneeMuted ? COLORS.mutedText : COLORS.navy));
-      drawText(doc, section.assigneeText, textX, rowCenterY(section.assigneeY, LIST_ROW_HEIGHT_IN), {
-        baseline: 'middle',
-      });
-    }
-
     if (section.commentsHeadingY !== undefined) {
       doc.setFont(PDF_FONT_FACE, 'bold');
       doc.setFontSize(14);
@@ -808,7 +777,6 @@ export async function exportTimelineToPdf(
   items: TimelineItem[],
   exportOptions: ExportOptions,
   comments: TaskComment[],
-  people: Person[],
   fileName: string = 'timeline-export.pdf',
   exportMode: ExportMode = 'compact',
 ): Promise<void> {
@@ -816,7 +784,6 @@ export async function exportTimelineToPdf(
   const slides = buildExportSlides(
     sortedItems,
     comments,
-    people,
     exportOptions.commentMode,
     exportOptions.exportTimeframe,
     exportOptions.showDependencies,

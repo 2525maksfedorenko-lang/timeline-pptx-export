@@ -4,7 +4,7 @@ import type { Span } from './rollup';
 import type { GanttRowModel } from './rows';
 import type { DragState } from './drag';
 import { DependencyArrows } from './DependencyArrows';
-import { TaskBar, type BarAssignee } from './TaskBar';
+import { TaskBar } from './TaskBar';
 
 interface TimelineBodyProps {
   rows: GanttRowModel[];
@@ -16,7 +16,6 @@ interface TimelineBodyProps {
   todayIndex: number;
   /** Column indices that start a Saturday. */
   weekendStarts: number[];
-  assigneesById: Map<string, BarAssignee[]>;
   /** "Aug 17 – Aug 24" per row, for the bar tooltips. */
   dateRangeById: Map<string, string>;
   statusLabelById: Map<string, string>;
@@ -51,7 +50,6 @@ export function TimelineBody({
   height,
   todayIndex,
   weekendStarts,
-  assigneesById,
   dateRangeById,
   statusLabelById,
   selectedId,
@@ -164,7 +162,6 @@ export function TimelineBody({
             columnWidth={columnWidth}
             canvasWidth={width}
             isSelected={selectedId === row.item.id}
-            assignees={assigneesById.get(row.item.id) ?? []}
             dateRange={dateRangeById.get(row.item.id) ?? ''}
             statusLabel={statusLabelById.get(row.item.id) ?? ''}
             onPointerDownBar={(event, mode) => onPointerDownBar(row.item.id, event, mode)}

@@ -453,9 +453,6 @@ export function analyzeExportCoverage(
             .forEach((depth) => lastRowAtDepth.delete(depth));
         });
 
-        if (section.assigneeY !== undefined) {
-          maxContentY = Math.max(maxContentY, section.assigneeY + LIST_ROW_HEIGHT_IN);
-        }
         section.comments.forEach((comment) => {
           if (comment.meta) {
             maxContentY = Math.max(maxContentY, comment.meta.y + COMMENT_META_ROW_HEIGHT_IN);

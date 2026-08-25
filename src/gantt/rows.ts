@@ -1,5 +1,4 @@
 import type { TaskStatus, TimelineItem } from '../types/timeline';
-import type { Person } from '../store/peopleStore';
 import { childrenOf, statusOf } from './rollup';
 
 /** One line of the plan, list and timeline alike — they draw the same rows in
@@ -25,8 +24,6 @@ export interface RowFilter {
   collapsed: Record<string, boolean>;
   search: string;
   filter: StatusFilter;
-  /** Needed only to match a search against an assignee's full name. */
-  people: Person[];
   /** When set, the only rows built are this item's sub-tasks — its children
    * become the top level and the item itself is not drawn. Null is the whole
    * plan. */
@@ -36,16 +33,16 @@ export interface RowFilter {
 /** Does this item survive the toolbar's search and filter?
  *
  * The status compared is the *effective* one, so filtering to Blocked keeps a
- * group whose children include a blocked task. The search reads the task's
- * name and its assignee's name — the handoff searches `people`, which in this
- * app's model is the single `assignee`. */
+ * group whose children include a blocked task. The search reads the task's own
+ * name and nothing else: it used to match an assignee's name too, which now
+ * that no row shows one would answer with a set of rows carrying no visible
+ * reason for being there. */
 function matches(items: TimelineItem[], item: TimelineItem, options: RowFilter): boolean {
   if (options.filter !== 'all' && statusOf(items, item) !== options.filter) return false;
 
   const query = options.search.trim().toLowerCase();
   if (query === '') return true;
-  if (item.label.toLowerCase().includes(query)) return true;
-  return item.assignee?.name.toLowerCase().includes(query) ?? false;
+  return item.label.toLowerCase().includes(query);
 }
 
 /** The rows to draw, top to bottom.

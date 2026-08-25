@@ -87,16 +87,6 @@
   /* Connectors */
   --gantt-link: #cbd5e1;
 
-  /* The six-person avatar palette. Assigned by position, so a name keeps its
-   * colour across every bar it appears on. */
-  --gantt-avatar-1: #2563eb;
-  --gantt-avatar-2: #7c3aed;
-  --gantt-avatar-3: #059669;
-  --gantt-avatar-4: #d97706;
-  --gantt-avatar-5: #db2777;
-  --gantt-avatar-6: #0891b2;
-  --gantt-avatar-ring: hsl(var(--card));
-
   /* Comments */
   --gantt-comment-avatar: #475569;
 }

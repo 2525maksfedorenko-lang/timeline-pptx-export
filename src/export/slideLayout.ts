@@ -383,12 +383,6 @@ export const SECTION_GAP_IN = 0.2;
 // parent's block when several are packed onto the same appendix slide.
 export const PARENT_SECTION_GAP_IN = 0.3;
 
-// Small color swatch drawn before "Assigned to: <name>" on a detail slide,
-// vertically centered within the assignee row (LIST_ROW_HEIGHT_IN) — see
-// assigneeColor in timelineExportModel.ts.
-export const ASSIGNEE_SWATCH_SIZE_IN = 0.1;
-export const ASSIGNEE_SWATCH_GAP_IN = 0.08;
-
 // Body text of a comment's paragraphs and list items. Lives here rather
 // than in each exporter because the model measures wrapped line counts
 // against it (estimateBlockHeight) at exactly the size both engines then
@@ -396,13 +390,11 @@ export const ASSIGNEE_SWATCH_GAP_IN = 0.08;
 // drift apart.
 export const COMMENT_BODY_FONT_SIZE_PT = 12;
 
-// Every single-line row on a detail slide (subtask rows, the assignee line,
-// the section headings) is drawn vertically centered in its own row box
-// rather than hung from the box's top: the pieces sharing one line are drawn
-// at four different sizes, and a shared top edge puts four different
-// baselines on what should read as one line. Centering is also what keeps a
-// row's text aligned with the graphics beside it — the assignee swatch is
-// centered in the same box.
+// Every single-line row on a detail slide (subtask rows, the section
+// headings) is drawn vertically centered in its own row box rather than hung
+// from the box's top: the pieces sharing one line are drawn at three
+// different sizes, and a shared top edge puts three different baselines on
+// what should read as one line.
 //
 // In pptxgenjs that's `valign: 'middle'` on a box of the row's height; in
 // jsPDF, `baseline: 'middle'` at the row's center Y, which this helper

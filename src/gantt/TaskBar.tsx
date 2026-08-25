@@ -1,7 +1,4 @@
 import {
-  AVATAR_GAP_PX,
-  AVATAR_OVERLAP_PX,
-  AVATAR_SIZE_PX,
   barHeight,
   barLeft,
   barOffsetY,
@@ -16,12 +13,6 @@ import { STATUS_TONE } from './tone';
 import type { DragState } from './drag';
 import { BAR_HIT_ATTRIBUTE } from './useScrollPanes';
 
-export interface BarAssignee {
-  name: string;
-  initials: string;
-  color: string;
-}
-
 interface TaskBarProps {
   row: GanttRowModel;
   span: Span;
@@ -31,7 +22,6 @@ interface TaskBarProps {
    * anywhere along it. */
   canvasWidth: number;
   isSelected: boolean;
-  assignees: BarAssignee[];
   /** Human date range for the bar's tooltip, e.g. "Aug 17 – Aug 24". */
   dateRange: string;
   statusLabel: string;
@@ -43,10 +33,9 @@ interface TaskBarProps {
 /** One bar: a pale block in its status' tint, with its own name set on it in
  * the matching dark tone. A group's name is set in the heavier weight.
  *
- * The dot on the right edge and the assignee badges past it are drawn as
- * siblings of the bar, not children: both sit *outside* its rounded rectangle
- * and would be clipped by the `overflow: hidden` that keeps the progress wash
- * inside the radius. */
+ * The dot on the right edge is drawn as a sibling of the bar, not a child: it
+ * hangs half outside the rounded rectangle and would be clipped by the
+ * `overflow: hidden` that keeps the label inside the radius. */
 export function TaskBar({
   row,
   span,
@@ -54,7 +43,6 @@ export function TaskBar({
   columnWidth,
   canvasWidth,
   isSelected,
-  assignees,
   dateRange,
   statusLabel,
   onPointerDownBar,
@@ -172,43 +160,6 @@ export function TaskBar({
         />
       )}
 
-      {!isGroup && assignees.length > 0 && (
-        <span
-          style={{
-            position: 'absolute',
-            left: left + width + AVATAR_GAP_PX,
-            top: 0,
-            height: ROW_HEIGHT_PX,
-            display: 'flex',
-            alignItems: 'center',
-            pointerEvents: 'none',
-          }}
-        >
-          {assignees.map((assignee, index) => (
-            <span
-              key={assignee.name}
-              title={assignee.name}
-              style={{
-                width: AVATAR_SIZE_PX,
-                height: AVATAR_SIZE_PX,
-                borderRadius: 999,
-                background: assignee.color,
-                color: 'var(--gantt-avatar-ring)',
-                fontSize: 8.5,
-                fontWeight: 700,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                border: '1.5px solid var(--gantt-avatar-ring)',
-                marginLeft: index === 0 ? 0 : AVATAR_OVERLAP_PX,
-                flex: 'none',
-              }}
-            >
-              {assignee.initials}
-            </span>
-          ))}
-        </span>
-      )}
     </div>
   );
 }

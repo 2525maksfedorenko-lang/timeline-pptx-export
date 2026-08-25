@@ -13,7 +13,6 @@ import { getExportOverviewItems, planOverview, type ExportMode } from './export/
 import { buildExportFilename } from './export/dateScale'
 import { sortItemsForExport } from './utils/sortItemsForExport'
 import { useTimelineStore } from './store/timelineStore'
-import { usePeopleStore } from './store/peopleStore'
 import { buttonBaseClass } from './components/systemUi';
 
 type Tab = 'timeline' | 'dashboard'
@@ -41,8 +40,6 @@ function App() {
   const items = useTimelineStore((state) => state.items)
   const exportOptions = useTimelineStore((state) => state.exportOptions)
   const comments = useTimelineStore((state) => state.comments)
-  const people = usePeopleStore((state) => state.people)
-  const loadPeople = usePeopleStore((state) => state.loadPeople)
 
   const [highlightSection] = useState<DashboardSection | null>(readDashboardViewParam)
   // Fixed at startup, not switched: the toolbar no longer offers the two
@@ -57,14 +54,10 @@ function App() {
     void loadPlans()
   }, [loadPlans])
 
-  useEffect(() => {
-    void loadPeople()
-  }, [loadPeople])
-
   const runExport = (format: ExportFormat, exportMode: ExportMode) => {
     const fileName = buildExportFilename(exportOptions.exportTimeframe, format)
     const exportTimeline = format === 'pptx' ? exportTimelineToPptx : exportTimelineToPdf
-    void exportTimeline(items, exportOptions, comments, people, fileName, exportMode)
+    void exportTimeline(items, exportOptions, comments, fileName, exportMode)
   }
 
   // More tasks in the effective date range than fit on one overview slide is a

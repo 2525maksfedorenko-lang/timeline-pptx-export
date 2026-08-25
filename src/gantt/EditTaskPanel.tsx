@@ -1,9 +1,7 @@
 import { useState } from 'react';
 import { PanelRightOpen, Trash2, X } from 'lucide-react';
 import { MultiSelect, type MultiSelectOption } from '../components/MultiSelect';
-import { AssigneeSelect, NEW_PERSON_OPTION } from '../components/AssigneeSelect';
-import { buttonBaseClass, buttonClass, CHECKBOX_CLASS, INPUT_SHELL_CLASS } from '../components/systemUi';
-import { usePeopleStore } from '../store/peopleStore';
+import { buttonBaseClass, CHECKBOX_CLASS, INPUT_SHELL_CLASS } from '../components/systemUi';
 import { useTimelineStore } from '../store/timelineStore';
 import { getTaskStatus, TASK_STATUS_VALUES, type TaskStatus, type TimelineItem } from '../types/timeline';
 import { progressForStatus } from '../utils/progressForStatus';
@@ -116,17 +114,10 @@ export function EditTaskPanel({ item, minDate, spans }: EditTaskPanelProps) {
   const addComment = useTimelineStore((state) => state.addComment);
   const deleteTaskCascade = useTimelineStore((state) => state.deleteTaskCascade);
   const toggleIncludeInExportCascade = useTimelineStore((state) => state.toggleIncludeInExportCascade);
-  const people = usePeopleStore((state) => state.people);
-  const addPerson = usePeopleStore((state) => state.addPerson);
-
   const panelWide = useGanttViewStore((state) => state.panelWide);
   const togglePanelWide = useGanttViewStore((state) => state.togglePanelWide);
   const select = useGanttViewStore((state) => state.select);
 
-  const [assigneeValue, setAssigneeValue] = useState(
-    () => people.find((person) => person.name === item.assignee?.name)?.id ?? '',
-  );
-  const [newPersonName, setNewPersonName] = useState('');
   const [commentDraft, setCommentDraft] = useState('');
 
   const isGroup = childrenOf(items, item.id).length > 0;
@@ -141,28 +132,6 @@ export function EditTaskPanel({ item, minDate, spans }: EditTaskPanelProps) {
   const predecessorOptions: MultiSelectOption[] = items
     .filter((candidate) => candidate.id !== item.id)
     .map((candidate) => ({ value: candidate.id, label: candidate.label }));
-
-  /** Picking someone already saved, or clearing the field. */
-  const commitAssignee = (value: string) => {
-    if (value === '') {
-      updateItem(item.id, { assignee: undefined });
-      return;
-    }
-    const person = people.find((candidate) => candidate.id === value);
-    if (person) updateItem(item.id, { assignee: { name: person.name } });
-  };
-
-  /** Saving a name nobody in the list has yet. The select lands on the new
-   * person rather than back on the placeholder, so the field says who the
-   * task now belongs to instead of looking as if nothing was saved. */
-  const commitNewPerson = async () => {
-    const trimmed = newPersonName.trim();
-    if (trimmed === '') return;
-    const person = await addPerson(trimmed);
-    updateItem(item.id, { assignee: { name: person.name } });
-    setAssigneeValue(person.id);
-    setNewPersonName('');
-  };
 
   const handleDelete = () => {
     const descendants = childrenOf(items, item.id).length;
@@ -271,32 +240,6 @@ export function EditTaskPanel({ item, minDate, spans }: EditTaskPanelProps) {
             </select>
           </Field>
 
-          {/* One assignee, not the handoff's list of them: a task in this app
-              remembers a single person. */}
-          <Field label="Assignee" htmlFor={`panel-${item.id}-assignee`}>
-            <AssigneeSelect
-              idPrefix={`panel-${item.id}`}
-              value={assigneeValue}
-              onChange={(value) => {
-                setAssigneeValue(value);
-                if (value !== NEW_PERSON_OPTION) commitAssignee(value);
-              }}
-              newPersonName={newPersonName}
-              onNewPersonNameChange={setNewPersonName}
-              placeholderLabel="Select assignee"
-              fieldClassName={PANEL_FIELD_CLASS}
-            />
-            {assigneeValue === NEW_PERSON_OPTION && (
-              <button
-                type="button"
-                onClick={() => void commitNewPerson()}
-                disabled={newPersonName.trim() === ''}
-                className={buttonClass('secondary', 'sm', 'self-start')}
-              >
-                Add person
-              </button>
-            )}
-          </Field>
         </div>
 
         <Band label="PLANNING" zIndex={5} topBorder />

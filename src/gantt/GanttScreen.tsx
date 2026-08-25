@@ -3,8 +3,6 @@ import { ChevronLeft, ChevronRight, Layers, Pencil, Plus, Trash2 } from 'lucide-
 import { buttonBaseClass } from '../components/systemUi';
 import { ContextMenu, type ContextMenuAction } from '../components/ContextMenu';
 import { useTimelineStore } from '../store/timelineStore';
-import { usePeopleStore } from '../store/peopleStore';
-import { getInitials } from '../utils/initials';
 import { buildNewTask } from '../utils/newTask';
 import { progressForStatus } from '../utils/progressForStatus';
 import { useScrollPanes } from './useScrollPanes';
@@ -29,13 +27,12 @@ import {
 import { childrenOf } from './rollup';
 import { visibleRows } from './rows';
 import { descendantLeafIds, groupMoveDays, previewSpans, type DragState } from './drag';
-import { avatarColor, STATUS_CYCLE, STATUS_LABEL } from './tone';
+import { STATUS_CYCLE, STATUS_LABEL } from './tone';
 import { TimelineHeader } from './TimelineHeader';
 import { TaskList } from './TaskList';
 import { TimelineBody } from './TimelineBody';
 import { EditTaskPanel } from './EditTaskPanel';
 import { useGanttViewStore } from './viewStore';
-import type { BarAssignee } from './TaskBar';
 
 /** How long after a pointerup a drag keeps suppressing the click it would
  * otherwise fire. Long enough for the click event to have been and gone,
@@ -62,7 +59,6 @@ export function GanttScreen() {
   const deleteTaskCascade = useTimelineStore((state) => state.deleteTaskCascade);
   const showDependencies = useTimelineStore((state) => state.exportOptions.showDependencies);
   const activePlanId = useTimelineStore((state) => state.activePlanId);
-  const people = usePeopleStore((state) => state.people);
 
   const scale = useGanttViewStore((state) => state.scale);
   const search = useGanttViewStore((state) => state.search);
@@ -100,8 +96,8 @@ export function GanttScreen() {
   const columnWidth = COLUMN_WIDTH_PX[scale];
 
   const rows = useMemo(
-    () => visibleRows(items, { collapsed, search, filter, people, focusId: activeFocusId }),
-    [items, collapsed, search, filter, people, activeFocusId],
+    () => visibleRows(items, { collapsed, search, filter, focusId: activeFocusId }),
+    [items, collapsed, search, filter, activeFocusId],
   );
 
   const bodyHeight = Math.max(rows.length * ROW_HEIGHT_PX + ADD_ROW_HEIGHT_PX, MIN_BODY_HEIGHT_PX);
@@ -133,19 +129,6 @@ export function GanttScreen() {
     () => weekendStarts(minDate, renderedDays, scale),
     [minDate, renderedDays, scale],
   );
-
-  const assigneesById = useMemo(() => {
-    const entries = rows.map((row): [string, BarAssignee[]] => {
-      const assignee = row.item.assignee;
-      if (!assignee) return [row.item.id, []];
-      const index = people.findIndex((person) => person.name === assignee.name);
-      return [
-        row.item.id,
-        [{ name: assignee.name, initials: getInitials(assignee.name), color: avatarColor(index, assignee.name) }],
-      ];
-    });
-    return new Map(entries);
-  }, [rows, people]);
 
   const dateRangeById = useMemo(
     () =>
@@ -589,7 +572,6 @@ export function GanttScreen() {
               height={bodyHeight}
               todayIndex={todayIndex}
               weekendStarts={weekends}
-              assigneesById={assigneesById}
               dateRangeById={dateRangeById}
               statusLabelById={statusLabelById}
               selectedId={selectedId}
@@ -622,7 +604,7 @@ export function GanttScreen() {
         <EditTaskPanel
           // Keyed on the item, so switching rows resets the panel's own
           // draft fields instead of carrying one task's half-typed
-          // assignee onto the next.
+          // comment onto the next.
           key={selectedItem.id}
           item={selectedItem}
           minDate={minDate}

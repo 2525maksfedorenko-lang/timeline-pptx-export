@@ -63,7 +63,6 @@ export function buildDeck(plan: FixturePlan, scenario: Pick<Scenario, 'exportMod
   const slides = buildExportSlides(
     sortedItems,
     plan.comments,
-    plan.people,
     scenario.commentMode,
     scenario.timeframe,
     true,
