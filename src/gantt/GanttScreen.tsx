@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, FilePlus, Layers, Pencil, Plus, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Eye, EyeOff, FilePlus, Layers, Pencil, Plus, Trash2 } from 'lucide-react';
 import { buttonBaseClass } from '../components/systemUi';
 import { ContextMenu, type ContextMenuAction } from '../components/ContextMenu';
 import { useTimelineStore } from '../store/timelineStore';
@@ -57,6 +57,7 @@ export function GanttScreen() {
   const updateItem = useTimelineStore((state) => state.updateItem);
   const addItem = useTimelineStore((state) => state.addItem);
   const deleteTaskCascade = useTimelineStore((state) => state.deleteTaskCascade);
+  const toggleIncludeInExportCascade = useTimelineStore((state) => state.toggleIncludeInExportCascade);
   const createPlanFromBranch = useTimelineStore((state) => state.createPlanFromBranch);
   const activePlanId = useTimelineStore((state) => state.activePlanId);
 
@@ -374,15 +375,17 @@ export function GanttScreen() {
     if (selectedId === id) select(null);
   };
 
-  /** The rows a right-click offers. Six at most, and three of them only where
-   * they mean anything: a task with no sub-tasks has no branch to copy out, to
-   * fold away, or to look at on its own.
+  /** The rows a right-click offers, on the name and on the bar alike. Seven at
+   * most, and three of them only where they mean anything: a task with no
+   * sub-tasks has no branch to copy out, to fold away, or to look at on its
+   * own.
    *
    * The badge on the row and the first of those three do the same thing, on
    * purpose: the badge is a small pill whose click now creates something, and
    * a menu naming the action in words is where that is discovered. */
   const menuActions = (id: string): ContextMenuAction[] => {
     const isGroup = childrenOf(items, id).length > 0;
+    const isIncluded = items.find((candidate) => candidate.id === id)?.includeInExport !== false;
     return [
       {
         label: 'Add sub-task',
@@ -416,6 +419,21 @@ export function GanttScreen() {
             },
           ]
         : []),
+      {
+        // Named for what it will do, not for the state it is in. The whole
+        // branch travels together, because a phase in the deck without its
+        // tasks — or tasks without the phase they sit under — is not a thing
+        // anyone means to export.
+        label: isIncluded
+          ? `Exclude ${isGroup ? 'branch ' : ''}from export`
+          : `Include ${isGroup ? 'branch ' : ''}in export`,
+        icon: isIncluded ? (
+          <EyeOff size={14} strokeWidth={2} aria-hidden="true" />
+        ) : (
+          <Eye size={14} strokeWidth={2} aria-hidden="true" />
+        ),
+        onSelect: () => toggleIncludeInExportCascade(id),
+      },
       {
         label: 'Delete',
         icon: <Trash2 size={14} strokeWidth={2} aria-hidden="true" />,

@@ -20,7 +20,7 @@ export interface SlideLinks {
    * neither subtasks nor comments never becomes a detail candidate (see
    * buildExportSlides), so it's absent and its bar is left inert. A parent
    * whose content spilled across "(continued)" slides maps to the first of
-   * them — the one carrying its subtasks and assignee. */
+   * them — the one carrying its subtasks. */
   detailSlideNumberByTaskId: ReadonlyMap<string, number>;
 }
 

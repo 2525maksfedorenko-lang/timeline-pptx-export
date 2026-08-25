@@ -28,9 +28,14 @@ interface ContextMenuProps {
   onClose: () => void;
 }
 
-/** Roughly what the menu grows to, used only to keep it on screen. Anything
- * taller simply opens higher. */
-const MENU_HEIGHT_PX = 210;
+/** What the menu measures, worked out rather than guessed: the surface's own
+ * padding twice over, its heading row and separator, and 32px per action (a
+ * 20px line with 6px above and below it — see MENU_ITEM_CLASS). Used only to
+ * keep the menu on screen, so it is allowed to be a row or two out; a fixed
+ * guess was not, because the row menu has grown from five actions to seven
+ * and the estimate would have stopped matching it. */
+const MENU_CHROME_HEIGHT_PX = 49;
+const MENU_ROW_HEIGHT_PX = 32;
 const MENU_WIDTH_PX = 224;
 const VIEWPORT_MARGIN_PX = 8;
 
@@ -74,9 +79,10 @@ export function ContextMenu({ x, y, label, actions, onClose }: ContextMenuProps)
     VIEWPORT_MARGIN_PX,
     Math.min(x, window.innerWidth - MENU_WIDTH_PX - VIEWPORT_MARGIN_PX),
   );
+  const height = MENU_CHROME_HEIGHT_PX + actions.length * MENU_ROW_HEIGHT_PX;
   const top = Math.max(
     VIEWPORT_MARGIN_PX,
-    Math.min(y, window.innerHeight - MENU_HEIGHT_PX - VIEWPORT_MARGIN_PX),
+    Math.min(y, window.innerHeight - height - VIEWPORT_MARGIN_PX),
   );
 
   return createPortal(
