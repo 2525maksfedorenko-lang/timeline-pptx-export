@@ -37,7 +37,10 @@ export function PlanNotice() {
       // Polite rather than assertive: nothing is broken and nothing is
       // waiting on the reader — the plan is already open and already repaired.
       role="status"
-      className={`mb-4 flex items-start gap-3 p-3 ${CARD_CLASS}`}
+      // Tighter on a phone, where this sits between the plan switcher and the
+      // chart it is about: the point is to explain what the chart is showing,
+      // so it must not be what stops you seeing the chart.
+      className={`mb-4 flex items-start gap-3 p-3 max-md:mb-2 max-md:gap-2 max-md:p-2.5 ${CARD_CLASS}`}
     >
       <AlertTriangle
         size={16}
@@ -49,7 +52,7 @@ export function PlanNotice() {
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium text-foreground">{notice.headline}</p>
         {notice.lines.length > 0 && (
-          <ul className="mt-1 flex flex-col gap-1">
+          <ul className="mt-1 flex flex-col gap-1 max-md:mt-0.5">
             {notice.lines.map((line) => (
               <li key={line} className="text-xs text-muted-foreground max-md:text-sm">
                 {line}
@@ -57,8 +60,17 @@ export function PlanNotice() {
             ))}
           </ul>
         )}
+        {/* Said on every screen, because it is the one thing here that cannot
+            be recovered from the app later. */}
+        {notice.fact !== undefined && (
+          <p className="mt-1.5 text-xs text-muted-foreground max-md:text-sm">{notice.fact}</p>
+        )}
+        {/* Hidden on a phone, not shortened: it is the line here that is
+            context rather than fact, and on a 375px screen those few lines are
+            the difference between the first bar being on screen and being
+            under the fold. The facts above it still say what changed. */}
         {notice.hint !== undefined && (
-          <p className="mt-1.5 text-xs text-muted-foreground max-md:text-sm">{notice.hint}</p>
+          <p className="mt-1 text-xs text-muted-foreground max-md:hidden">{notice.hint}</p>
         )}
       </div>
 

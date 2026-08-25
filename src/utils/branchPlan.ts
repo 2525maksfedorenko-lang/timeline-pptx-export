@@ -105,6 +105,8 @@ export function droppedDependencyNotice(count: number, parentLabel: string): Pla
         ? 'One dependency pointed at a task outside the branch, and this plan holds the branch and nothing else.'
         : `${count} dependencies pointed at tasks outside the branch, and this plan holds the branch and nothing else.`,
     ],
-    hint: 'The plan it was copied from still has every task and every link it had.',
+    // A fact rather than a hint: it is what says the copy cost the original
+    // nothing, so it is worth its line on a phone too.
+    fact: 'The plan it was copied from still has every task and every link it had.',
   };
 }
