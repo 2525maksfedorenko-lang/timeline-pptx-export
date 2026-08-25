@@ -18,8 +18,6 @@ import {
   STATUS_COL_WIDTH_IN,
   subtaskRowIndent,
   TASK_COL_WIDTH_IN,
-  TIMELINE_X_IN,
-  TIMELINE_WIDTH_IN,
   tableColumnTextWidthIn,
   tableRowHeightIn,
 } from './slideLayout';
@@ -366,20 +364,6 @@ export function analyzeExportCoverage(
           );
         }
 
-        // Wherever the progress label ended up — in the fill, on the track, or
-        // clear of a bar too short to hold it — it stays inside the timeline
-        // zone. This is the one piece of a bar that is placed relative to the
-        // fill rather than clamped with the track, so it is the one that can
-        // walk off the slide.
-        const labelLeft = bar.progressX;
-        const labelRight = bar.progressX + bar.progressWidth;
-        if (labelLeft < TIMELINE_X_IN - EPSILON_IN || labelRight > TIMELINE_X_IN + TIMELINE_WIDTH_IN + EPSILON_IN) {
-          failures.push(
-            `slide ${slideNumber}: bar "${bar.id}" progress label spans ` +
-              `${labelLeft.toFixed(4)}-${labelRight.toFixed(4)}in, outside the timeline zone ` +
-              `(${TIMELINE_X_IN.toFixed(4)}-${(TIMELINE_X_IN + TIMELINE_WIDTH_IN).toFixed(4)}in)`,
-          );
-        }
       });
 
       if (slide.windowStart !== null && slide.windowEnd !== null && slide.windowTierDays !== null) {

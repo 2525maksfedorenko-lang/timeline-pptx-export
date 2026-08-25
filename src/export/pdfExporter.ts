@@ -34,7 +34,6 @@ import {
   BACK_LINK_Y_IN,
   BAR_HEIGHT_IN,
   BAR_LABEL_FONT_SIZE_PT,
-  BAR_PROGRESS_FONT_SIZE_PT,
   BAR_RADIUS_IN,
   BAR_STATUS_FONT_SIZE_PT,
   AXIS_MONTH_FONT_SIZE_PT,
@@ -285,14 +284,10 @@ function drawOverviewSlide(doc: jsPDF, model: OverviewSlideModel, links: SlideLi
     });
   }
 
+  // One solid rectangle per task, spanning the days it runs.
   model.bars.forEach((bar) => {
-    doc.setFillColor(withHash(COLORS.border));
-    doc.roundedRect(bar.barX, bar.barY, bar.trackWidth, bar.barHeight, BAR_RADIUS_IN, BAR_RADIUS_IN, 'F');
-
-    if (bar.fillWidth > 0) {
-      doc.setFillColor(withHash(bar.color));
-      doc.roundedRect(bar.barX, bar.barY, bar.fillWidth, bar.barHeight, BAR_RADIUS_IN, BAR_RADIUS_IN, 'F');
-    }
+    doc.setFillColor(withHash(bar.color));
+    doc.roundedRect(bar.barX, bar.barY, bar.barWidth, bar.barHeight, BAR_RADIUS_IN, BAR_RADIUS_IN, 'F');
   });
 
   // Month captions at the axis's normal size, week captions a notch smaller
@@ -324,18 +319,7 @@ function drawOverviewSlide(doc: jsPDF, model: OverviewSlideModel, links: SlideLi
     // the gap (which would also swallow clicks on the empty gutter).
     const detailPage = links.detailSlideNumberByTaskId.get(bar.id);
     linkToPage(doc, detailPage, bar.labelX, bar.y, bar.labelWidth, BAR_HEIGHT_IN);
-    linkToPage(doc, detailPage, bar.barX, bar.y, bar.trackWidth, BAR_HEIGHT_IN);
-
-    // Progress rides on the bar itself: centered in the fill when it fits
-    // there, otherwise just past the fill on the gray track (see
-    // timelineExportModel for the measured fit).
-    doc.setFont(PDF_FONT_FACE, 'bold');
-    doc.setFontSize(BAR_PROGRESS_FONT_SIZE_PT);
-    doc.setTextColor(withHash(bar.progressColor));
-    drawText(doc, bar.progressText, bar.progressX + (bar.progressInsideFill ? bar.progressWidth / 2 : 0), centerY, {
-      baseline: 'middle',
-      align: bar.progressInsideFill ? 'center' : 'left',
-    });
+    linkToPage(doc, detailPage, bar.barX, bar.y, bar.barWidth, BAR_HEIGHT_IN);
 
     // The name sits in the Task column, at the same x on every row — it no
     // longer tracks the bar. The model has already truncated it to the column's
@@ -404,7 +388,7 @@ function drawOverviewSlide(doc: jsPDF, model: OverviewSlideModel, links: SlideLi
     }
 
     if (bar.chevronRight) {
-      drawText(doc, '▶', bar.barX + bar.trackWidth - CHEVRON_WIDTH_IN, centerY, {
+      drawText(doc, '▶', bar.barX + bar.barWidth - CHEVRON_WIDTH_IN, centerY, {
         baseline: 'middle',
         align: 'left',
       });
@@ -562,9 +546,9 @@ function drawDetailSlide(doc: jsPDF, model: DetailSlideModel, links: SlideLinks)
     }
 
     section.subtasks.forEach((row) => {
-      // Four typographic tiers on one line, each drawn at an x the model
+      // Three typographic tiers on one line, each drawn at an x the model
       // resolved against the face and size used here (see SubtaskRowModel):
-      // bold task name, monospace dates, plain progress, tracked-out status.
+      // bold task name, monospace dates, tracked-out status.
       const centerY = rowCenterY(row.y, LIST_ROW_HEIGHT_IN);
 
       doc.setFont(PDF_FONT_FACE, 'bold');
@@ -583,11 +567,6 @@ function drawDetailSlide(doc: jsPDF, model: DetailSlideModel, links: SlideLinks)
         letterSpacingPt(SUBTASK_DATE_FONT_SIZE_PT, DATE_LETTER_SPACING_EM),
         { baseline: 'middle' },
       );
-
-      doc.setFont(PDF_FONT_FACE, 'normal');
-      doc.setFontSize(SUBTASK_TEXT_FONT_SIZE_PT);
-      doc.setTextColor(withHash(COLORS.navy));
-      drawText(doc, row.progressText, row.progressX, centerY, { baseline: 'middle' });
 
       doc.setFont(PDF_FONT_FACE, 'bold');
       doc.setFontSize(SUBTASK_STATUS_FONT_SIZE_PT);

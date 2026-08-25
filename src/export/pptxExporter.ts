@@ -31,7 +31,6 @@ import {
   BACK_LINK_Y_IN,
   BAR_HEIGHT_IN,
   BAR_LABEL_FONT_SIZE_PT,
-  BAR_PROGRESS_FONT_SIZE_PT,
   BAR_RADIUS_IN,
   BAR_STATUS_FONT_SIZE_PT,
   AXIS_MONTH_FONT_SIZE_PT,
@@ -298,29 +297,17 @@ function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel, links: S
     // shapes: pptxgenjs stamps its own `_rId` onto whatever hyperlink object
     // it's handed, so reusing one would leave both shapes rendering the
     // second one's relationship.
+    // One solid rectangle per task, spanning the days it runs.
     slide.addShape('roundRect', {
       x: bar.barX,
       y: bar.barY,
-      w: bar.trackWidth,
+      w: bar.barWidth,
       h: bar.barHeight,
       rectRadius: BAR_RADIUS_IN,
-      fill: { color: COLORS.border },
-      line: { color: COLORS.border },
+      fill: { color: bar.color },
+      line: { color: bar.color },
       ...barJump(bar),
     });
-
-    if (bar.fillWidth > 0) {
-      slide.addShape('roundRect', {
-        x: bar.barX,
-        y: bar.barY,
-        w: bar.fillWidth,
-        h: bar.barHeight,
-        rectRadius: BAR_RADIUS_IN,
-        fill: { color: bar.color },
-        line: { color: bar.color },
-        ...barJump(bar),
-      });
-    }
   });
 
   // Month captions at the axis's normal size, week captions a notch smaller
@@ -346,25 +333,6 @@ function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel, links: S
   });
 
   model.bars.forEach((bar) => {
-    // Progress rides on the bar itself: centered in the fill when it fits
-    // there, otherwise just past the fill on the gray track (see
-    // timelineExportModel for the measured fit). `margin: 0` + `wrap: false`
-    // keep it on one line inside a box sized to the glyphs themselves.
-    slide.addText(bar.progressText, {
-      x: bar.progressX,
-      y: bar.y,
-      w: bar.progressWidth,
-      h: BAR_HEIGHT_IN,
-      fontSize: BAR_PROGRESS_FONT_SIZE_PT,
-      bold: true,
-      color: bar.progressColor,
-      fontFace: PPTX_FONT_FACE,
-      align: bar.progressInsideFill ? 'center' : 'left',
-      valign: 'middle',
-      margin: 0,
-      wrap: false,
-    });
-
     // The name sits in the Task column, at the same x on every row — it no
     // longer tracks the bar at all. The model has already truncated it to the
     // column's width, so `wrap: false` keeps it on the one line that width was
@@ -470,7 +438,7 @@ function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel, links: S
 
     if (bar.chevronRight) {
       slide.addText('▶', {
-        x: bar.barX + bar.trackWidth - CHEVRON_WIDTH_IN,
+        x: bar.barX + bar.barWidth - CHEVRON_WIDTH_IN,
         y: bar.y,
         w: CHEVRON_WIDTH_IN,
         h: BAR_HEIGHT_IN,
@@ -630,7 +598,7 @@ function drawDetailSlide(slide: PptxSlide, model: DetailSlideModel, links: Slide
 
     section.subtasks.forEach((row) => {
       // Four typographic tiers on one line, each its own textbox at an x the
-      // model resolved: bold task name, monospace dates, plain progress,
+      // model resolved: bold task name, monospace dates,
       // tracked-out status. Four *sizes* on one line is exactly why they're
       // vertically centered rather than top-aligned — a shared top edge puts
       // the four baselines at four different heights, which is what made
@@ -657,15 +625,6 @@ function drawDetailSlide(slide: PptxSlide, model: DetailSlideModel, links: Slide
         charSpacing: letterSpacingPt(SUBTASK_DATE_FONT_SIZE_PT, DATE_LETTER_SPACING_EM),
         color: COLORS.footerText,
         fontFace: PPTX_MONO_FONT_FACE,
-        wrap: false,
-      });
-
-      slide.addText(row.progressText, {
-        ...rowText(SUBTASK_TEXT_FONT_SIZE_PT, LIST_ROW_HEIGHT_IN),
-        x: row.progressX,
-        y: row.y,
-        w: CONTENT_X_IN + CONTENT_WIDTH_IN - row.progressX,
-        color: COLORS.navy,
         wrap: false,
       });
 

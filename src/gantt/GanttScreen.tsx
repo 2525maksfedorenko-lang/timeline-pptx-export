@@ -26,7 +26,7 @@ import {
   planRange,
   weekendStarts,
 } from './scale';
-import { childrenOf, progressOf } from './rollup';
+import { childrenOf } from './rollup';
 import { visibleRows } from './rows';
 import { descendantLeafIds, groupMoveDays, previewSpans, type DragState } from './drag';
 import { avatarColor, STATUS_CYCLE, STATUS_LABEL } from './tone';
@@ -132,11 +132,6 @@ export function GanttScreen() {
   const weekends = useMemo(
     () => weekendStarts(minDate, renderedDays, scale),
     [minDate, renderedDays, scale],
-  );
-
-  const progressById = useMemo(
-    () => new Map(rows.map((row) => [row.item.id, progressOf(items, row.item, minDate)])),
-    [rows, items, minDate],
   );
 
   const assigneesById = useMemo(() => {
@@ -554,7 +549,6 @@ export function GanttScreen() {
           >
             <TaskList
               rows={rows}
-              progressById={progressById}
               collapsed={collapsed}
               selectedId={selectedId}
               minHeight={bodyHeight}
@@ -595,7 +589,6 @@ export function GanttScreen() {
               height={bodyHeight}
               todayIndex={todayIndex}
               weekendStarts={weekends}
-              progressById={progressById}
               assigneesById={assigneesById}
               dateRangeById={dateRangeById}
               statusLabelById={statusLabelById}

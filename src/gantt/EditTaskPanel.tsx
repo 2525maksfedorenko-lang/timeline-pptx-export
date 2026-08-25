@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { PanelRightOpen, Trash2, X } from 'lucide-react';
 import { MultiSelect, type MultiSelectOption } from '../components/MultiSelect';
 import { AssigneeSelect, NEW_PERSON_OPTION } from '../components/AssigneeSelect';
-import { buttonBaseClass, buttonClass, CHECKBOX_CLASS, FOCUS_RING, INPUT_SHELL_CLASS } from '../components/systemUi';
+import { buttonBaseClass, buttonClass, CHECKBOX_CLASS, INPUT_SHELL_CLASS } from '../components/systemUi';
 import { usePeopleStore } from '../store/peopleStore';
 import { useTimelineStore } from '../store/timelineStore';
 import { getTaskStatus, TASK_STATUS_VALUES, type TaskStatus, type TimelineItem } from '../types/timeline';
@@ -327,24 +327,6 @@ export function EditTaskPanel({ item, minDate, spans }: EditTaskPanelProps) {
                 updateItem(item.id, { end: event.target.value });
               }}
               style={{ ...DATE_FIELD_STYLE, opacity: isGroup ? 0.5 : 1 }}
-            />
-          </Field>
-
-          {/* The percentage, as the earlier prototype in this handoff sets it:
-              a 0–100 slider in steps of five, inert on a group because a
-              group's figure is its children's, weighted by duration. */}
-          <Field label="Progress" htmlFor={`panel-${item.id}-progress`}>
-            <input
-              id={`panel-${item.id}-progress`}
-              type="range"
-              min={0}
-              max={100}
-              step={5}
-              value={item.progress ?? 0}
-              disabled={isGroup}
-              onChange={(event) => updateItem(item.id, { progress: Number(event.target.value) })}
-              className={FOCUS_RING}
-              style={{ width: '100%', accentColor: 'hsl(var(--primary))' }}
             />
           </Field>
 

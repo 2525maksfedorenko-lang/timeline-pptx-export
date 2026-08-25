@@ -7,8 +7,6 @@ import { useGanttViewStore } from './viewStore';
 
 interface TaskListProps {
   rows: GanttRowModel[];
-  /** Each row's own percentage, or a group's roll-up, keyed by item id. */
-  progressById: Map<string, number>;
   collapsed: Record<string, boolean>;
   selectedId: string | null;
   onSelect: (id: string) => void;
@@ -42,7 +40,6 @@ interface TaskListProps {
  * column has any use for either. */
 export function TaskList({
   rows,
-  progressById,
   collapsed,
   selectedId,
   onSelect,
@@ -97,7 +94,6 @@ export function TaskList({
         <TaskListRow
           key={row.item.id}
           row={row}
-          progress={progressById.get(row.item.id) ?? 0}
           isSelected={selectedId === row.item.id}
           isCollapsed={collapsed[row.item.id] === true}
           isEditing={renamingId === row.item.id}

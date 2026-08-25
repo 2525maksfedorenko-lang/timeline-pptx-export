@@ -101,14 +101,7 @@ export const ROW_GAP_IN = 0.04;
 export const BAR_HEIGHT_IN = 0.28;
 export const BAR_RADIUS_IN = 0.05;
 export const BAR_LABEL_PADDING_IN = 0.06;
-// Progress text ("70%") drawn on the bar: centered inside the filled part
-// when that part measurably fits it, otherwise immediately after the fill,
-// on the gray track. The font size lives here rather than in the exporters
-// because the layout math has to measure the text at exactly the size both
-// engines then draw it at.
-export const BAR_PROGRESS_FONT_SIZE_PT = 9;
-export const BAR_PROGRESS_PADDING_IN = 0.05;
-// Same reasoning as BAR_PROGRESS_FONT_SIZE_PT: the label and status sizes
+// The label and status sizes
 // live here so the model can measure a bar's label/status text at exactly
 // the size both engines draw it at, to reserve the status's own width out of
 // the label's box instead of the two overlapping (see truncateToWidth in
@@ -340,7 +333,7 @@ export function subtaskRowIndent(depth: number): number {
 export const BAR_LABEL_ZONE_MIN_IN = 2.6;
 // Smallest a track is ever drawn, even for a same-day task or one clipped
 // almost entirely out of an export timeframe window.
-export const MIN_TRACK_WIDTH_IN = 0.15;
+export const MIN_BAR_WIDTH_IN = 0.15;
 
 // Per-row vertical pitch on the overview slide = bar height + gap to the
 // next bar. = 0.28 + 0.04 = 0.32in

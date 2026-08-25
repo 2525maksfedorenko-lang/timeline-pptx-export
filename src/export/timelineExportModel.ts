@@ -10,17 +10,12 @@ import {
 } from '../types/timeline';
 import { parseMarkdownBlocks, type MarkdownBlock } from '../utils/renderMarkdown';
 import { getStatusSegments, type StatusSegment } from '../utils/dashboardMetrics';
-import { clampProgress } from '../utils/clampProgress';
 import { resolveBarColor } from '../utils/barColor';
 import {
   buildDepthMap,
   labelIndent,
-  progressLabelFitsInBar,
-  progressLabelXOutsideBar,
   resolveBarGeometry,
-  type ProgressLabelBounds,
 } from '../utils/barNesting';
-import { readableTextOn } from '../utils/colorContrast';
 import { buildTaskHierarchy, type TaskNode } from '../utils/taskHierarchy';
 import {
   daysBetween,
@@ -50,8 +45,6 @@ import { COLORS } from './theme';
 import {
   BAR_HEIGHT_IN,
   BAR_LABEL_FONT_SIZE_PT,
-  BAR_PROGRESS_FONT_SIZE_PT,
-  BAR_PROGRESS_PADDING_IN,
   AXIS_LABEL_GAP_IN,
   AXIS_MONTH_FONT_SIZE_PT,
   AXIS_WEEK_FONT_SIZE_PT,
@@ -75,7 +68,7 @@ import {
   LABEL_TAG_GAP_IN,
   LIST_ROW_HEIGHT_IN,
   MAX_OVERVIEW_BARS_PER_SLIDE,
-  MIN_TRACK_WIDTH_IN,
+  MIN_BAR_WIDTH_IN,
   OVERVIEW_WINDOW_PAD_RATIO,
   TIMELINE_X_IN,
   TIMELINE_WIDTH_IN,
@@ -158,26 +151,20 @@ export interface OverviewBarModel {
   statusChipHeight: number;
   statusChipBg: string;
   statusChipBorder: string;
-  // The row's top edge. Everything drawn on the bar's *line* — its label,
-  // status, progress, tag pills — is positioned against this and a full
-  // BAR_HEIGHT_IN box, so those stay put whatever height the bar itself is.
+  // The row's top edge. Everything drawn on the bar's *line* — its label and
+  // its status — is positioned against this and a full BAR_HEIGHT_IN box, so
+  // those stay put whatever height the bar itself is.
   y: number;
   barX: number;
-  // The track's own rectangle. A nested task's bar is drawn shorter than a
+  // The bar's own rectangle. A nested task's bar is drawn shorter than a
   // top-level one and centered in the same slot (see resolveBarGeometry), so
-  // this is `y` plus a centering offset rather than `y` itself.
+  // this is `y` plus a centering offset rather than `y` itself. One solid
+  // rectangle in the task's colour: it says when the task runs, and nothing
+  // else — there is no second, paler rectangle behind it, because there is no
+  // longer a fraction of it to fill.
   barY: number;
   barHeight: number;
-  trackWidth: number;
-  fillWidth: number;
-  // Progress percentage drawn on the bar itself, in the box
-  // (progressX, progressWidth): centered in it when it sits inside the fill,
-  // left-aligned when it sits just after the fill on the gray track.
-  progressText: string;
-  progressX: number;
-  progressWidth: number;
-  progressInsideFill: boolean;
-  progressColor: string;
+  barWidth: number;
   // True when the task's real start/end falls outside the export timeframe
   // window, so the bar is drawn clipped at that edge with a chevron marker.
   chevronLeft: boolean;
@@ -289,13 +276,12 @@ export interface OverviewSlideModel {
 }
 
 /** One subtask line on a detail slide. The left side used to be a single
- * pre-joined string ("name  —  2026-08-20 → 2026-08-28  —  45%") drawn in
- * one call; it's split into separately-positioned pieces now because each
- * carries its own typographic role — the name is the content, the dates are
- * monospace, the progress is a figure — and neither engine can vary the
- * face mid-string at a position the other could reproduce. Same approach as
- * OverviewBarTagModel: the model resolves x for every piece so a renderer
- * only has to draw. */
+ * pre-joined string ("name  —  2026-08-20 → 2026-08-28") drawn in one call;
+ * it's split into separately-positioned pieces now because each carries its
+ * own typographic role — the name is the content, the dates are monospace —
+ * and neither engine can vary the face mid-string at a position the other
+ * could reproduce. Same approach as OverviewBarTagModel: the model resolves x
+ * for every piece so a renderer only has to draw. */
 export interface SubtaskRowModel {
   /** Which task this row *is*. Carried for exactly the reason
    * DetailSectionModel.taskId is — nothing about the row is drawn from it —
@@ -313,8 +299,6 @@ export interface SubtaskRowModel {
   /** "Aug 20 – Aug 28", drawn in the monospace face. */
   dateText: string;
   dateX: number;
-  progressText: string;
-  progressX: number;
   statusText: string;
   statusColor: string;
   y: number;
@@ -705,18 +689,9 @@ function buildOverviewAxes(
   return windows.map((window) => (window ? { ...window, scale, tierDays: widestDays } : null));
 }
 
-/** The slide's timeline zone, as the band a progress label pushed outside its
- * bar is held inside — the same two edges the bars themselves are clamped to. */
-const PROGRESS_LABEL_BOUNDS_IN: ProgressLabelBounds = {
-  zoneStart: TIMELINE_X_IN,
-  zoneEnd: TIMELINE_X_IN + TIMELINE_WIDTH_IN,
-  padding: BAR_PROGRESS_PADDING_IN,
-};
-
 /** Lays out one overview slide: a date-scale axis at the top, then one bar
  * per item. If a task's real dates fall outside `dateWindow`, the bar is
- * clipped to the content edge and flagged with a chevron — but its progress
- * is unaffected by the clip. */
+ * clipped to the content edge and flagged with a chevron. */
 function buildOverviewSlide(
   items: TimelineItem[],
   axis: OverviewAxis | null,
@@ -792,7 +767,6 @@ function buildOverviewSlide(
 
     items.forEach((item) => {
       const { left, width } = getItemBar(item, minDate, BASE_PX_PER_DAY);
-      const progress = clampProgress(item.progress ?? 0);
       const status = getTaskStatus(item);
 
       // Raw (unclamped) horizontal extent, in inches from TIMELINE_X_IN — used
@@ -810,15 +784,14 @@ function buildOverviewSlide(
       // No label zone to reserve any more: the name and the status live in their
       // own columns, so a bar is free to use the whole timeline zone and is
       // clamped only by that zone's own right edge. A bar can still start at the
-      // very end of the window, in which case MIN_TRACK_WIDTH_IN keeps it
+      // very end of the window, in which case MIN_BAR_WIDTH_IN keeps it
       // visible — it just can't spill past TIMELINE_X_IN + TIMELINE_WIDTH_IN.
-      const maxLeftIn = Math.max(0, windowWidthIn - MIN_TRACK_WIDTH_IN);
+      const maxLeftIn = Math.max(0, windowWidthIn - MIN_BAR_WIDTH_IN);
       const barX = TIMELINE_X_IN + Math.min(clippedLeftIn, maxLeftIn);
 
-      const maxTrackWidth = Math.max(MIN_TRACK_WIDTH_IN, TIMELINE_X_IN + windowWidthIn - barX);
+      const maxBarWidth = Math.max(MIN_BAR_WIDTH_IN, TIMELINE_X_IN + windowWidthIn - barX);
       const windowClippedWidth = Math.max(clippedRightIn - (barX - TIMELINE_X_IN), 0);
-      const trackWidth = Math.min(Math.max(windowClippedWidth, MIN_TRACK_WIDTH_IN), maxTrackWidth);
-      const fillWidth = progress > 0 ? Math.max((trackWidth * progress) / 100, 0.05) : 0;
+      const barWidth = Math.min(Math.max(windowClippedWidth, MIN_BAR_WIDTH_IN), maxBarWidth);
       const barColor = resolveBarColor(item);
       // Nesting is judged against the items the overview draws *in total*, not
       // against this page's slice of them (see buildOverviewSlides): a task
@@ -829,45 +802,6 @@ function buildOverviewSlide(
       // that.
       const depth = depthById.get(item.id) ?? 0;
       const { height: barHeight, offset: barOffsetY } = resolveBarGeometry(BAR_HEIGHT_IN, depth);
-
-      // Where the progress percentage goes. Vertically, nowhere new: both
-      // exporters center it on the row's own center line, which is every bar's
-      // center line whatever its height (see resolveBarGeometry), so a
-      // shortened bar keeps its percentage on the same line a full-height one
-      // has it on.
-      //
-      // Horizontally there are three placements, in order of preference:
-      //   1. centered in the fill — the bar is tall enough to hold text at all
-      //      *and* the fill measurably holds it at the size it is actually
-      //      drawn. Measured, not a percentage of the bar, which says nothing
-      //      about how wide "100%" renders on a track that may itself be a
-      //      fraction of an inch;
-      //   2. just past the fill, on the pale track — tall enough, fill too
-      //      short;
-      //   3. clear of the bar altogether — the bar itself is too short to hold
-      //      text. This is the case the lower rungs of the height ladder
-      //      create, and the reason that ladder is free to go as low as it now
-      //      does: the percentage no longer has to fit inside every bar, so bar
-      //      height no longer has to be traded against reading it.
-      const progressText = `${progress}%`;
-      const progressTextWidth = measureTextWidthIn(progressText, BAR_PROGRESS_FONT_SIZE_PT);
-      // Keyed on the height this bar is actually drawn at, never on its depth —
-      // one shared rule, one call site per surface. See progressLabelFitsInBar.
-      const progressFitsInBar = progressLabelFitsInBar(barHeight, BAR_PROGRESS_FONT_SIZE_PT / 72);
-      const progressInsideFill =
-        progressFitsInBar && fillWidth >= progressTextWidth + BAR_PROGRESS_PADDING_IN * 2;
-      const progressX = progressInsideFill
-        ? barX
-        : progressFitsInBar
-          ? // Past the fill, on the bar's own track — but held off the zone's
-            // right edge all the same: a bar ending there with a short fill
-            // would otherwise put its label past the edge of the timeline.
-            Math.min(
-              barX + fillWidth + BAR_PROGRESS_PADDING_IN,
-              PROGRESS_LABEL_BOUNDS_IN.zoneEnd - progressTextWidth,
-            )
-          : progressLabelXOutsideBar(barX, trackWidth, progressTextWidth, PROGRESS_LABEL_BOUNDS_IN);
-      const progressWidth = progressInsideFill ? fillWidth : progressTextWidth;
 
       // The name lives in the Task column: same x on every row, whatever the
       // bar is doing. Nothing about the bar feeds into this any more.
@@ -962,20 +896,7 @@ function buildOverviewSlide(
         barX,
         barY: y + barOffsetY,
         barHeight,
-        trackWidth,
-        fillWidth,
-        progressText,
-        progressX,
-        progressWidth,
-        progressInsideFill,
-        // Inside the fill, whichever of the two text tokens actually measures
-        // more contrast against it (status fills clear 4.5:1 with the light one
-        // by construction; a user's own item.color might not, and then the dark
-        // one wins). Anywhere else the label is on the pale track or on the
-        // slide itself, and the dark token is the readable one on both.
-        progressColor: progressInsideFill
-          ? readableTextOn(barColor).replace('#', '')
-          : COLORS.textOnSurface,
+        barWidth,
         chevronLeft,
         chevronRight,
       });
@@ -1183,12 +1104,12 @@ function buildDependencyConnectors(items: TimelineItem[], bars: OverviewBarModel
       const predecessorBar = barById.get(depId);
       if (!predecessorBar) return [];
 
-      const x1 = clampX(predecessorBar.barX + predecessorBar.trackWidth);
+      const x1 = clampX(predecessorBar.barX + predecessorBar.barWidth);
       const y1 = predecessorBar.y + BAR_HEIGHT_IN / 2;
       const y2 = successorBar.y + BAR_HEIGHT_IN / 2;
 
       const successorLeft = successorBar.barX;
-      const successorRight = successorBar.barX + successorBar.trackWidth;
+      const successorRight = successorBar.barX + successorBar.barWidth;
       // Room to drop in front of the successor means room for the approach
       // column too, i.e. a full jog either side of the predecessor's stub.
       const approachFromLeft = successorLeft - DEPENDENCY_JOG_IN >= x1 + DEPENDENCY_JOG_IN;
@@ -1389,14 +1310,13 @@ function buildDetailSection(
     y += ROW_LABEL_HEIGHT_IN + ROW_GAP_IN;
 
     chunk.rows.forEach(({ item: child, depth }) => {
-      const progress = clampProgress(child.progress ?? 0);
       const status = getTaskStatus(child);
       const statusText = TASK_STATUS_LABELS[status];
 
       // Same collision to guard against as an overview bar's label/status
       // (see truncateToWidth): the row's label is the flexible part, so it's
-      // what gets truncated — the trailing dates/progress and the status
-      // all stay intact and fully readable. Dates use formatShortDate (the
+      // what gets truncated — the trailing dates and the status
+      // both stay intact and fully readable. Dates use formatShortDate (the
       // same "Aug 20" the on-screen day header and overview axis already
       // use) rather than the raw ISO string — no year, short month, so the
       // fixed non-truncatable tail stays as narrow as possible.
@@ -1407,7 +1327,6 @@ function buildDetailSection(
       // proportional *plus* its tracking, which neither engine folds into
       // its own metrics.
       const dateText = `${formatShortDate(new Date(child.start))} – ${formatShortDate(new Date(child.end))}`;
-      const progressText = `${progress}%`;
 
       // Depth is drawn as indent, from the same barNesting ladder the
       // on-screen label column steps by (see subtaskRowIndent). These rows
@@ -1420,7 +1339,6 @@ function buildDetailSection(
         dateText,
         letterSpacingPt(SUBTASK_DATE_FONT_SIZE_PT, DATE_LETTER_SPACING_EM),
       );
-      const progressWidth = measureTextWidthIn(progressText, SUBTASK_TEXT_FONT_SIZE_PT);
       const statusTextWidth = statusTextWidthIn(statusText, SUBTASK_STATUS_FONT_SIZE_PT);
 
       const availableWidth =
@@ -1430,8 +1348,7 @@ function buildDetailSection(
         statusTextWidth -
         SUBTASK_META_STATUS_GAP_IN -
         (dateWidth + dateTrackingWidth) -
-        progressWidth -
-        SUBTASK_META_GAP_IN * 2;
+        SUBTASK_META_GAP_IN;
       const label = truncateToWidth(child.label, SUBTASK_TEXT_FONT_SIZE_PT, Math.max(availableWidth, 0));
 
       // Each piece follows the previous one's *actual* drawn width, not its
@@ -1441,7 +1358,6 @@ function buildDetailSection(
       // edge — the same rule as an indented overview bar label.
       const labelX = CONTENT_X_IN + rowIndentIn;
       const dateX = labelX + measureTextWidthIn(label, SUBTASK_TEXT_FONT_SIZE_PT) + SUBTASK_META_GAP_IN;
-      const progressX = dateX + dateWidth + dateTrackingWidth + SUBTASK_META_GAP_IN;
 
       subtasks.push({
         taskId: child.id,
@@ -1450,8 +1366,6 @@ function buildDetailSection(
         labelX,
         dateText,
         dateX,
-        progressText,
-        progressX,
         statusText,
         statusColor: TASK_STATUS_COLORS[status],
         y,

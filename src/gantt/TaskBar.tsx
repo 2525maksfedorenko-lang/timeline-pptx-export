@@ -30,7 +30,6 @@ interface TaskBarProps {
   /** The canvas width, which the row wrapper spans so a bar can be positioned
    * anywhere along it. */
   canvasWidth: number;
-  progress: number;
   isSelected: boolean;
   assignees: BarAssignee[];
   /** Human date range for the bar's tooltip, e.g. "Aug 17 – Aug 24". */
@@ -41,13 +40,8 @@ interface TaskBarProps {
   onContextMenu: (event: React.MouseEvent) => void;
 }
 
-/** One bar: a pale block in its status' tint, its own name set on it in the
- * matching dark tone, and the percentage shown as a translucent wash filling
- * it from the left rather than as a number.
- *
- * A group's wash is stronger (.35 against .18) because a group's bar is the
- * one bar on the row that has no label competing with it for contrast — its
- * name is set in the heavier weight for the same reason.
+/** One bar: a pale block in its status' tint, with its own name set on it in
+ * the matching dark tone. A group's name is set in the heavier weight.
  *
  * The dot on the right edge and the assignee badges past it are drawn as
  * siblings of the bar, not children: both sit *outside* its rounded rectangle
@@ -59,7 +53,6 @@ export function TaskBar({
   rowIndex,
   columnWidth,
   canvasWidth,
-  progress,
   isSelected,
   assignees,
   dateRange,
@@ -105,7 +98,7 @@ export function TaskBar({
         onPointerDown={(event) => onPointerDownBar(event, 'move')}
         onClick={onSelect}
         onContextMenu={onContextMenu}
-        title={`${item.label} · ${dateRange} · ${progress}% · ${statusLabel}`}
+        title={`${item.label} · ${dateRange} · ${statusLabel}`}
         style={{
           position: 'absolute',
           left,
@@ -125,19 +118,6 @@ export function TaskBar({
           boxShadow: isSelected ? `0 0 0 2px color-mix(in srgb, ${tone.fill} 50%, transparent)` : 'none',
         }}
       >
-        {progress > 0 && (
-          <div
-            style={{
-              position: 'absolute',
-              left: 0,
-              top: 0,
-              bottom: 0,
-              width: `${progress}%`,
-              background: tone.fill,
-              opacity: isGroup ? 0.35 : 0.18,
-            }}
-          />
-        )}
         <span
           style={{
             position: 'relative',

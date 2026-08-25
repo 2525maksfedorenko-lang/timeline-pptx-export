@@ -6,21 +6,15 @@
  * `src/gantt/geometry.ts`, which is a different picture: 52px rows, 34px
  * bars, a 320px list, and column widths of 30/15.2/7px per day.
  *
- * What is left here is the pair of numbers the export side still needs: a
- * reference bar height, and the size the percentage is set at on it. Two
- * things read them — the export settings panel, whose task list indents its
- * rows on the same ladder the slides do (`labelIndent`), and
- * `scripts/checkExportCoverage.ts`, which asserts the slides' own ladder
- * against them. Neither is the plan screen.
+ * What is left here is the one number the export side still needs: the
+ * reference bar height the depth ladder is expressed in. Two things read it —
+ * the export settings panel, whose task list indents its rows on the same
+ * ladder the slides do (`labelIndent`), and `scripts/checkExportCoverage.ts`,
+ * which asserts the slides' own ladder against it. Neither is the plan
+ * screen.
  */
 
 /** The bar height the depth ladder is expressed in — `barNesting`'s ratios and
  * indents are fractions of it, so it is the unit those rules are read in
  * rather than a size anything is drawn at. */
 export const BAR_HEIGHT_PX = 32;
-
-/** The progress percentage's type size in that same unit, which is what
- * decides whether a bar at a given depth is tall enough to hold its label
- * inside itself (`progressLabelFitsInBar`). 12px, not 11: 11 is not a step on
- * the design system's type scale. */
-export const PROGRESS_FONT_SIZE_PX = 12;

@@ -16,7 +16,6 @@ interface TimelineBodyProps {
   todayIndex: number;
   /** Column indices that start a Saturday. */
   weekendStarts: number[];
-  progressById: Map<string, number>;
   assigneesById: Map<string, BarAssignee[]>;
   /** "Aug 17 – Aug 24" per row, for the bar tooltips. */
   dateRangeById: Map<string, string>;
@@ -52,7 +51,6 @@ export function TimelineBody({
   height,
   todayIndex,
   weekendStarts,
-  progressById,
   assigneesById,
   dateRangeById,
   statusLabelById,
@@ -165,7 +163,6 @@ export function TimelineBody({
             rowIndex={index}
             columnWidth={columnWidth}
             canvasWidth={width}
-            progress={progressById.get(row.item.id) ?? 0}
             isSelected={selectedId === row.item.id}
             assignees={assigneesById.get(row.item.id) ?? []}
             dateRange={dateRangeById.get(row.item.id) ?? ''}

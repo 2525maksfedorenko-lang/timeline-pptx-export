@@ -6,8 +6,6 @@ import { StatusIcon } from './StatusIcon';
 
 interface TaskListRowProps {
   row: GanttRowModel;
-  /** The row's own percentage, or a group's roll-up. */
-  progress: number;
   isSelected: boolean;
   isCollapsed: boolean;
   isEditing: boolean;
@@ -50,8 +48,7 @@ function DragGrip() {
   );
 }
 
-/** One line of the task list: what the row is, who has to act on it, and how
- * far along it is — in that order, left to right.
+/** One line of the task list: what the row is, and what can be done to it.
  *
  * A group starts hard against the column's edge because its caret occupies
  * that space; a task starts where the caret would have ended. A task's name
@@ -59,7 +56,6 @@ function DragGrip() {
  * is plain text one step larger. */
 export function TaskListRow({
   row,
-  progress,
   isSelected,
   isCollapsed,
   isEditing,
@@ -225,24 +221,6 @@ export function TaskListRow({
           {item.label}
         </span>
       )}
-
-      <span
-        title={isGroup ? 'Rolled up from sub-tasks' : 'Percent complete'}
-        style={{
-          flex: 'none',
-          fontSize: 11,
-          fontWeight: 600,
-          fontVariantNumeric: 'tabular-nums',
-          color:
-            progress === 100
-              ? 'var(--gantt-pct-complete)'
-              : progress > 0
-                ? 'var(--gantt-pct-started)'
-                : 'var(--gantt-pct-zero)',
-        }}
-      >
-        {progress}%
-      </span>
 
       {/* The count badge is also the way into those sub-tasks: it is the one
           thing on the row that already names them, so it carries the click

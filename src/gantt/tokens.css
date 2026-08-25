@@ -62,11 +62,6 @@
   --gantt-pill-bg-blocked: #fef6f6;
   --gantt-edit-focus: #60a5fa;
 
-  /* Percent complete */
-  --gantt-pct-complete: #16a34a;
-  --gantt-pct-started: #64748b;
-  --gantt-pct-zero: #cbd5e1;
-
   /* Badges */
   --gantt-subcount-bg: #475569;
 
