@@ -17,9 +17,10 @@ interface TaskListRowProps {
   onSelect: () => void;
   onToggleCollapse: () => void;
   onCycleStatus: () => void;
-  /** Narrow the plan to this row's sub-tasks. Only ever called from a group's
-   * count badge, which is the one row element that names them. */
-  onOpenFocus: () => void;
+  /** Lift this row and everything under it out into a plan of its own. Only
+   * ever called from a group's count badge, which is the one row element that
+   * names the sub-tasks it would take with it. */
+  onMakePlan: () => void;
   /** Create a sub-task under this row and start renaming it. */
   onAddSubtask: () => void;
   onContextMenu: (event: React.MouseEvent) => void;
@@ -67,7 +68,7 @@ export function TaskListRow({
   onSelect,
   onToggleCollapse,
   onCycleStatus,
-  onOpenFocus,
+  onMakePlan,
   onAddSubtask,
   onContextMenu,
 }: TaskListRowProps) {
@@ -222,19 +223,21 @@ export function TaskListRow({
         </span>
       )}
 
-      {/* The count badge is also the way into those sub-tasks: it is the one
-          thing on the row that already names them, so it carries the click
-          rather than a second control appearing beside it. */}
+      {/* The count badge is also the way to lift this branch out into a plan
+          of its own: it is the one thing on the row that already names the
+          sub-tasks that would come along, so it carries the click rather than
+          a second control appearing beside it. Looking at the branch without
+          copying it is the context menu's "Show only sub-tasks". */}
       {isGroup && (
         <button
           type="button"
           className="gantt-subcount"
           onClick={(event) => {
             event.stopPropagation();
-            onOpenFocus();
+            onMakePlan();
           }}
-          title={`Show only these ${childCount} sub-tasks`}
-          aria-label={`Show only the ${childCount} sub-tasks of ${item.label}`}
+          title="Make a separate plan from this branch"
+          aria-label={`Make a separate plan from ${item.label} and everything under it`}
           style={{
             display: 'inline-flex',
             alignItems: 'center',

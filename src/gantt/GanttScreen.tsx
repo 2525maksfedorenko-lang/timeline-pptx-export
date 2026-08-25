@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Layers, Pencil, Plus, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, FilePlus, Layers, Pencil, Plus, Trash2 } from 'lucide-react';
 import { buttonBaseClass } from '../components/systemUi';
 import { ContextMenu, type ContextMenuAction } from '../components/ContextMenu';
 import { useTimelineStore } from '../store/timelineStore';
@@ -57,6 +57,7 @@ export function GanttScreen() {
   const updateItem = useTimelineStore((state) => state.updateItem);
   const addItem = useTimelineStore((state) => state.addItem);
   const deleteTaskCascade = useTimelineStore((state) => state.deleteTaskCascade);
+  const createPlanFromBranch = useTimelineStore((state) => state.createPlanFromBranch);
   const activePlanId = useTimelineStore((state) => state.activePlanId);
 
   const scale = useGanttViewStore((state) => state.scale);
@@ -335,6 +336,20 @@ export function GanttScreen() {
     beginRename(task.id, task.label);
   };
 
+  /** The sub-task count badge's action: this row and everything under it,
+   * copied into a plan of its own, which then opens.
+   *
+   * A copy and not a view — that is the whole difference between this and the
+   * focus below it. The plan it was taken from keeps every task it had and is
+   * still in the switcher; the new one is a plan like any other, so it is
+   * edited, saved and exported like any other. */
+  const makePlanFromBranch = (id: string) => {
+    void createPlanFromBranch(id);
+    // Whatever was being focused on lives in the plan being left. Clearing it
+    // opens the new plan whole, which is what a plan of its own means.
+    setFocus(null);
+  };
+
   /** This item and every group under it — what "the branch" means to the two
    * actions that act on one. */
   const branchGroupIds = (id: string): string[] => {
@@ -359,9 +374,13 @@ export function GanttScreen() {
     if (selectedId === id) select(null);
   };
 
-  /** The rows a right-click offers. Five actions at most, and two of them
-   * only where they mean anything: a task with no sub-tasks has no branch to
-   * fold away and none to focus on. */
+  /** The rows a right-click offers. Six at most, and three of them only where
+   * they mean anything: a task with no sub-tasks has no branch to copy out, to
+   * fold away, or to look at on its own.
+   *
+   * The badge on the row and the first of those three do the same thing, on
+   * purpose: the badge is a small pill whose click now creates something, and
+   * a menu naming the action in words is where that is discovered. */
   const menuActions = (id: string): ContextMenuAction[] => {
     const isGroup = childrenOf(items, id).length > 0;
     return [
@@ -380,6 +399,11 @@ export function GanttScreen() {
       },
       ...(isGroup
         ? [
+            {
+              label: 'Make a plan from this branch',
+              icon: <FilePlus size={14} strokeWidth={2} aria-hidden="true" />,
+              onSelect: () => makePlanFromBranch(id),
+            },
             {
               label: 'Show only sub-tasks',
               icon: <Layers size={14} strokeWidth={2} aria-hidden="true" />,
@@ -539,7 +563,7 @@ export function GanttScreen() {
               onCycleStatus={cycleStatus}
               onRename={(id, name) => updateItem(id, { label: name })}
               onAddTask={addTask}
-              onOpenFocus={setFocus}
+              onMakePlan={makePlanFromBranch}
             onAddSubtask={addSubtask}
             onContextMenu={openMenu}
             />

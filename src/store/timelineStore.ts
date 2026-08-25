@@ -6,7 +6,9 @@ import type {
   TaskComment,
   TimelineItem,
 } from '../types/timeline';
+import { copyBranch, droppedDependencyNotice, uniquePlanName } from '../utils/branchPlan';
 import { normalizePlanItems } from '../utils/normalizePlanItems';
+import { repairNotice, type PlanNotice } from '../utils/planNotice';
 import { getDescendantIds } from '../utils/taskHierarchy';
 import { DEV_SEED_COMMENTS, DEV_SEED_ITEMS, DEV_SEED_TITLE } from './devSeed';
 import {
@@ -51,11 +53,12 @@ interface TimelineStore {
   setZoomLevel: (zoomLevel: number) => void;
   setEditingItem: (id: string | null) => void;
 
-  // What loading a plan had to repair in it, keyed by plan id — see
-  // normalizePlanItems and PlanNotice. Deliberately absent from
-  // `partialize`: it describes one load of one plan, so it must not outlive
-  // the session that found it.
-  planNotices: Record<string, string[]>;
+  // What each plan has to say about itself this session, keyed by plan id —
+  // a repair on the way in, or the links a plan made from a branch could not
+  // bring with it. See utils/planNotice.ts and PlanNotice. Deliberately
+  // absent from `partialize`: it describes this session's view of a plan, so
+  // it must not outlive the session that found it.
+  planNotices: Record<string, PlanNotice>;
   dismissPlanNotices: () => void;
 
   // Multiple plans, persisted locally in IndexedDB (see planStorage.ts).
@@ -64,6 +67,10 @@ interface TimelineStore {
   loadPlans: () => Promise<void>;
   saveCurrentAsPlan: (name: string) => Promise<void>;
   switchToPlan: (id: string) => Promise<void>;
+  /** Copies one task and its whole sub-tree into a plan of its own, saves it
+   * beside the others and opens it. The plan it was taken from is left
+   * exactly as it was — see utils/branchPlan.ts for what is copied. */
+  createPlanFromBranch: (rootId: string) => Promise<void>;
   deletePlan: (id: string) => Promise<void>;
 }
 
@@ -82,15 +89,20 @@ export const DEFAULT_EXPORT_OPTIONS: ExportOptions = {
 const UNNAMED_PLAN_KEY = '';
 
 /** Both doors into a plan repair it, so both can report the same thing about
- * the same plan in one load. Notices are plain sentences, so identical text is
- * identical news: a Set is the whole deduplication rule. */
+ * the same plan in one load. The lines are plain sentences, so identical text
+ * is identical news: a Set is the whole deduplication rule. The headline the
+ * plan already had is kept — a second report on one plan is the same report
+ * arriving twice, and its own headline is the same sentence. */
 function mergePlanNotices(
-  existing: Record<string, string[]>,
-  incoming: Record<string, string[]>,
-): Record<string, string[]> {
+  existing: Record<string, PlanNotice>,
+  incoming: Record<string, PlanNotice>,
+): Record<string, PlanNotice> {
   const merged = { ...existing };
-  Object.entries(incoming).forEach(([planId, notices]) => {
-    merged[planId] = [...new Set([...(merged[planId] ?? []), ...notices])];
+  Object.entries(incoming).forEach(([planId, notice]) => {
+    const held = merged[planId];
+    merged[planId] = held
+      ? { ...held, lines: [...new Set([...held.lines, ...notice.lines])] }
+      : notice;
   });
   return merged;
 }
@@ -100,15 +112,33 @@ function mergePlanNotices(
  * mints a *new* id for those same items — without this the notice would be
  * filed under a plan that no longer exists and nobody would ever see it. */
 function renamePlanNotices(
-  notices: Record<string, string[]>,
+  notices: Record<string, PlanNotice>,
   from: string,
   to: string,
-): Record<string, string[]> {
+): Record<string, PlanNotice> {
   if (from === to || notices[from] === undefined) return notices;
 
   const renamed = { ...notices };
   delete renamed[from];
   return mergePlanNotices(renamed, { [to]: notices[from] });
+}
+
+/** The active plan with the working copy written back into it, ready to be
+ * persisted — or null when nothing is active to write back.
+ *
+ * Leaving a plan has to save it first, and there are two ways to leave one
+ * now: switching to another, and making a new one out of a branch of this
+ * one. Both flush the same way, so the rule lives here rather than in each. */
+function flushedActivePlan(state: TimelineStore): SavedPlan | null {
+  const outgoing = state.savedPlans.find((plan) => plan.id === state.activePlanId);
+  if (!outgoing) return null;
+
+  return {
+    ...outgoing,
+    items: state.items,
+    exportOptions: state.exportOptions,
+    updatedAt: new Date().toISOString(),
+  };
 }
 
 const DEFAULT_UI: UiState = {
@@ -325,27 +355,74 @@ export const useTimelineStore = create<TimelineStore>()(
         if (!targetPlan) return;
 
         // Flush in-progress edits on the outgoing plan before switching away.
-        const outgoingPlan = state.savedPlans.find((plan) => plan.id === state.activePlanId);
-        if (outgoingPlan) {
-          const flushedPlan: SavedPlan = {
-            ...outgoingPlan,
-            items: state.items,
-            exportOptions: state.exportOptions,
-            updatedAt: new Date().toISOString(),
-          };
-          await persistPlan(flushedPlan);
-          set((current) => ({
-            savedPlans: current.savedPlans.map((p) => (p.id === flushedPlan.id ? flushedPlan : p)),
-          }));
-        }
+        const flushed = flushedActivePlan(state);
+        if (flushed) await persistPlan(flushed);
 
-        set({
+        set((current) => ({
+          savedPlans: flushed
+            ? current.savedPlans.map((plan) => (plan.id === flushed.id ? flushed : plan))
+            : current.savedPlans,
           activePlanId: targetPlan.id,
           title: targetPlan.name,
           items: targetPlan.items,
           exportOptions: targetPlan.exportOptions,
           ui: DEFAULT_UI,
-        });
+        }));
+      },
+
+      createPlanFromBranch: async (rootId) => {
+        const state = get();
+        const root = state.items.find((item) => item.id === rootId);
+        if (!root) return;
+
+        const branch = copyBranch(state.items, state.comments, rootId);
+        if (!branch) return;
+
+        const now = new Date().toISOString();
+        const plan: SavedPlan = {
+          id: crypto.randomUUID(),
+          name: uniquePlanName(
+            root.label,
+            state.savedPlans.map((saved) => saved.name),
+          ),
+          items: branch.items,
+          // The settings the branch was already going to be exported under:
+          // theme, scale, order, window and comment mode are facts about how a
+          // deck is read, not about which tasks are in one.
+          exportOptions: state.exportOptions,
+          createdAt: now,
+          updatedAt: now,
+        };
+
+        // The plan this came out of is saved on the way past, exactly as it is
+        // when one is switched away from: taking a copy of a branch changes
+        // nothing about the plan that branch is still in.
+        const flushed = flushedActivePlan(state);
+        if (flushed) await persistPlan(flushed);
+        await persistPlan(plan);
+
+        const notice = droppedDependencyNotice(branch.droppedDependencies, root.label);
+
+        set((current) => ({
+          savedPlans: [
+            ...(flushed
+              ? current.savedPlans.map((saved) => (saved.id === flushed.id ? flushed : saved))
+              : current.savedPlans),
+            plan,
+          ],
+          activePlanId: plan.id,
+          title: plan.name,
+          items: plan.items,
+          exportOptions: plan.exportOptions,
+          // Comments belong to the app rather than to one plan — they are kept
+          // in one list, keyed by task id — so the copies simply join them,
+          // and the ones on the original tasks stay where they were.
+          comments: [...current.comments, ...branch.comments],
+          ui: DEFAULT_UI,
+          planNotices: notice
+            ? mergePlanNotices(current.planNotices, { [plan.id]: notice })
+            : current.planNotices,
+        }));
       },
 
       deletePlan: async (id) => {
@@ -402,7 +479,7 @@ export const useTimelineStore = create<TimelineStore>()(
           items,
           planNotices:
             warnings.length > 0
-              ? mergePlanNotices(currentState.planNotices, { [key]: warnings })
+              ? mergePlanNotices(currentState.planNotices, { [key]: repairNotice(warnings) })
               : currentState.planNotices,
         };
       },

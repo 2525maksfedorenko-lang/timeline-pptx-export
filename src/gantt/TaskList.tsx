@@ -14,7 +14,9 @@ interface TaskListProps {
   onCycleStatus: (id: string) => void;
   onRename: (id: string, name: string) => void;
   onAddTask: (name: string) => void;
-  onOpenFocus: (id: string) => void;
+  /** Copies a row's whole branch into a plan of its own and opens it — what
+   * the sub-task count badge does. */
+  onMakePlan: (id: string) => void;
   /** Creates a sub-task under `parentId`. The screen opens the new row's name
    * for editing as it goes, so the task is named where it will live rather
    * than in a form somewhere else. */
@@ -47,7 +49,7 @@ export function TaskList({
   onCycleStatus,
   onRename,
   onAddTask,
-  onOpenFocus,
+  onMakePlan,
   onAddSubtask,
   onContextMenu,
   minHeight,
@@ -105,7 +107,7 @@ export function TaskList({
           onSelect={() => onSelect(row.item.id)}
           onToggleCollapse={() => onToggleCollapse(row.item.id)}
           onCycleStatus={() => onCycleStatus(row.item.id)}
-          onOpenFocus={() => onOpenFocus(row.item.id)}
+          onMakePlan={() => onMakePlan(row.item.id)}
           onAddSubtask={() => onAddSubtask(row.item.id)}
           onContextMenu={(event) => onContextMenu(row.item.id, event)}
         />
