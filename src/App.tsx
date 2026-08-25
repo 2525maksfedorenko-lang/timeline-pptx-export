@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
-import { Upload } from 'lucide-react'
 import { GanttScreen } from './gantt/GanttScreen'
 import { GanttToolbar } from './gantt/GanttToolbar'
 import { Dashboard, type DashboardSection } from './components/Dashboard'
 import { SettingsFlyout } from './components/SettingsFlyout'
 import { ExportOverflowModal } from './components/ExportOverflowModal'
 import { ImportModal } from './components/ImportModal'
+import { ExportMenu, type ExportFormat } from './components/ExportMenu'
 import { PlanNotice } from './components/PlanNotice'
 import { exportTimelineToPptx } from './export/pptxExporter'
 import { exportTimelineToPdf } from './export/pdfExporter'
@@ -17,7 +17,6 @@ import { usePeopleStore } from './store/peopleStore'
 import { buttonBaseClass } from './components/systemUi';
 
 type Tab = 'timeline' | 'dashboard'
-type ExportFormat = 'pptx' | 'pdf'
 
 /** The export the user asked for, held while the overflow modal asks how to
  * handle the tasks that don't fit on one overview slide. */
@@ -98,34 +97,17 @@ function App() {
         onOpenSettings={() => setIsSettingsOpen(true)}
         actions={
           <>
+            {/* The two things the app does to a whole plan, both said as the
+                verb. Which file an export produces is a question for the menu
+                behind it, not for the header. */}
             <button
               type="button"
               onClick={() => setIsImportOpen(true)}
-              title="Import a plan"
-              aria-label="Import a plan"
-              className={buttonBaseClass('ghost', 'h-8 w-8 flex-none text-muted-foreground')}
-            >
-              <Upload size={16} strokeWidth={2} aria-hidden="true" />
-            </button>
-            {/* Two exports, labelled by the file they produce rather than by
-                the verb — the verb is the same for both, and the row has no
-                width to spend saying it twice. */}
-            <button
-              type="button"
-              onClick={() => handleExport('pdf')}
-              title="Export as PDF"
               className={buttonBaseClass('outline', 'h-8 whitespace-nowrap px-3 text-xs font-semibold')}
             >
-              PDF
+              Import
             </button>
-            <button
-              type="button"
-              onClick={() => handleExport('pptx')}
-              title="Export to PowerPoint"
-              className={buttonBaseClass('default', 'h-8 whitespace-nowrap px-3 text-xs font-semibold')}
-            >
-              PPTX
-            </button>
+            <ExportMenu onExport={handleExport} />
           </>
         }
       />
