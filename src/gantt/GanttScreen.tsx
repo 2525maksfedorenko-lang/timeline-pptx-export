@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronLeft, Layers } from 'lucide-react';
+import { buttonBaseClass } from '../components/systemUi';
 import { useTimelineStore } from '../store/timelineStore';
 import { usePeopleStore } from '../store/peopleStore';
 import { getInitials } from '../utils/initials';
@@ -64,6 +66,14 @@ export function GanttScreen() {
   const showCriticalPath = useGanttViewStore((state) => state.showCriticalPath);
   const select = useGanttViewStore((state) => state.select);
   const toggleCollapsed = useGanttViewStore((state) => state.toggleCollapsed);
+  const focusId = useGanttViewStore((state) => state.focusId);
+  const setFocus = useGanttViewStore((state) => state.setFocus);
+
+  // Resolved against the plan rather than trusted: the focused parent can be
+  // deleted, or the plan switched under it, and a focus on an item that is no
+  // longer there is simply no focus.
+  const focusItem = focusId === null ? null : (items.find((item) => item.id === focusId) ?? null);
+  const activeFocusId = focusItem?.id ?? null;
 
   const [drag, setDrag] = useState<DragState | null>(null);
   // Set the moment a drag snaps a whole column, and cleared shortly after the
@@ -81,8 +91,8 @@ export function GanttScreen() {
   const columnWidth = COLUMN_WIDTH_PX[scale];
 
   const rows = useMemo(
-    () => visibleRows(items, { collapsed, search, filter, people }),
-    [items, collapsed, search, filter, people],
+    () => visibleRows(items, { collapsed, search, filter, people, focusId: activeFocusId }),
+    [items, collapsed, search, filter, people, activeFocusId],
   );
 
   const bodyHeight = Math.max(rows.length * ROW_HEIGHT_PX + ADD_ROW_HEIGHT_PX, MIN_BODY_HEIGHT_PX);
@@ -295,12 +305,17 @@ export function GanttScreen() {
   };
 
   const addTask = (name: string) => {
-    const task = buildNewTask({
-      label: name,
-      start: isoAtIndex(minDate, todayIndex),
-      end: isoAtIndex(minDate, todayIndex + 4),
-      status: 'todo',
-    });
+    const task = buildNewTask(
+      {
+        label: name,
+        start: isoAtIndex(minDate, todayIndex),
+        end: isoAtIndex(minDate, todayIndex + 4),
+        status: 'todo',
+      },
+      // Inside a focus the list is one parent's sub-tasks, so a task added to
+      // it is one of them — a new root would vanish the moment it was typed.
+      activeFocusId === null ? {} : { parentId: activeFocusId },
+    );
     addItem(task);
     select(task.id);
   };
@@ -314,127 +329,177 @@ export function GanttScreen() {
 
   return (
     <div style={{ display: 'flex', flex: 1, minHeight: 0, background: 'var(--gantt-surface)' }}>
-      {/* The frame. Two fixed tracks by two: the list's width and the header's
-          height are constants, and the timeline zone takes whatever the window
-          leaves. Nothing here scrolls — the frame is what the three panes
-          inside it scroll *within*, which is what keeps the zone the same
-          width at every scale and keeps the scrollbar in view. */}
-      <div
-        style={{
-          flex: 1,
-          minWidth: 0,
-          display: 'grid',
-          gridTemplateColumns: `${LIST_WIDTH_PX}px minmax(0, 1fr)`,
-          gridTemplateRows: `${HEADER_HEIGHT_PX}px minmax(0, 1fr)`,
-          overflow: 'hidden',
-        }}
-      >
-        {/* The corner. It follows neither axis, so it is the one pane that is
-            simply a box. */}
-        <div
-          style={{
-            gridColumn: 1,
-            gridRow: 1,
-            background: 'var(--gantt-surface)',
-            borderRight: '1px solid var(--gantt-rule-strong)',
-            borderBottom: '1px solid var(--gantt-rule-strong)',
-            boxSizing: 'border-box',
-          }}
-        />
+      {/* The plan and, above it when one is open, the bar naming the focus.
+          A column, so the bar is the plan's own strip and does not run under
+          the Edit Task panel beside it. */}
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        {focusItem && (
+          <div
+            style={{
+              flex: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              height: 38,
+              padding: '0 14px',
+              boxSizing: 'border-box',
+              background: 'var(--gantt-band)',
+              borderBottom: '1px solid var(--gantt-rule-strong)',
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setFocus(null)}
+              className={buttonBaseClass('ghost', 'h-7 gap-1 px-2 text-[11px] font-semibold')}
+              style={{ color: 'var(--gantt-text-secondary)' }}
+            >
+              <ChevronLeft size={14} strokeWidth={2.2} aria-hidden="true" />
+              Back to plan
+            </button>
+            <span className="h-4 w-px flex-none" style={{ background: 'var(--gantt-rule-strong)' }} />
+            <Layers size={13} strokeWidth={2.2} aria-hidden="true" color="var(--gantt-text-secondary)" />
+            {/* Says both what is on screen and what is not: a filtered chart
+                with no such line reads as a plan that has lost its other
+                tasks. */}
+            <span style={{ fontSize: 12, color: 'var(--gantt-text-secondary)', minWidth: 0 }}>
+              Sub-tasks of{' '}
+              <span
+                title={focusItem.label}
+                style={{
+                  fontWeight: 600,
+                  color: 'var(--gantt-text)',
+                }}
+              >
+                {focusItem.label}
+              </span>
+            </span>
+          </div>
+        )}
 
-        {/* The header pane: follows the body sideways, never moves up or
-            down. Its right padding is the width of the body's vertical
-            scrollbar, so the two show the same span of days rather than the
-            header running a scrollbar's width further. */}
+        {/* The frame. Two fixed tracks by two: the list's width and the header's
+            height are constants, and the timeline zone takes whatever the window
+            leaves. Nothing here scrolls — the frame is what the three panes
+            inside it scroll *within*, which is what keeps the zone the same
+            width at every scale and keeps the scrollbar in view. */}
         <div
-          ref={panes.headerRef}
           style={{
-            gridColumn: 2,
-            gridRow: 1,
+            flex: 1,
+            minWidth: 0,
+            minHeight: 0,
+            display: 'grid',
+            gridTemplateColumns: `${LIST_WIDTH_PX}px minmax(0, 1fr)`,
+            gridTemplateRows: `${HEADER_HEIGHT_PX}px minmax(0, 1fr)`,
             overflow: 'hidden',
-            background: 'var(--gantt-surface)',
-            borderBottom: '1px solid var(--gantt-rule-strong)',
-            boxSizing: 'border-box',
-            paddingRight: panes.gutter.vertical,
           }}
         >
-          <TimelineHeader cells={headerCells} columnWidth={columnWidth} width={canvasWidth} />
-        </div>
-
-        {/* The list pane: follows the body down, never moves sideways. Its
-            bottom padding matches the body's horizontal scrollbar for the
-            same reason the header's right padding matches the vertical one. */}
-        <div
-          ref={panes.listRef}
-          style={{
-            gridColumn: 1,
-            gridRow: 2,
-            overflow: 'hidden',
-            background: 'var(--gantt-surface)',
-            borderRight: '1px solid var(--gantt-rule-strong)',
-            boxSizing: 'border-box',
-            paddingBottom: panes.gutter.horizontal,
-          }}
-        >
-          <TaskList
-            rows={rows}
-            progressById={progressById}
-            collapsed={collapsed}
-            selectedId={selectedId}
-            criticalIds={critical}
-            showCriticalPath={showCriticalPath}
-            minHeight={bodyHeight}
-            onSelect={select}
-            onToggleCollapse={toggleCollapsed}
-            onCycleStatus={cycleStatus}
-            onRename={(id, name) => updateItem(id, { label: name })}
-            onAddTask={addTask}
-          />
-        </div>
-
-        {/* The body: the only scroller on the screen. Both bars belong to it,
-            which puts the horizontal one along the bottom of the timeline and
-            nowhere near the task names. `overflow-x: scroll` rather than
-            `auto` so the bar is a standing part of the zone instead of
-            something that appears and disappears under the pointer. */}
-        <div
-          ref={panes.bodyRef}
-          className="gantt-scroll"
-          style={{
-            gridColumn: 2,
-            gridRow: 2,
-            overflowX: 'scroll',
-            overflowY: 'auto',
-            position: 'relative',
-            cursor: 'grab',
-          }}
-        >
-          <TimelineBody
-            rows={rows}
-            spans={spans}
-            scale={scale}
-            columnWidth={columnWidth}
-            width={canvasWidth}
-            height={bodyHeight}
-            todayIndex={todayIndex}
-            weekendStarts={weekends}
-            progressById={progressById}
-            assigneesById={assigneesById}
-            dateRangeById={dateRangeById}
-            statusLabelById={statusLabelById}
-            selectedId={selectedId}
-            criticalIds={critical}
-            showCriticalPath={showCriticalPath}
-            showDependencies={showDependencies}
-            drag={drag}
-            dragLabel={dragLabel}
-            onPointerDownBar={beginDrag}
-            onSelectBar={(id) => {
-              // A pan ends in a click too, and selecting a task because
-              // someone dragged the canvas past it would be a surprise.
-              if (!movedRef.current && !panes.isPanningRef.current) select(id);
+          {/* The corner. It follows neither axis, so it is the one pane that is
+              simply a box. */}
+          <div
+            style={{
+              gridColumn: 1,
+              gridRow: 1,
+              background: 'var(--gantt-surface)',
+              borderRight: '1px solid var(--gantt-rule-strong)',
+              borderBottom: '1px solid var(--gantt-rule-strong)',
+              boxSizing: 'border-box',
             }}
           />
+
+          {/* The header pane: follows the body sideways, never moves up or
+              down. Its right padding is the width of the body's vertical
+              scrollbar, so the two show the same span of days rather than the
+              header running a scrollbar's width further. */}
+          <div
+            ref={panes.headerRef}
+            style={{
+              gridColumn: 2,
+              gridRow: 1,
+              overflow: 'hidden',
+              background: 'var(--gantt-surface)',
+              borderBottom: '1px solid var(--gantt-rule-strong)',
+              boxSizing: 'border-box',
+              paddingRight: panes.gutter.vertical,
+            }}
+          >
+            <TimelineHeader cells={headerCells} columnWidth={columnWidth} width={canvasWidth} />
+          </div>
+
+          {/* The list pane: follows the body down, never moves sideways. Its
+              bottom padding matches the body's horizontal scrollbar for the
+              same reason the header's right padding matches the vertical one. */}
+          <div
+            ref={panes.listRef}
+            style={{
+              gridColumn: 1,
+              gridRow: 2,
+              overflow: 'hidden',
+              background: 'var(--gantt-surface)',
+              borderRight: '1px solid var(--gantt-rule-strong)',
+              boxSizing: 'border-box',
+              paddingBottom: panes.gutter.horizontal,
+            }}
+          >
+            <TaskList
+              rows={rows}
+              progressById={progressById}
+              collapsed={collapsed}
+              selectedId={selectedId}
+              criticalIds={critical}
+              showCriticalPath={showCriticalPath}
+              minHeight={bodyHeight}
+              onSelect={select}
+              onToggleCollapse={toggleCollapsed}
+              onCycleStatus={cycleStatus}
+              onRename={(id, name) => updateItem(id, { label: name })}
+              onAddTask={addTask}
+              onOpenFocus={setFocus}
+            />
+          </div>
+
+          {/* The body: the only scroller on the screen. Both bars belong to it,
+              which puts the horizontal one along the bottom of the timeline and
+              nowhere near the task names. `overflow-x: scroll` rather than
+              `auto` so the bar is a standing part of the zone instead of
+              something that appears and disappears under the pointer. */}
+          <div
+            ref={panes.bodyRef}
+            className="gantt-scroll"
+            style={{
+              gridColumn: 2,
+              gridRow: 2,
+              overflowX: 'scroll',
+              overflowY: 'auto',
+              position: 'relative',
+              cursor: 'grab',
+            }}
+          >
+            <TimelineBody
+              rows={rows}
+              spans={spans}
+              scale={scale}
+              columnWidth={columnWidth}
+              width={canvasWidth}
+              height={bodyHeight}
+              todayIndex={todayIndex}
+              weekendStarts={weekends}
+              progressById={progressById}
+              assigneesById={assigneesById}
+              dateRangeById={dateRangeById}
+              statusLabelById={statusLabelById}
+              selectedId={selectedId}
+              criticalIds={critical}
+              showCriticalPath={showCriticalPath}
+              showDependencies={showDependencies}
+              drag={drag}
+              dragLabel={dragLabel}
+              onPointerDownBar={beginDrag}
+              onSelectBar={(id) => {
+                // A pan ends in a click too, and selecting a task because
+                // someone dragged the canvas past it would be a surprise.
+                if (!movedRef.current && !panes.isPanningRef.current) select(id);
+              }}
+            />
+          </div>
         </div>
       </div>
 

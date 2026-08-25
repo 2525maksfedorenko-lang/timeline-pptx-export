@@ -21,6 +21,9 @@ interface TaskListRowProps {
   onSelect: () => void;
   onToggleCollapse: () => void;
   onCycleStatus: () => void;
+  /** Narrow the plan to this row's sub-tasks. Only ever called from a group's
+   * count badge, which is the one row element that names them. */
+  onOpenFocus: () => void;
 }
 
 /** The drag-to-reorder grip: a 2×3 grid of 3px dots.
@@ -68,6 +71,7 @@ export function TaskListRow({
   onSelect,
   onToggleCollapse,
   onCycleStatus,
+  onOpenFocus,
 }: TaskListRowProps) {
   const { item, depth, isGroup, childCount, status } = row;
   const blocked = status === 'blocked';
@@ -231,9 +235,19 @@ export function TaskListRow({
         {progress}%
       </span>
 
+      {/* The count badge is also the way into those sub-tasks: it is the one
+          thing on the row that already names them, so it carries the click
+          rather than a second control appearing beside it. */}
       {isGroup && (
-        <span
-          title={`${childCount} sub-tasks`}
+        <button
+          type="button"
+          className="gantt-subcount"
+          onClick={(event) => {
+            event.stopPropagation();
+            onOpenFocus();
+          }}
+          title={`Show only these ${childCount} sub-tasks`}
+          aria-label={`Show only the ${childCount} sub-tasks of ${item.label}`}
           style={{
             display: 'inline-flex',
             alignItems: 'center',
@@ -242,16 +256,18 @@ export function TaskListRow({
             minWidth: 18,
             height: 17,
             padding: '0 6px',
+            border: 'none',
             borderRadius: 999,
             background: 'var(--gantt-subcount-bg)',
             color: 'var(--gantt-surface)',
             fontSize: 10,
             fontWeight: 600,
+            cursor: 'pointer',
           }}
         >
           <Layers size={10} strokeWidth={2.4} aria-hidden="true" />
           {childCount}
-        </span>
+        </button>
       )}
 
       {showsCriticalBadge && (

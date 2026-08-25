@@ -17,6 +17,7 @@ interface TaskListProps {
   onCycleStatus: (id: string) => void;
   onRename: (id: string, name: string) => void;
   onAddTask: (name: string) => void;
+  onOpenFocus: (id: string) => void;
   /** The body's content height. The two panes scroll on one offset, so the
    * list has to be exactly as tall as the canvas beside it — otherwise the
    * offset that puts the last bar at the foot of the timeline puts the last
@@ -46,6 +47,7 @@ export function TaskList({
   onCycleStatus,
   onRename,
   onAddTask,
+  onOpenFocus,
   minHeight,
 }: TaskListProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -106,6 +108,7 @@ export function TaskList({
           onSelect={() => onSelect(row.item.id)}
           onToggleCollapse={() => onToggleCollapse(row.item.id)}
           onCycleStatus={() => onCycleStatus(row.item.id)}
+          onOpenFocus={() => onOpenFocus(row.item.id)}
         />
       ))}
 

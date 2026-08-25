@@ -32,6 +32,13 @@ interface GanttViewStore {
   selectedId: string | null;
   select: (id: string | null) => void;
 
+  /** The parent whose sub-tasks the plan is narrowed to, or null for the
+   * whole plan. A way of looking at the current plan and nothing more — no
+   * second plan is created, and leaving the focus leaves the plan exactly as
+   * it was. */
+  focusId: string | null;
+  setFocus: (id: string | null) => void;
+
   showCriticalPath: boolean;
   setShowCriticalPath: (value: boolean) => void;
 
@@ -63,6 +70,11 @@ export const useGanttViewStore = create<GanttViewStore>()((set) => ({
 
   selectedId: null,
   select: (selectedId) => set({ selectedId }),
+
+  focusId: null,
+  // Entering a focus closes the Edit Task panel: the row it was open on is
+  // usually the parent, which is the one row the focused view does not draw.
+  setFocus: (focusId) => set({ focusId, selectedId: null }),
 
   showCriticalPath: false,
   setShowCriticalPath: (showCriticalPath) => set({ showCriticalPath }),

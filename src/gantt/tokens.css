@@ -156,3 +156,15 @@
   background: var(--gantt-handle-hover);
   box-shadow: inset -2px 0 0 var(--gantt-handle-hover-inset);
 }
+
+/* The sub-task count badge, which is a button (it opens the focused view of
+ * the branch it counts). Hover darkens the slate one step — to --gantt-text,
+ * a value already transcribed above, so the hover state introduces no colour
+ * of its own. Colour only: nothing about the badge moves. */
+.gantt-subcount {
+  transition: background-color 150ms;
+}
+
+.gantt-subcount:hover {
+  background: var(--gantt-text);
+}
