@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, Layers } from 'lucide-react';
+import { ChevronDown, ChevronRight, Layers, Plus } from 'lucide-react';
 import { rowPaddingLeft, ROW_HEIGHT_PX } from './geometry';
 import type { GanttRowModel } from './rows';
 import { STATUS_LABEL } from './tone';
@@ -6,12 +6,8 @@ import { StatusIcon } from './StatusIcon';
 
 interface TaskListRowProps {
   row: GanttRowModel;
-  /** The row's own percentage, or a group's roll-up. */
-  progress: number;
   isSelected: boolean;
   isCollapsed: boolean;
-  /** On the critical path *and* the toolbar's switch is on. */
-  showsCriticalBadge: boolean;
   isEditing: boolean;
   editText: string;
   onEditTextChange: (value: string) => void;
@@ -21,6 +17,13 @@ interface TaskListRowProps {
   onSelect: () => void;
   onToggleCollapse: () => void;
   onCycleStatus: () => void;
+  /** Lift this row and everything under it out into a plan of its own. Only
+   * ever called from a group's count badge, which is the one row element that
+   * names the sub-tasks it would take with it. */
+  onMakePlan: () => void;
+  /** Create a sub-task under this row and start renaming it. */
+  onAddSubtask: () => void;
+  onContextMenu: (event: React.MouseEvent) => void;
 }
 
 /** The drag-to-reorder grip: a 2×3 grid of 3px dots.
@@ -46,8 +49,7 @@ function DragGrip() {
   );
 }
 
-/** One line of the task list: what the row is, who has to act on it, and how
- * far along it is — in that order, left to right.
+/** One line of the task list: what the row is, and what can be done to it.
  *
  * A group starts hard against the column's edge because its caret occupies
  * that space; a task starts where the caret would have ended. A task's name
@@ -55,10 +57,8 @@ function DragGrip() {
  * is plain text one step larger. */
 export function TaskListRow({
   row,
-  progress,
   isSelected,
   isCollapsed,
-  showsCriticalBadge,
   isEditing,
   editText,
   onEditTextChange,
@@ -68,6 +68,9 @@ export function TaskListRow({
   onSelect,
   onToggleCollapse,
   onCycleStatus,
+  onMakePlan,
+  onAddSubtask,
+  onContextMenu,
 }: TaskListRowProps) {
   const { item, depth, isGroup, childCount, status } = row;
   const blocked = status === 'blocked';
@@ -104,6 +107,8 @@ export function TaskListRow({
   return (
     <div
       onClick={onSelect}
+      onContextMenu={onContextMenu}
+      className="gantt-row"
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -178,6 +183,11 @@ export function TaskListRow({
           type="text"
           value={editText}
           autoFocus
+          // Selected, not just focused: a row that was created a moment ago
+          // opens this field on a placeholder name, and typing has to replace
+          // it rather than run on the end of it. A rename works the same way,
+          // which is what an inline rename does everywhere else.
+          onFocus={(event) => event.target.select()}
           onClick={(event) => event.stopPropagation()}
           onChange={(event) => onEditTextChange(event.target.value)}
           onKeyDown={(event) => {
@@ -213,27 +223,21 @@ export function TaskListRow({
         </span>
       )}
 
-      <span
-        title={isGroup ? 'Rolled up from sub-tasks' : 'Percent complete'}
-        style={{
-          flex: 'none',
-          fontSize: 11,
-          fontWeight: 600,
-          fontVariantNumeric: 'tabular-nums',
-          color:
-            progress === 100
-              ? 'var(--gantt-pct-complete)'
-              : progress > 0
-                ? 'var(--gantt-pct-started)'
-                : 'var(--gantt-pct-zero)',
-        }}
-      >
-        {progress}%
-      </span>
-
+      {/* The count badge is also the way to lift this branch out into a plan
+          of its own: it is the one thing on the row that already names the
+          sub-tasks that would come along, so it carries the click rather than
+          a second control appearing beside it. Looking at the branch without
+          copying it is the context menu's "Show only sub-tasks". */}
       {isGroup && (
-        <span
-          title={`${childCount} sub-tasks`}
+        <button
+          type="button"
+          className="gantt-subcount"
+          onClick={(event) => {
+            event.stopPropagation();
+            onMakePlan();
+          }}
+          title="Make a separate plan from this branch"
+          aria-label={`Make a separate plan from ${item.label} and everything under it`}
           style={{
             display: 'inline-flex',
             alignItems: 'center',
@@ -242,38 +246,49 @@ export function TaskListRow({
             minWidth: 18,
             height: 17,
             padding: '0 6px',
+            border: 'none',
             borderRadius: 999,
             background: 'var(--gantt-subcount-bg)',
             color: 'var(--gantt-surface)',
             fontSize: 10,
             fontWeight: 600,
+            cursor: 'pointer',
           }}
         >
           <Layers size={10} strokeWidth={2.4} aria-hidden="true" />
           {childCount}
-        </span>
+        </button>
       )}
 
-      {showsCriticalBadge && (
-        <span
-          title="On the critical path"
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            flex: 'none',
-            height: 15,
-            padding: '0 4px',
-            borderRadius: 3,
-            background: 'var(--gantt-cp-bg)',
-            color: 'var(--gantt-cp-fg)',
-            fontSize: 8.5,
-            fontWeight: 800,
-            letterSpacing: '.06em',
-          }}
-        >
-          CP
-        </span>
-      )}
+      {/* Any row can take a sub-task — a task with one is simply a group from
+          then on — so the control is on every row rather than on the groups
+          that already have children. Out of the way until the pointer is on
+          the row: at rest the column is names, not controls. */}
+      <button
+        type="button"
+        className="gantt-row-add"
+        onClick={(event) => {
+          event.stopPropagation();
+          onAddSubtask();
+        }}
+        title="Add sub-task"
+        aria-label={`Add a sub-task under ${item.label}`}
+        style={{
+          width: 18,
+          height: 18,
+          flex: 'none',
+          border: 'none',
+          borderRadius: 4,
+          background: 'transparent',
+          padding: 0,
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Plus size={14} strokeWidth={2.2} aria-hidden="true" />
+      </button>
     </div>
   );
 }

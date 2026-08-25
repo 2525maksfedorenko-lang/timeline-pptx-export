@@ -2,7 +2,6 @@ import { jsPDF } from 'jspdf';
 import type { TextOptionsLight } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import type { ExportOptions } from '../store/timelineStore';
-import type { Person } from '../store/peopleStore';
 import type { TaskComment, TimelineItem } from '../types/timeline';
 import { sortItemsForExport } from '../utils/sortItemsForExport';
 import {
@@ -25,8 +24,6 @@ import { orderExportSlides } from './slideOrder';
 import { COLORS, FOOTER_TEXT, PDF_FONT_FACE, PDF_MONO_FONT_FACE, withHash } from './theme';
 import { measureLetterSpacingWidthIn, measureTextWidthIn } from './textMetrics';
 import {
-  ASSIGNEE_SWATCH_GAP_IN,
-  ASSIGNEE_SWATCH_SIZE_IN,
   BACK_LINK_FONT_SIZE_PT,
   BACK_LINK_HEIGHT_IN,
   BACK_LINK_TEXT,
@@ -34,7 +31,6 @@ import {
   BACK_LINK_Y_IN,
   BAR_HEIGHT_IN,
   BAR_LABEL_FONT_SIZE_PT,
-  BAR_PROGRESS_FONT_SIZE_PT,
   BAR_RADIUS_IN,
   BAR_STATUS_FONT_SIZE_PT,
   AXIS_MONTH_FONT_SIZE_PT,
@@ -53,7 +49,6 @@ import {
   DASHBOARD_TABLE_TOP_IN,
   DASHBOARD_TABLE_WIDTH_IN,
   STATUS_RIGHT_PADDING_IN,
-  DEPENDENCY_LINE_WIDTH_PT,
   FOOTER_HEIGHT_IN,
   GROUP_HEADER_HEIGHT_IN,
   HEADER_HEIGHT_IN,
@@ -75,9 +70,6 @@ import {
   STATUS_CHIP_BORDER_WIDTH_PT,
   DATE_LETTER_SPACING_EM,
   letterSpacingPt,
-  TAG_PILL_FONT_SIZE_PT,
-  TAG_PILL_HEIGHT_IN,
-  TAG_PILL_RADIUS_IN,
 } from './slideLayout';
 import { DATE_GRID_LEVELS, DATE_GRID_STYLES } from './dateGrid';
 
@@ -209,16 +201,10 @@ function drawOmittedNote(doc: jsPDF, note: string | null) {
 /** Painted strictly back to front, because jsPDF has no z-index — draw order
  * *is* z-order:
  *   1. the three date-grid densities (palest first)
- *   2. the dependency connectors
- *   3. the bar tracks and fills, over the connectors — the same order the
- *      on-screen chart uses (connectors z-1, bars z-10; see GanttChart), so
- *      a line passing a row it has no business in disappears behind that
- *      row's bar instead of being drawn across it. The connectors are
- *      anchored on bar edges besides (see buildDependencyConnectors), so
- *      what this hides is incidental crossings, not their own endpoints.
- *   4. every piece of text, over both, so nothing can cut through a label,
- *      percentage or status
- * Splitting the bars into a shapes pass and a text pass is what buys step 4;
+ *   2. the bars, over the grid
+ *   3. every piece of text, over both, so nothing can cut through a label or
+ *      a status
+ * Splitting the bars into a shapes pass and a text pass is what buys step 3;
  * drawing each bar's shapes and text together would put the first bars' text
  * under the later bars again. Mirrors pptxExporter.ts's identical ordering. */
 function drawOverviewSlide(doc: jsPDF, model: OverviewSlideModel, links: SlideLinks) {
@@ -274,25 +260,10 @@ function drawOverviewSlide(doc: jsPDF, model: OverviewSlideModel, links: SlideLi
     });
   }
 
-  if (model.dependencyConnectors.length > 0) {
-    doc.setDrawColor(withHash(COLORS.dependencyLine));
-    doc.setLineWidth(DEPENDENCY_LINE_WIDTH_PT * PT_TO_IN);
-
-    model.dependencyConnectors.forEach((connector) => {
-      connector.segments.forEach((segment) => {
-        doc.line(segment.x1, segment.y1, segment.x2, segment.y2);
-      });
-    });
-  }
-
+  // One solid rectangle per task, spanning the days it runs.
   model.bars.forEach((bar) => {
-    doc.setFillColor(withHash(COLORS.border));
-    doc.roundedRect(bar.barX, bar.barY, bar.trackWidth, bar.barHeight, BAR_RADIUS_IN, BAR_RADIUS_IN, 'F');
-
-    if (bar.fillWidth > 0) {
-      doc.setFillColor(withHash(bar.color));
-      doc.roundedRect(bar.barX, bar.barY, bar.fillWidth, bar.barHeight, BAR_RADIUS_IN, BAR_RADIUS_IN, 'F');
-    }
+    doc.setFillColor(withHash(bar.color));
+    doc.roundedRect(bar.barX, bar.barY, bar.barWidth, bar.barHeight, BAR_RADIUS_IN, BAR_RADIUS_IN, 'F');
   });
 
   // Month captions at the axis's normal size, week captions a notch smaller
@@ -324,18 +295,7 @@ function drawOverviewSlide(doc: jsPDF, model: OverviewSlideModel, links: SlideLi
     // the gap (which would also swallow clicks on the empty gutter).
     const detailPage = links.detailSlideNumberByTaskId.get(bar.id);
     linkToPage(doc, detailPage, bar.labelX, bar.y, bar.labelWidth, BAR_HEIGHT_IN);
-    linkToPage(doc, detailPage, bar.barX, bar.y, bar.trackWidth, BAR_HEIGHT_IN);
-
-    // Progress rides on the bar itself: centered in the fill when it fits
-    // there, otherwise just past the fill on the gray track (see
-    // timelineExportModel for the measured fit).
-    doc.setFont(PDF_FONT_FACE, 'bold');
-    doc.setFontSize(BAR_PROGRESS_FONT_SIZE_PT);
-    doc.setTextColor(withHash(bar.progressColor));
-    drawText(doc, bar.progressText, bar.progressX + (bar.progressInsideFill ? bar.progressWidth / 2 : 0), centerY, {
-      baseline: 'middle',
-      align: bar.progressInsideFill ? 'center' : 'left',
-    });
+    linkToPage(doc, detailPage, bar.barX, bar.y, bar.barWidth, BAR_HEIGHT_IN);
 
     // The name sits in the Task column, at the same x on every row — it no
     // longer tracks the bar. The model has already truncated it to the column's
@@ -344,27 +304,6 @@ function drawOverviewSlide(doc: jsPDF, model: OverviewSlideModel, links: SlideLi
     doc.setFontSize(BAR_LABEL_FONT_SIZE_PT);
     doc.setTextColor(withHash(COLORS.navy));
     drawText(doc, bar.label, bar.labelX, centerY, { baseline: 'middle' });
-
-    // Mini gray pills for item.tags, right after the label (which the model
-    // has already truncated to leave room for them) — same mini-pill
-    // pattern as the bar/track itself (a filled roundedRect), just much
-    // smaller, with the tag text centered on top.
-    bar.tags.forEach((tag) => {
-      doc.setFillColor(withHash(COLORS.border));
-      doc.roundedRect(
-        tag.x,
-        bar.y + (BAR_HEIGHT_IN - TAG_PILL_HEIGHT_IN) / 2,
-        tag.width,
-        TAG_PILL_HEIGHT_IN,
-        TAG_PILL_RADIUS_IN,
-        TAG_PILL_RADIUS_IN,
-        'F',
-      );
-      doc.setFont(PDF_FONT_FACE, 'bold');
-      doc.setFontSize(TAG_PILL_FONT_SIZE_PT);
-      doc.setTextColor(withHash(COLORS.navy));
-      drawText(doc, tag.text, tag.x + tag.width / 2, centerY, { baseline: 'middle', align: 'center' });
-    });
 
     // The status chip in the Status column: the app's own chip — pale surface,
     // hairline border, dark text, lowercase — and no dropdown chevron, which
@@ -404,7 +343,7 @@ function drawOverviewSlide(doc: jsPDF, model: OverviewSlideModel, links: SlideLi
     }
 
     if (bar.chevronRight) {
-      drawText(doc, '▶', bar.barX + bar.trackWidth - CHEVRON_WIDTH_IN, centerY, {
+      drawText(doc, '▶', bar.barX + bar.barWidth - CHEVRON_WIDTH_IN, centerY, {
         baseline: 'middle',
         align: 'left',
       });
@@ -562,9 +501,9 @@ function drawDetailSlide(doc: jsPDF, model: DetailSlideModel, links: SlideLinks)
     }
 
     section.subtasks.forEach((row) => {
-      // Four typographic tiers on one line, each drawn at an x the model
+      // Three typographic tiers on one line, each drawn at an x the model
       // resolved against the face and size used here (see SubtaskRowModel):
-      // bold task name, monospace dates, plain progress, tracked-out status.
+      // bold task name, monospace dates, tracked-out status.
       const centerY = rowCenterY(row.y, LIST_ROW_HEIGHT_IN);
 
       doc.setFont(PDF_FONT_FACE, 'bold');
@@ -584,11 +523,6 @@ function drawDetailSlide(doc: jsPDF, model: DetailSlideModel, links: SlideLinks)
         { baseline: 'middle' },
       );
 
-      doc.setFont(PDF_FONT_FACE, 'normal');
-      doc.setFontSize(SUBTASK_TEXT_FONT_SIZE_PT);
-      doc.setTextColor(withHash(COLORS.navy));
-      drawText(doc, row.progressText, row.progressX, centerY, { baseline: 'middle' });
-
       doc.setFont(PDF_FONT_FACE, 'bold');
       doc.setFontSize(SUBTASK_STATUS_FONT_SIZE_PT);
       doc.setTextColor(withHash(row.statusColor));
@@ -601,34 +535,6 @@ function drawDetailSlide(doc: jsPDF, model: DetailSlideModel, links: SlideLinks)
         { baseline: 'middle', align: 'right' },
       );
     });
-
-    if (section.assigneeText !== undefined && section.assigneeY !== undefined) {
-      // Swatch only when there's an actual person color to show (i.e. not
-      // the "No assignee" placeholder) — text starts right after it instead
-      // of at the row's usual left edge.
-      const textX = section.assigneeColor
-        ? CONTENT_X_IN + ASSIGNEE_SWATCH_SIZE_IN + ASSIGNEE_SWATCH_GAP_IN
-        : CONTENT_X_IN;
-
-      if (section.assigneeColor) {
-        doc.setFillColor(withHash(section.assigneeColor));
-        doc.circle(
-          CONTENT_X_IN + ASSIGNEE_SWATCH_SIZE_IN / 2,
-          section.assigneeY + LIST_ROW_HEIGHT_IN / 2,
-          ASSIGNEE_SWATCH_SIZE_IN / 2,
-          'F',
-        );
-      }
-
-      // Centered on the same line the swatch above is centered on — that
-      // pairing is the whole reason this line can't be top-aligned.
-      doc.setFont(PDF_FONT_FACE, 'bold');
-      doc.setFontSize(12);
-      doc.setTextColor(withHash(section.assigneeMuted ? COLORS.mutedText : COLORS.navy));
-      drawText(doc, section.assigneeText, textX, rowCenterY(section.assigneeY, LIST_ROW_HEIGHT_IN), {
-        baseline: 'middle',
-      });
-    }
 
     if (section.commentsHeadingY !== undefined) {
       doc.setFont(PDF_FONT_FACE, 'bold');
@@ -829,7 +735,6 @@ export async function exportTimelineToPdf(
   items: TimelineItem[],
   exportOptions: ExportOptions,
   comments: TaskComment[],
-  people: Person[],
   fileName: string = 'timeline-export.pdf',
   exportMode: ExportMode = 'compact',
 ): Promise<void> {
@@ -837,10 +742,8 @@ export async function exportTimelineToPdf(
   const slides = buildExportSlides(
     sortedItems,
     comments,
-    people,
     exportOptions.commentMode,
     exportOptions.exportTimeframe,
-    exportOptions.showDependencies,
     exportMode,
   );
   const dashboardSlides = buildDashboardSlides(sortedItems, new Date());

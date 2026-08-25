@@ -101,14 +101,7 @@ export const ROW_GAP_IN = 0.04;
 export const BAR_HEIGHT_IN = 0.28;
 export const BAR_RADIUS_IN = 0.05;
 export const BAR_LABEL_PADDING_IN = 0.06;
-// Progress text ("70%") drawn on the bar: centered inside the filled part
-// when that part measurably fits it, otherwise immediately after the fill,
-// on the gray track. The font size lives here rather than in the exporters
-// because the layout math has to measure the text at exactly the size both
-// engines then draw it at.
-export const BAR_PROGRESS_FONT_SIZE_PT = 9;
-export const BAR_PROGRESS_PADDING_IN = 0.05;
-// Same reasoning as BAR_PROGRESS_FONT_SIZE_PT: the label and status sizes
+// The label and status sizes
 // live here so the model can measure a bar's label/status text at exactly
 // the size both engines draw it at, to reserve the status's own width out of
 // the label's box instead of the two overlapping (see truncateToWidth in
@@ -283,34 +276,6 @@ export const SUBTASK_META_STATUS_GAP_IN = 0.05;
 // the dashes would just be noise.
 export const SUBTASK_META_GAP_IN = 0.09;
 
-// An overview bar's tag pills (item.tags — see TimelineItem) sit right
-// after its label, in the rest of the Task column: mini gray pills, small
-// enough not to compete with the name for attention. They take the width the
-// name does not want rather than reserving their own out of it — the name is
-// the last thing on the row to give way, and the pills are what compresses
-// first (see buildOverviewSlides in timelineExportModel.ts).
-//
-// They run at the bottom rung of the slide's type scale, one step under the
-// status text and four under the name they sit beside — the same rung the
-// week-level date captions use, which is the tier this deck reserves for
-// reference detail. At 8pt, set bold in a filled pill, they carried as much
-// weight on the row as the 11pt name did, and a tag is a qualifier: it should
-// be legible when looked for and quiet when not.
-//
-// The pill's own padding and height are held in em of its own type rather than
-// in inches, so "proportional to the size" is a property of the definition
-// instead of an arithmetic step someone has to remember to repeat. The two
-// em figures are exactly what the old inch values were at the old 8pt
-// (0.04in = 0.36em, 0.16in = 1.44em), so the pill's proportions are unchanged
-// — it is the same chip, drawn one size down.
-export const TAG_PILL_FONT_SIZE_PT = AXIS_WEEK_FONT_SIZE_PT;
-const TAG_PILL_PADDING_EM = 0.36;
-const TAG_PILL_HEIGHT_EM = 1.44;
-export const TAG_PILL_PADDING_IN = (TAG_PILL_FONT_SIZE_PT * TAG_PILL_PADDING_EM) / 72;
-export const TAG_PILL_HEIGHT_IN = (TAG_PILL_FONT_SIZE_PT * TAG_PILL_HEIGHT_EM) / 72;
-export const TAG_PILL_RADIUS_IN = 0.03;
-export const TAG_PILL_GAP_IN = 0.05;
-export const LABEL_TAG_GAP_IN = 0.08;
 // The whole subtask block's inset from a detail slide's content edge: what
 // separates the rows from the section title above them, before any nesting is
 // taken into account. Every row gets it whatever its depth — the levels are
@@ -340,7 +305,7 @@ export function subtaskRowIndent(depth: number): number {
 export const BAR_LABEL_ZONE_MIN_IN = 2.6;
 // Smallest a track is ever drawn, even for a same-day task or one clipped
 // almost entirely out of an export timeframe window.
-export const MIN_TRACK_WIDTH_IN = 0.15;
+export const MIN_BAR_WIDTH_IN = 0.15;
 
 // Per-row vertical pitch on the overview slide = bar height + gap to the
 // next bar. = 0.28 + 0.04 = 0.32in
@@ -351,16 +316,6 @@ export const ROW_HEIGHT_IN = BAR_HEIGHT_IN + ROW_GAP_IN;
 // on-screen chart, so both their colors and their stroke widths live in one
 // table next to the geometry that produces them — see DATE_GRID_STYLES in
 // dateGrid.ts.
-
-// Dependency connector: a bracket line ("┐" + "└", no arrowhead) from a
-// predecessor bar's right edge to the nearest reachable edge of the
-// successor's bar — a short stub out, down/up, then back in to that edge,
-// stopping at it rather than continuing into the bar. Drawn under the bars
-// in both exporters, as on screen. DEPENDENCY_JOG_IN is how far clear of a
-// bar's edge the vertical leg runs; see buildDependencyConnectors for which
-// edge each end lands on.
-export const DEPENDENCY_LINE_WIDTH_PT = 0.75;
-export const DEPENDENCY_JOG_IN = 0.06;
 
 // Small heading-weight row, reused for the overview slide's date-scale axis
 // row. = 0.22 + 0.04 = 0.26in
@@ -390,12 +345,6 @@ export const SECTION_GAP_IN = 0.2;
 // parent's block when several are packed onto the same appendix slide.
 export const PARENT_SECTION_GAP_IN = 0.3;
 
-// Small color swatch drawn before "Assigned to: <name>" on a detail slide,
-// vertically centered within the assignee row (LIST_ROW_HEIGHT_IN) — see
-// assigneeColor in timelineExportModel.ts.
-export const ASSIGNEE_SWATCH_SIZE_IN = 0.1;
-export const ASSIGNEE_SWATCH_GAP_IN = 0.08;
-
 // Body text of a comment's paragraphs and list items. Lives here rather
 // than in each exporter because the model measures wrapped line counts
 // against it (estimateBlockHeight) at exactly the size both engines then
@@ -403,13 +352,11 @@ export const ASSIGNEE_SWATCH_GAP_IN = 0.08;
 // drift apart.
 export const COMMENT_BODY_FONT_SIZE_PT = 12;
 
-// Every single-line row on a detail slide (subtask rows, the assignee line,
-// the section headings) is drawn vertically centered in its own row box
-// rather than hung from the box's top: the pieces sharing one line are drawn
-// at four different sizes, and a shared top edge puts four different
-// baselines on what should read as one line. Centering is also what keeps a
-// row's text aligned with the graphics beside it — the assignee swatch is
-// centered in the same box.
+// Every single-line row on a detail slide (subtask rows, the section
+// headings) is drawn vertically centered in its own row box rather than hung
+// from the box's top: the pieces sharing one line are drawn at three
+// different sizes, and a shared top edge puts three different baselines on
+// what should read as one line.
 //
 // In pptxgenjs that's `valign: 'middle'` on a box of the row's height; in
 // jsPDF, `baseline: 'middle'` at the row's center Y, which this helper

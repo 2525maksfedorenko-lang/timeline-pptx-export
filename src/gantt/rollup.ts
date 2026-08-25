@@ -10,10 +10,10 @@ import { dayIndexOf } from './scale';
  * handoff's three roll-ups.
  *
  * Consequence worth knowing: a parent item in this app *does* carry its own
- * start/end/status/progress, and the export slides still read them. On screen
- * those four are ignored in favour of the roll-up, which is the handoff's
- * rule. A parent whose stored dates disagree with its children's extent
- * therefore draws one span here and another on the slide.
+ * start/end/status, and the export slides still read them. On screen those
+ * are ignored in favour of the roll-up, which is the handoff's rule. A parent
+ * whose stored dates disagree with its children's extent therefore draws one
+ * span here and another on the slide.
  */
 
 /** Direct children of `id`, in list order. */
@@ -52,27 +52,6 @@ export function spanOf(items: TimelineItem[], item: TimelineItem, minDate: Date)
   const start = Math.min(...spans.map((span) => span.start));
   const end = Math.max(...spans.map((span) => span.start + span.len));
   return { start, len: end - start };
-}
-
-/** A group's percentage: its children's, weighted by how long each one runs,
- * so a two-week task at 50% moves the number twice as far as a one-week task
- * at 50%. Leaves report their own. */
-export function progressOf(items: TimelineItem[], item: TimelineItem, minDate: Date): number {
-  const children = childrenOf(items, item.id);
-  if (children.length === 0) return item.progress ?? 0;
-
-  const weighted = children.reduce(
-    (totals, child) => {
-      const { len } = spanOf(items, child, minDate);
-      return {
-        days: totals.days + len,
-        points: totals.points + len * progressOf(items, child, minDate),
-      };
-    },
-    { days: 0, points: 0 },
-  );
-
-  return Math.round(weighted.points / (weighted.days || 1));
 }
 
 /** A group's status, in the handoff's order of precedence: one blocked child

@@ -1,6 +1,7 @@
 import { openDB, type IDBPDatabase } from 'idb';
 import type { TimelineItem } from '../types/timeline';
 import { normalizePlanItems } from '../utils/normalizePlanItems';
+import { repairNotice, type PlanNotice } from '../utils/planNotice';
 import type { ExportOptions } from './timelineStore';
 
 export interface SavedPlan {
@@ -42,7 +43,7 @@ export interface LoadedPlans {
    * normalizePlanItems. Kept per plan rather than pooled because only the
    * plan actually on screen is worth telling anyone about, and which one that
    * is isn't decided here. */
-  noticesByPlanId: Record<string, string[]>;
+  noticesByPlanId: Record<string, PlanNotice>;
 }
 
 export async function getAllPlans(): Promise<LoadedPlans> {
@@ -61,10 +62,10 @@ export async function getAllPlans(): Promise<LoadedPlans> {
   // What the repair changed is returned rather than swallowed: an import says
   // so in its dialog, and a reload has to say so too, or the person meets a
   // plan that sorts differently than they left it with no way to find out why.
-  const noticesByPlanId: Record<string, string[]> = {};
+  const noticesByPlanId: Record<string, PlanNotice> = {};
   const plans = stored.map((plan) => {
     const { items, warnings } = normalizePlanItems(plan.items);
-    if (warnings.length > 0) noticesByPlanId[plan.id] = warnings;
+    if (warnings.length > 0) noticesByPlanId[plan.id] = repairNotice(warnings);
     return { ...plan, items };
   });
 

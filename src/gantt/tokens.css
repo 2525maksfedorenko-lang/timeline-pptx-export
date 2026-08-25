@@ -38,7 +38,7 @@
   --gantt-text: #334155;
   --gantt-text-secondary: #64748b;
   --gantt-text-muted: #94a3b8;
-  --gantt-text-faint: #cbd5e1;                  /* drag dots, todo icon, links */
+  --gantt-text-faint: #cbd5e1;                  /* drag dots, todo icon */
 
   /* Status tones: bar fill, on-bar label, progress overlay + status icon. */
   --gantt-done-bg: #dcfce7;
@@ -62,15 +62,8 @@
   --gantt-pill-bg-blocked: #fef6f6;
   --gantt-edit-focus: #60a5fa;
 
-  /* Percent complete */
-  --gantt-pct-complete: #16a34a;
-  --gantt-pct-started: #64748b;
-  --gantt-pct-zero: #cbd5e1;
-
   /* Badges */
   --gantt-subcount-bg: #475569;
-  --gantt-cp-bg: #fee2e2;
-  --gantt-cp-fg: #b91c1c;
 
   /* Timeline overlays */
   --gantt-today-fill: rgba(254, 240, 138, 0.35);
@@ -90,20 +83,6 @@
   --gantt-handle-hover-inset: rgba(15, 23, 42, 0.35);
   --gantt-drag-pill-bg: #334155;
   --gantt-drag-pill-fg: hsl(var(--card));
-
-  /* Connectors */
-  --gantt-link: #cbd5e1;
-  --gantt-link-critical: #ef4444;
-
-  /* The six-person avatar palette. Assigned by position, so a name keeps its
-   * colour across every bar it appears on. */
-  --gantt-avatar-1: #2563eb;
-  --gantt-avatar-2: #7c3aed;
-  --gantt-avatar-3: #059669;
-  --gantt-avatar-4: #d97706;
-  --gantt-avatar-5: #db2777;
-  --gantt-avatar-6: #0891b2;
-  --gantt-avatar-ring: hsl(var(--card));
 
   /* Comments */
   --gantt-comment-avatar: #475569;
@@ -155,4 +134,35 @@
 .gantt-handle-right:hover {
   background: var(--gantt-handle-hover);
   box-shadow: inset -2px 0 0 var(--gantt-handle-hover-inset);
+}
+
+/* The sub-task count badge, which is a button (it opens the focused view of
+ * the branch it counts). Hover darkens the slate one step — to --gantt-text,
+ * a value already transcribed above, so the hover state introduces no colour
+ * of its own. Colour only: nothing about the badge moves. */
+.gantt-subcount {
+  transition: background-color 150ms;
+}
+
+.gantt-subcount:hover {
+  background: var(--gantt-text);
+}
+
+/* The row's "add sub-task" control. Present in the layout at all times so a
+ * row does not change width under the pointer; visible only while the row is
+ * hovered or the button itself has keyboard focus, because at rest this
+ * column is names rather than controls. */
+.gantt-row-add {
+  opacity: 0;
+  color: var(--gantt-text-muted);
+  transition: opacity 150ms, color 150ms;
+}
+
+.gantt-row:hover .gantt-row-add,
+.gantt-row-add:focus-visible {
+  opacity: 1;
+}
+
+.gantt-row-add:hover {
+  color: var(--gantt-text-secondary);
 }

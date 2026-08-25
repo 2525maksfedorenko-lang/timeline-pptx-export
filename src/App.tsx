@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
-import { Settings, Upload } from 'lucide-react'
 import { GanttScreen } from './gantt/GanttScreen'
 import { GanttToolbar } from './gantt/GanttToolbar'
 import { Dashboard, type DashboardSection } from './components/Dashboard'
 import { SettingsFlyout } from './components/SettingsFlyout'
 import { ExportOverflowModal } from './components/ExportOverflowModal'
 import { ImportModal } from './components/ImportModal'
+import { ExportMenu, type ExportFormat } from './components/ExportMenu'
 import { PlanNotice } from './components/PlanNotice'
 import { exportTimelineToPptx } from './export/pptxExporter'
 import { exportTimelineToPdf } from './export/pdfExporter'
@@ -13,11 +13,9 @@ import { getExportOverviewItems, planOverview, type ExportMode } from './export/
 import { buildExportFilename } from './export/dateScale'
 import { sortItemsForExport } from './utils/sortItemsForExport'
 import { useTimelineStore } from './store/timelineStore'
-import { usePeopleStore } from './store/peopleStore'
 import { buttonBaseClass } from './components/systemUi';
 
 type Tab = 'timeline' | 'dashboard'
-type ExportFormat = 'pptx' | 'pdf'
 
 /** The export the user asked for, held while the overflow modal asks how to
  * handle the tasks that don't fit on one overview slide. */
@@ -42,11 +40,12 @@ function App() {
   const items = useTimelineStore((state) => state.items)
   const exportOptions = useTimelineStore((state) => state.exportOptions)
   const comments = useTimelineStore((state) => state.comments)
-  const people = usePeopleStore((state) => state.people)
-  const loadPeople = usePeopleStore((state) => state.loadPeople)
 
   const [highlightSection] = useState<DashboardSection | null>(readDashboardViewParam)
-  const [activeTab, setActiveTab] = useState<Tab>(highlightSection ? 'dashboard' : 'timeline')
+  // Fixed at startup, not switched: the toolbar no longer offers the two
+  // views. The dashboard is what a deck's QR codes open (?dashboardView=…),
+  // which is the only thing that still selects it.
+  const [activeTab] = useState<Tab>(highlightSection ? 'dashboard' : 'timeline')
   const [overflow, setOverflow] = useState<PendingOverflowExport | null>(null)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isImportOpen, setIsImportOpen] = useState(false)
@@ -55,14 +54,10 @@ function App() {
     void loadPlans()
   }, [loadPlans])
 
-  useEffect(() => {
-    void loadPeople()
-  }, [loadPeople])
-
   const runExport = (format: ExportFormat, exportMode: ExportMode) => {
     const fileName = buildExportFilename(exportOptions.exportTimeframe, format)
     const exportTimeline = format === 'pptx' ? exportTimelineToPptx : exportTimelineToPdf
-    void exportTimeline(items, exportOptions, comments, people, fileName, exportMode)
+    void exportTimeline(items, exportOptions, comments, fileName, exportMode)
   }
 
   // More tasks in the effective date range than fit on one overview slide is a
@@ -92,64 +87,20 @@ function App() {
           live once the screen is the plan. */}
       <GanttToolbar
         showTimelineControls={activeTab === 'timeline'}
+        onOpenSettings={() => setIsSettingsOpen(true)}
         actions={
           <>
+            {/* The two things the app does to a whole plan, both said as the
+                verb. Which file an export produces is a question for the menu
+                behind it, not for the header. */}
             <button
               type="button"
               onClick={() => setIsImportOpen(true)}
-              title="Import a plan"
-              aria-label="Import a plan"
-              className={buttonBaseClass('ghost', 'h-8 w-8 flex-none text-muted-foreground')}
-            >
-              <Upload size={16} strokeWidth={2} aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsSettingsOpen(true)}
-              title="Export settings"
-              aria-label="Export settings"
-              className={buttonBaseClass('ghost', 'h-8 w-8 flex-none text-muted-foreground')}
-            >
-              <Settings size={16} strokeWidth={2} aria-hidden="true" />
-            </button>
-            {/* Two exports, labelled by the file they produce rather than by
-                the verb — the verb is the same for both, and the row has no
-                width to spend saying it twice. */}
-            <button
-              type="button"
-              onClick={() => handleExport('pdf')}
-              title="Export as PDF"
               className={buttonBaseClass('outline', 'h-8 whitespace-nowrap px-3 text-xs font-semibold')}
             >
-              PDF
+              Import
             </button>
-            <button
-              type="button"
-              onClick={() => handleExport('pptx')}
-              title="Export to PowerPoint"
-              className={buttonBaseClass('default', 'h-8 whitespace-nowrap px-3 text-xs font-semibold')}
-            >
-              PPTX
-            </button>
-            <span className="h-5 w-px flex-none bg-border" />
-            {/* The same tray the scale switch uses, so the two read as one
-                kind of control rather than two. */}
-            <div className="bg-muted flex flex-none gap-0.5 rounded-lg p-0.5">
-              {([['timeline', 'Timeline'], ['dashboard', 'Dashboard']] as const).map(([tab, label]) => (
-                <button
-                  key={tab}
-                  type="button"
-                  onClick={() => setActiveTab(tab)}
-                  aria-pressed={activeTab === tab}
-                  className={buttonBaseClass(
-                    activeTab === tab ? 'default' : 'ghost',
-                    'h-7 whitespace-nowrap px-3 text-[11px] font-semibold',
-                  )}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+            <ExportMenu onExport={handleExport} />
           </>
         }
       />

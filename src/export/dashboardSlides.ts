@@ -41,10 +41,6 @@ export interface DashboardTableSlideModel {
 
 export type DashboardSlideModel = DashboardTableSlideModel;
 
-function assigneeText(item: TimelineItem): string {
-  return item.assignee?.name ?? '—';
-}
-
 /** Cuts a table down to the rows that fit on its slide, and counts the rest.
  *
  * Neither engine paginates a table, and the PDF is explicitly stopped from
@@ -131,11 +127,10 @@ export function buildDashboardSlides(items: TimelineItem[], today: Date): Dashbo
     view: 'atrisk',
     noun: 'at-risk task',
     emptyMessage: 'No at-risk tasks.',
-    headers: ['Task', 'End date', 'Assignee'],
+    headers: ['Task', 'End date'],
     rows: getAtRiskTasks(exportableItems).map((item) => [
       item.label,
       formatShortDate(new Date(item.end)),
-      assigneeText(item),
     ]),
     dateColumnIndex: 1,
   });
@@ -145,12 +140,11 @@ export function buildDashboardSlides(items: TimelineItem[], today: Date): Dashbo
     view: 'delayed',
     noun: 'delayed task',
     emptyMessage: 'No delayed tasks.',
-    headers: ['Task', 'End date', 'Days overdue', 'Assignee'],
+    headers: ['Task', 'End date', 'Days overdue'],
     rows: getDelayedTasks(exportableItems, today).map((item) => [
       item.label,
       formatShortDate(new Date(item.end)),
       `${getDaysOverdue(item, today)}`,
-      assigneeText(item),
     ]),
     dateColumnIndex: 1,
   });

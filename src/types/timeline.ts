@@ -44,8 +44,7 @@ const withoutHash = (hex: string) => hex.replace('#', '').toUpperCase();
 
 /** Bar and marker fills, as hex without a leading '#' to match pptxgenjs's
  * expected format (see export/theme.ts's COLORS); prefix with '#' for CSS and
- * jsPDF use. The `solid` step, so the percentage drawn inside a bar clears
- * 4.5:1 against it. */
+ * jsPDF use. The `solid` step, dark enough to carry light text. */
 export const TASK_STATUS_COLORS: Record<TaskStatus, string> = {
   todo: withoutHash(TASK_STATUS_SCALE.todo.solid),
   in_progress: withoutHash(TASK_STATUS_SCALE.in_progress.solid),
@@ -87,9 +86,33 @@ export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
   blocked: 'blocked',
 };
 
-/** Every status, in the order they're offered in a picker — one list, so a
- * new status can't reach some dropdowns and miss others. */
+/** Every status the model can hold, in the order they're offered — one list,
+ * so a new status can't reach some dropdowns and miss others. */
 export const TASK_STATUS_VALUES = Object.keys(TASK_STATUS_LABELS) as TaskStatus[];
+
+/** The statuses a person can *choose*, which is no longer all of them.
+ *
+ * `blocked` is missing deliberately. It remains a value the model carries, the
+ * importer produces and every colour table answers for — a task that arrives
+ * blocked stays blocked, draws blocked, sorts as blocked and counts as at risk
+ * — but nothing in the app sets it any more. That makes it a one-way door: a
+ * blocked task can be moved to another status from the screen and cannot be
+ * moved back. */
+export const SELECTABLE_TASK_STATUS_VALUES: TaskStatus[] = ['todo', 'in_progress', 'done'];
+
+/** What a picker sitting on `current` should offer: the choosable statuses,
+ * plus `current` itself when it is not one of them.
+ *
+ * Without that second half a blocked task's control would be bound to a value
+ * none of its options carry, which renders as an empty box — the task would
+ * look statusless rather than blocked. It is shown, so the picker tells the
+ * truth; it is not added to the list for anything else, so it cannot be
+ * chosen. */
+export function statusOptionsFor(current: TaskStatus): TaskStatus[] {
+  return SELECTABLE_TASK_STATUS_VALUES.includes(current)
+    ? SELECTABLE_TASK_STATUS_VALUES
+    : [...SELECTABLE_TASK_STATUS_VALUES, current];
+}
 
 export function getTaskStatus(item: Pick<TimelineItem, 'status'>): TaskStatus {
   return item.status ?? DEFAULT_TASK_STATUS;
@@ -106,6 +129,12 @@ export interface ExportTimeframe {
 export interface ExportOptions {
   theme: string;
   scale: Timeline['scale'];
+  // Two switches nothing reads any more: progress and dependency connectors
+  // were taken off both the screen and the slides. They stay in the shape
+  // because they are part of the plan *file* — one written by an older build,
+  // by hand or by another tool still carries them, and normalizeExportOptions
+  // still has to answer for a malformed one rather than a plan failing to
+  // open. Nothing sets them; nothing draws from them.
   showProgress: boolean;
   showDependencies: boolean;
   commentMode: 'latest' | 'pinned' | 'all' | 'none';

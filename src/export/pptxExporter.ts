@@ -1,6 +1,5 @@
 import pptxgen from 'pptxgenjs';
 import type { ExportOptions } from '../store/timelineStore';
-import type { Person } from '../store/peopleStore';
 import type { TaskComment, TimelineItem } from '../types/timeline';
 import { sortItemsForExport } from '../utils/sortItemsForExport';
 import {
@@ -22,8 +21,6 @@ import { buildSlideLinks, type SlideLinks } from './slideLinks';
 import { orderExportSlides } from './slideOrder';
 import { COLORS, FOOTER_TEXT, PPTX_FONT_FACE, PPTX_MONO_FONT_FACE } from './theme';
 import {
-  ASSIGNEE_SWATCH_GAP_IN,
-  ASSIGNEE_SWATCH_SIZE_IN,
   BACK_LINK_FONT_SIZE_PT,
   BACK_LINK_HEIGHT_IN,
   BACK_LINK_TEXT,
@@ -31,7 +28,6 @@ import {
   BACK_LINK_Y_IN,
   BAR_HEIGHT_IN,
   BAR_LABEL_FONT_SIZE_PT,
-  BAR_PROGRESS_FONT_SIZE_PT,
   BAR_RADIUS_IN,
   BAR_STATUS_FONT_SIZE_PT,
   AXIS_MONTH_FONT_SIZE_PT,
@@ -48,7 +44,6 @@ import {
   DASHBOARD_TABLE_QR_SIZE_IN,
   DASHBOARD_TABLE_TOP_IN,
   DASHBOARD_TABLE_WIDTH_IN,
-  DEPENDENCY_LINE_WIDTH_PT,
   FOOTER_HEIGHT_IN,
   GROUP_HEADER_HEIGHT_IN,
   HEADER_HEIGHT_IN,
@@ -70,9 +65,6 @@ import {
   STATUS_CHIP_BORDER_WIDTH_PT,
   DATE_LETTER_SPACING_EM,
   letterSpacingPt,
-  TAG_PILL_FONT_SIZE_PT,
-  TAG_PILL_HEIGHT_IN,
-  TAG_PILL_RADIUS_IN,
 } from './slideLayout';
 import { DATE_GRID_STYLES } from './dateGrid';
 
@@ -193,16 +185,10 @@ function drawBackToOverviewLink(slide: PptxSlide, overviewSlideNumber: number | 
 /** Painted strictly back to front, because pptxgenjs has no z-index — shape
  * order *is* z-order:
  *   1. the three date-grid densities (palest first)
- *   2. the dependency connectors
- *   3. the bar tracks and fills, over the connectors — the same order the
- *      on-screen chart uses (connectors z-1, bars z-10; see GanttChart), so
- *      a line passing a row it has no business in disappears behind that
- *      row's bar instead of being drawn across it. The connectors are
- *      anchored on bar edges besides (see buildDependencyConnectors), so
- *      what this hides is incidental crossings, not their own endpoints.
- *   4. every piece of text, over both, so nothing can cut through a label,
- *      percentage or status
- * Splitting the bars into a shapes pass and a text pass is what buys step 4;
+ *   2. the bars, over the grid
+ *   3. every piece of text, over both, so nothing can cut through a label or
+ *      a status
+ * Splitting the bars into a shapes pass and a text pass is what buys step 3;
  * drawing each bar's shapes and text together would put the first bars' text
  * under the later bars again. */
 function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel, links: SlideLinks) {
@@ -281,46 +267,22 @@ function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel, links: S
     });
   }
 
-  model.dependencyConnectors.forEach((connector) => {
-    connector.segments.forEach((segment) => {
-      slide.addShape('line', {
-        x: Math.min(segment.x1, segment.x2),
-        y: Math.min(segment.y1, segment.y2),
-        w: Math.abs(segment.x2 - segment.x1),
-        h: Math.abs(segment.y2 - segment.y1),
-        line: { color: COLORS.dependencyLine, width: DEPENDENCY_LINE_WIDTH_PT },
-      });
-    });
-  });
-
   model.bars.forEach((bar) => {
     // barJump() is called per object rather than shared between the two
     // shapes: pptxgenjs stamps its own `_rId` onto whatever hyperlink object
     // it's handed, so reusing one would leave both shapes rendering the
     // second one's relationship.
+    // One solid rectangle per task, spanning the days it runs.
     slide.addShape('roundRect', {
       x: bar.barX,
       y: bar.barY,
-      w: bar.trackWidth,
+      w: bar.barWidth,
       h: bar.barHeight,
       rectRadius: BAR_RADIUS_IN,
-      fill: { color: COLORS.border },
-      line: { color: COLORS.border },
+      fill: { color: bar.color },
+      line: { color: bar.color },
       ...barJump(bar),
     });
-
-    if (bar.fillWidth > 0) {
-      slide.addShape('roundRect', {
-        x: bar.barX,
-        y: bar.barY,
-        w: bar.fillWidth,
-        h: bar.barHeight,
-        rectRadius: BAR_RADIUS_IN,
-        fill: { color: bar.color },
-        line: { color: bar.color },
-        ...barJump(bar),
-      });
-    }
   });
 
   // Month captions at the axis's normal size, week captions a notch smaller
@@ -346,25 +308,6 @@ function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel, links: S
   });
 
   model.bars.forEach((bar) => {
-    // Progress rides on the bar itself: centered in the fill when it fits
-    // there, otherwise just past the fill on the gray track (see
-    // timelineExportModel for the measured fit). `margin: 0` + `wrap: false`
-    // keep it on one line inside a box sized to the glyphs themselves.
-    slide.addText(bar.progressText, {
-      x: bar.progressX,
-      y: bar.y,
-      w: bar.progressWidth,
-      h: BAR_HEIGHT_IN,
-      fontSize: BAR_PROGRESS_FONT_SIZE_PT,
-      bold: true,
-      color: bar.progressColor,
-      fontFace: PPTX_FONT_FACE,
-      align: bar.progressInsideFill ? 'center' : 'left',
-      valign: 'middle',
-      margin: 0,
-      wrap: false,
-    });
-
     // The name sits in the Task column, at the same x on every row — it no
     // longer tracks the bar at all. The model has already truncated it to the
     // column's width, so `wrap: false` keeps it on the one line that width was
@@ -388,39 +331,6 @@ function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel, links: S
       margin: 0,
       wrap: false,
       ...barJump(bar),
-    });
-
-    // Mini gray pills for item.tags, right after the label (which the model
-    // has already truncated to leave room for them) — same mini-pill
-    // pattern as the bar/track itself (a filled roundRect), just much
-    // smaller, with the tag text centered on top.
-    bar.tags.forEach((tag) => {
-      slide.addShape('roundRect', {
-        x: tag.x,
-        y: bar.y + (BAR_HEIGHT_IN - TAG_PILL_HEIGHT_IN) / 2,
-        w: tag.width,
-        h: TAG_PILL_HEIGHT_IN,
-        rectRadius: TAG_PILL_RADIUS_IN,
-        fill: { color: COLORS.border },
-        line: { color: COLORS.border },
-      });
-      slide.addText(tag.text, {
-        x: tag.x,
-        y: bar.y,
-        w: tag.width,
-        h: BAR_HEIGHT_IN,
-        fontSize: TAG_PILL_FONT_SIZE_PT,
-        bold: true,
-        color: COLORS.navy,
-        fontFace: PPTX_FONT_FACE,
-        align: 'center',
-        valign: 'middle',
-        // Zero inset for the same reason the name above it has one: the box is
-        // the pill, measured to the glyph, and pptxgenjs's default 0.05in would
-        // be a third of a 7pt pill's own padding.
-        margin: 0,
-        wrap: false,
-      });
     });
 
     // The status chip in the Status column: the app's own chip — pale surface,
@@ -470,7 +380,7 @@ function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel, links: S
 
     if (bar.chevronRight) {
       slide.addText('▶', {
-        x: bar.barX + bar.trackWidth - CHEVRON_WIDTH_IN,
+        x: bar.barX + bar.barWidth - CHEVRON_WIDTH_IN,
         y: bar.y,
         w: CHEVRON_WIDTH_IN,
         h: BAR_HEIGHT_IN,
@@ -630,7 +540,7 @@ function drawDetailSlide(slide: PptxSlide, model: DetailSlideModel, links: Slide
 
     section.subtasks.forEach((row) => {
       // Four typographic tiers on one line, each its own textbox at an x the
-      // model resolved: bold task name, monospace dates, plain progress,
+      // model resolved: bold task name, monospace dates,
       // tracked-out status. Four *sizes* on one line is exactly why they're
       // vertically centered rather than top-aligned — a shared top edge puts
       // the four baselines at four different heights, which is what made
@@ -660,15 +570,6 @@ function drawDetailSlide(slide: PptxSlide, model: DetailSlideModel, links: Slide
         wrap: false,
       });
 
-      slide.addText(row.progressText, {
-        ...rowText(SUBTASK_TEXT_FONT_SIZE_PT, LIST_ROW_HEIGHT_IN),
-        x: row.progressX,
-        y: row.y,
-        w: CONTENT_X_IN + CONTENT_WIDTH_IN - row.progressX,
-        color: COLORS.navy,
-        wrap: false,
-      });
-
       slide.addText(row.statusText, {
         ...rowText(SUBTASK_STATUS_FONT_SIZE_PT, LIST_ROW_HEIGHT_IN),
         x: CONTENT_X_IN,
@@ -680,40 +581,6 @@ function drawDetailSlide(slide: PptxSlide, model: DetailSlideModel, links: Slide
         align: 'right',
       });
     });
-
-    if (section.assigneeText !== undefined && section.assigneeY !== undefined) {
-      // Swatch only when there's an actual person color to show (i.e. not
-      // the "No assignee" placeholder) — text starts right after it instead
-      // of at the row's usual left edge.
-      const textX = section.assigneeColor
-        ? CONTENT_X_IN + ASSIGNEE_SWATCH_SIZE_IN + ASSIGNEE_SWATCH_GAP_IN
-        : CONTENT_X_IN;
-      const textW = section.assigneeColor
-        ? CONTENT_WIDTH_IN - ASSIGNEE_SWATCH_SIZE_IN - ASSIGNEE_SWATCH_GAP_IN
-        : CONTENT_WIDTH_IN;
-
-      if (section.assigneeColor) {
-        slide.addShape('ellipse', {
-          x: CONTENT_X_IN,
-          y: section.assigneeY + (LIST_ROW_HEIGHT_IN - ASSIGNEE_SWATCH_SIZE_IN) / 2,
-          w: ASSIGNEE_SWATCH_SIZE_IN,
-          h: ASSIGNEE_SWATCH_SIZE_IN,
-          fill: { color: section.assigneeColor },
-          line: { color: section.assigneeColor },
-        });
-      }
-
-      // Centered in the same row box the swatch above is centered in — that
-      // pairing is the whole reason this line can't be top-aligned.
-      slide.addText(section.assigneeText, {
-        ...rowText(12, LIST_ROW_HEIGHT_IN),
-        x: textX,
-        y: section.assigneeY,
-        w: textW,
-        bold: true,
-        color: section.assigneeMuted ? COLORS.mutedText : COLORS.navy,
-      });
-    }
 
     if (section.commentsHeadingY !== undefined) {
       slide.addText(section.commentsHeadingText ?? 'Comments', {
@@ -931,7 +798,6 @@ export async function exportTimelineToPptx(
   items: TimelineItem[],
   exportOptions: ExportOptions,
   comments: TaskComment[],
-  people: Person[],
   fileName: string = 'timeline-export.pptx',
   exportMode: ExportMode = 'compact',
 ): Promise<void> {
@@ -939,10 +805,8 @@ export async function exportTimelineToPptx(
   const slides = buildExportSlides(
     sortedItems,
     comments,
-    people,
     exportOptions.commentMode,
     exportOptions.exportTimeframe,
-    exportOptions.showDependencies,
     exportMode,
   );
   const dashboardSlides = buildDashboardSlides(sortedItems, new Date());

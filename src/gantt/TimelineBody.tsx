@@ -3,8 +3,7 @@ import { PERIOD_DAYS, type TimeScale } from './scale';
 import type { Span } from './rollup';
 import type { GanttRowModel } from './rows';
 import type { DragState } from './drag';
-import { DependencyArrows } from './DependencyArrows';
-import { TaskBar, type BarAssignee } from './TaskBar';
+import { TaskBar } from './TaskBar';
 
 interface TimelineBodyProps {
   rows: GanttRowModel[];
@@ -16,19 +15,15 @@ interface TimelineBodyProps {
   todayIndex: number;
   /** Column indices that start a Saturday. */
   weekendStarts: number[];
-  progressById: Map<string, number>;
-  assigneesById: Map<string, BarAssignee[]>;
   /** "Aug 17 – Aug 24" per row, for the bar tooltips. */
   dateRangeById: Map<string, string>;
   statusLabelById: Map<string, string>;
   selectedId: string | null;
-  criticalIds: Set<string>;
-  showCriticalPath: boolean;
-  showDependencies: boolean;
   drag: DragState | null;
   /** The pill's text while a drag is in flight, e.g. "Aug 13 → Aug 18  (6d)". */
   dragLabel: string;
   onPointerDownBar: (id: string, event: React.PointerEvent, mode: DragState['mode']) => void;
+  onContextMenuBar: (id: string, event: React.MouseEvent) => void;
   onSelectBar: (id: string) => void;
 }
 
@@ -53,17 +48,13 @@ export function TimelineBody({
   height,
   todayIndex,
   weekendStarts,
-  progressById,
-  assigneesById,
   dateRangeById,
   statusLabelById,
   selectedId,
-  criticalIds,
-  showCriticalPath,
-  showDependencies,
   drag,
   dragLabel,
   onPointerDownBar,
+  onContextMenuBar,
   onSelectBar,
 }: TimelineBodyProps) {
   const period = columnWidth * PERIOD_DAYS[scale];
@@ -147,17 +138,6 @@ export function TimelineBody({
         }}
       />
 
-      {showDependencies && (
-        <DependencyArrows
-          rows={rows}
-          spans={spans}
-          columnWidth={columnWidth}
-          width={width}
-          criticalIds={criticalIds}
-          showCriticalPath={showCriticalPath}
-        />
-      )}
-
       {rows.map((row, index) => {
         const span = spans.get(row.item.id);
         if (!span) return null;
@@ -169,14 +149,12 @@ export function TimelineBody({
             rowIndex={index}
             columnWidth={columnWidth}
             canvasWidth={width}
-            progress={progressById.get(row.item.id) ?? 0}
             isSelected={selectedId === row.item.id}
-            isCritical={showCriticalPath && criticalIds.has(row.item.id)}
-            assignees={assigneesById.get(row.item.id) ?? []}
             dateRange={dateRangeById.get(row.item.id) ?? ''}
             statusLabel={statusLabelById.get(row.item.id) ?? ''}
             onPointerDownBar={(event, mode) => onPointerDownBar(row.item.id, event, mode)}
             onSelect={() => onSelectBar(row.item.id)}
+            onContextMenu={(event) => onContextMenuBar(row.item.id, event)}
           />
         );
       })}

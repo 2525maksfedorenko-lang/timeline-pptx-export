@@ -78,16 +78,8 @@ you see on screen is not the order you get in the file.
 
 ## Dependency connectors
 
-Sorting by status takes rows out of time order, so a dependency that used to step
-one row down now runs upward and diagonally across many rows. Two consequences:
-
-- **Bounds.** Every connector x is clamped into the timeline zone
-  (`buildDependencyConnectors` in `timelineExportModel.ts`). Two of the x values a
-  connector derives sit outside the bars themselves — the stub past the
-  predecessor's right edge and the approach column in front of the successor — and
-  since the columns change, a bar may end at the zone's right edge or start at its
-  left one. Unclamped, the stub ran into the slide margin and the approach column
-  into the Task column, drawing a dependency line through the task names.
-- **Readability.** The lines stay inside the timeline and under the bars, so they
-  obscure no text, but a long dependency chain does become harder to follow than
-  it was in date order. That is inherent to the requested ordering, not a bug.
+Removed. The slides drew elbow connectors between a predecessor's bar and its
+successor's, and status ordering made them long and diagonal — the reason this
+section used to describe how they were clamped into the timeline zone. Neither
+the plan screen nor the deck draws them any more; `dependencies` remains on the
+item, and nothing renders it.

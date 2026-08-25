@@ -1,14 +1,16 @@
 import { buttonBaseClass, INPUT_SHELL_CLASS } from '../components/systemUi';
 import { PlanMenu } from '../components/PlanMenu';
-import { Switch } from '../components/Switch';
 import { useTimelineStore } from '../store/timelineStore';
-import { TASK_STATUS_VALUES } from '../types/timeline';
+import { SELECTABLE_TASK_STATUS_VALUES } from '../types/timeline';
 import { TIME_SCALE_LABELS, TIME_SCALES } from './scale';
 import { STATUS_LABEL } from './tone';
 import type { StatusFilter } from './rows';
 import { useGanttViewStore } from './viewStore';
 
 interface GanttToolbarProps {
+  /** Opens the export settings. Handed to the plan menu, which is where the
+   * app's own plan-level actions live now that the toolbar has none. */
+  onOpenSettings: () => void;
   /** The app's own actions — import, settings, the two exports, and the
    * view switch — rendered at the right of the top row after the plan's
    * own controls. Passed in rather than built here so this file stays about
@@ -20,12 +22,16 @@ interface GanttToolbarProps {
 }
 
 /** Which statuses get a filter chip, in the handoff's order. "All" first,
- * then the three states worth singling out; "Not started" has no chip,
- * because the plan is mostly that and the chip would select nearly
- * everything. */
+ * then the states worth singling out; "Not started" has no chip, because the
+ * plan is mostly that and the chip would select nearly everything.
+ *
+ * Built from the choosable statuses, so there is no Blocked chip: a status
+ * nothing in the app can set is not something to filter a plan down to. A
+ * blocked task imported into the plan is still reachable — under All, where it
+ * draws in its own colour like everything else. */
 const FILTER_CHIPS: { value: StatusFilter; label: string }[] = [
   { value: 'all', label: 'All' },
-  ...TASK_STATUS_VALUES.filter((status) => status !== 'todo').map((status) => ({
+  ...SELECTABLE_TASK_STATUS_VALUES.filter((status) => status !== 'todo').map((status) => ({
     value: status as StatusFilter,
     label: STATUS_LABEL[status],
   })),
@@ -45,7 +51,7 @@ const FILTER_CHIPS: { value: StatusFilter; label: string }[] = [
  * row in their most compact legible form — icons where the glyph says it,
  * short labels where it does not — so that row still clears its width budget.
  */
-export function GanttToolbar({ actions, showTimelineControls }: GanttToolbarProps) {
+export function GanttToolbar({ actions, showTimelineControls, onOpenSettings }: GanttToolbarProps) {
   const title = useTimelineStore((state) => state.title);
   const items = useTimelineStore((state) => state.items);
 
@@ -56,13 +62,6 @@ export function GanttToolbar({ actions, showTimelineControls }: GanttToolbarProp
   const setSearch = useGanttViewStore((state) => state.setSearch);
   const filter = useGanttViewStore((state) => state.filter);
   const setFilter = useGanttViewStore((state) => state.setFilter);
-  const showCriticalPath = useGanttViewStore((state) => state.showCriticalPath);
-  const setShowCriticalPath = useGanttViewStore((state) => state.setShowCriticalPath);
-
-  // "Links" is the same setting the export slides read, not a second copy of
-  // it — turning the arrows off on screen turns them off in the deck.
-  const showDependencies = useTimelineStore((state) => state.exportOptions.showDependencies);
-  const updateExportOptions = useTimelineStore((state) => state.updateExportOptions);
 
   // A group is an item something else calls its parent; everything else is a
   // work item. Two passes over the list rather than one, because the counts
@@ -73,7 +72,7 @@ export function GanttToolbar({ actions, showTimelineControls }: GanttToolbarProp
   return (
     <div className="flex-none border-b border-border bg-background">
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, height: 50, padding: '0 14px' }}>
-        <PlanMenu>
+        <PlanMenu onOpenSettings={onOpenSettings}>
           <div
             className="bg-primary text-primary-foreground"
             aria-hidden="true"
@@ -194,32 +193,6 @@ export function GanttToolbar({ actions, showTimelineControls }: GanttToolbarProp
             ))}
           </div>
 
-          <div style={{ flex: '1 1 auto', minWidth: 8 }} />
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14, flex: '0 0 auto' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-              <Switch
-                id="gantt-links"
-                checked={showDependencies}
-                onCheckedChange={(checked) => updateExportOptions({ showDependencies: checked })}
-                label="Links"
-              />
-              <label htmlFor="gantt-links" className="text-[11px] font-medium text-muted-foreground">
-                Links
-              </label>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-              <Switch
-                id="gantt-critical"
-                checked={showCriticalPath}
-                onCheckedChange={setShowCriticalPath}
-                label="Critical path"
-              />
-              <label htmlFor="gantt-critical" className="text-[11px] font-medium text-muted-foreground">
-                Critical path
-              </label>
-            </div>
-          </div>
         </div>
       )}
     </div>

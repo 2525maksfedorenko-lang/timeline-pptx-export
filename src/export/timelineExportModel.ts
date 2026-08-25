@@ -1,5 +1,4 @@
 import type { ExportOptions, ExportTimeframe } from '../store/timelineStore';
-import type { Person } from '../store/peopleStore';
 import {
   getTaskStatus,
   TASK_STATUS_COLORS,
@@ -10,17 +9,12 @@ import {
 } from '../types/timeline';
 import { parseMarkdownBlocks, type MarkdownBlock } from '../utils/renderMarkdown';
 import { getStatusSegments, type StatusSegment } from '../utils/dashboardMetrics';
-import { clampProgress } from '../utils/clampProgress';
 import { resolveBarColor } from '../utils/barColor';
 import {
   buildDepthMap,
   labelIndent,
-  progressLabelFitsInBar,
-  progressLabelXOutsideBar,
   resolveBarGeometry,
-  type ProgressLabelBounds,
 } from '../utils/barNesting';
-import { readableTextOn } from '../utils/colorContrast';
 import { buildTaskHierarchy, type TaskNode } from '../utils/taskHierarchy';
 import {
   daysBetween,
@@ -46,12 +40,9 @@ import {
   measureMonoTextWidthIn,
   measureTextWidthIn,
 } from './textMetrics';
-import { COLORS } from './theme';
 import {
   BAR_HEIGHT_IN,
   BAR_LABEL_FONT_SIZE_PT,
-  BAR_PROGRESS_FONT_SIZE_PT,
-  BAR_PROGRESS_PADDING_IN,
   AXIS_LABEL_GAP_IN,
   AXIS_MONTH_FONT_SIZE_PT,
   AXIS_WEEK_FONT_SIZE_PT,
@@ -70,12 +61,10 @@ import {
   CONTENT_BOTTOM_IN,
   CONTENT_X_IN,
   CONTENT_WIDTH_IN,
-  DEPENDENCY_JOG_IN,
   GROUP_HEADER_HEIGHT_IN,
-  LABEL_TAG_GAP_IN,
   LIST_ROW_HEIGHT_IN,
   MAX_OVERVIEW_BARS_PER_SLIDE,
-  MIN_TRACK_WIDTH_IN,
+  MIN_BAR_WIDTH_IN,
   OVERVIEW_WINDOW_PAD_RATIO,
   TIMELINE_X_IN,
   TIMELINE_WIDTH_IN,
@@ -97,9 +86,6 @@ import {
   subtaskRowIndent,
   tableColumnTextWidthIn,
   tableRowHeightIn,
-  TAG_PILL_FONT_SIZE_PT,
-  TAG_PILL_GAP_IN,
-  TAG_PILL_PADDING_IN,
 } from './slideLayout';
 
 /** Shortens `text` with a trailing "..." until it measures at or under
@@ -122,16 +108,6 @@ function truncateToWidth(text: string, fontSizePt: number, maxWidthIn: number): 
   return end > 0 ? text.slice(0, end) + ellipsis : ellipsis;
 }
 
-// One tag pill drawn right after an overview bar's label, before its status
-// text — position and width are already resolved here so a renderer just
-// draws a rounded rect (TAG_PILL_HEIGHT_IN tall) and centers `text` in it,
-// the same way it draws the bar's own track.
-export interface OverviewBarTagModel {
-  text: string;
-  x: number;
-  width: number;
-}
-
 export interface OverviewColumnHeaderModel {
   text: string;
   x: number;
@@ -144,7 +120,6 @@ export interface OverviewBarModel {
   // the Task column plus its inset, on every row, however the bar moves.
   labelX: number;
   labelWidth: number;
-  tags: OverviewBarTagModel[];
   color: string;
   // The status chip in the Status column: the same pale-surface / dark-text /
   // hairline-border chip the app draws, minus the dropdown chevron, which
@@ -158,26 +133,20 @@ export interface OverviewBarModel {
   statusChipHeight: number;
   statusChipBg: string;
   statusChipBorder: string;
-  // The row's top edge. Everything drawn on the bar's *line* — its label,
-  // status, progress, tag pills — is positioned against this and a full
-  // BAR_HEIGHT_IN box, so those stay put whatever height the bar itself is.
+  // The row's top edge. Everything drawn on the bar's *line* — its label and
+  // its status — is positioned against this and a full BAR_HEIGHT_IN box, so
+  // those stay put whatever height the bar itself is.
   y: number;
   barX: number;
-  // The track's own rectangle. A nested task's bar is drawn shorter than a
+  // The bar's own rectangle. A nested task's bar is drawn shorter than a
   // top-level one and centered in the same slot (see resolveBarGeometry), so
-  // this is `y` plus a centering offset rather than `y` itself.
+  // this is `y` plus a centering offset rather than `y` itself. One solid
+  // rectangle in the task's colour: it says when the task runs, and nothing
+  // else — there is no second, paler rectangle behind it, because there is no
+  // longer a fraction of it to fill.
   barY: number;
   barHeight: number;
-  trackWidth: number;
-  fillWidth: number;
-  // Progress percentage drawn on the bar itself, in the box
-  // (progressX, progressWidth): centered in it when it sits inside the fill,
-  // left-aligned when it sits just after the fill on the gray track.
-  progressText: string;
-  progressX: number;
-  progressWidth: number;
-  progressInsideFill: boolean;
-  progressColor: string;
+  barWidth: number;
   // True when the task's real start/end falls outside the export timeframe
   // window, so the bar is drawn clipped at that edge with a chevron marker.
   chevronLeft: boolean;
@@ -211,25 +180,6 @@ export interface OverviewAxisLabelModel {
   x: number;
 }
 
-// One straight (horizontal or vertical) leg of a dependency connector's
-// elbow path — drawn as its own line by both exporters, since neither
-// pptxgenjs nor jsPDF can draw an arbitrary multi-segment path directly.
-export interface DependencyConnectorSegment {
-  x1: number;
-  y1: number;
-  x2: number;
-  y2: number;
-}
-
-export interface OverviewConnectorModel {
-  id: string;
-  // A polyline from one bar's edge to another's, as its individual legs:
-  // 1 segment for a same-row (straight) connector, otherwise up to 5 for the
-  // stub/gutter/approach route (see buildDependencyConnectors), with any
-  // zero-length leg already dropped.
-  segments: DependencyConnectorSegment[];
-}
-
 export interface OverviewSlideModel {
   kind: 'overview';
   title: string;
@@ -250,11 +200,6 @@ export interface OverviewSlideModel {
   dividerTop: number;
   dividerBottom: number;
   bars: OverviewBarModel[];
-  // Empty when exportOptions.showDependencies is off, or for any dependency
-  // whose predecessor/successor didn't make it onto this slide (excluded
-  // from export, outside the timeframe window, or truncated by overflow) —
-  // silently omitted rather than drawn as a bracket to nowhere.
-  dependencyConnectors: OverviewConnectorModel[];
   // The date span this slide's axis covers, yyyy-mm-dd, or null when the slide
   // draws nothing. Carried for the same reason the grid lines carry their
   // dates: it is what an audit needs to say whether the grid matches the
@@ -289,13 +234,12 @@ export interface OverviewSlideModel {
 }
 
 /** One subtask line on a detail slide. The left side used to be a single
- * pre-joined string ("name  —  2026-08-20 → 2026-08-28  —  45%") drawn in
- * one call; it's split into separately-positioned pieces now because each
- * carries its own typographic role — the name is the content, the dates are
- * monospace, the progress is a figure — and neither engine can vary the
- * face mid-string at a position the other could reproduce. Same approach as
- * OverviewBarTagModel: the model resolves x for every piece so a renderer
- * only has to draw. */
+ * pre-joined string ("name  —  2026-08-20 → 2026-08-28") drawn in one call;
+ * it's split into separately-positioned pieces now because each carries its
+ * own typographic role — the name is the content, the dates are monospace —
+ * and neither engine can vary the face mid-string at a position the other
+ * could reproduce. Same approach as OverviewBarTagModel: the model resolves x
+ * for every piece so a renderer only has to draw. */
 export interface SubtaskRowModel {
   /** Which task this row *is*. Carried for exactly the reason
    * DetailSectionModel.taskId is — nothing about the row is drawn from it —
@@ -313,8 +257,6 @@ export interface SubtaskRowModel {
   /** "Aug 20 – Aug 28", drawn in the monospace face. */
   dateText: string;
   dateX: number;
-  progressText: string;
-  progressX: number;
   statusText: string;
   statusColor: string;
   y: number;
@@ -347,17 +289,6 @@ export interface DetailSectionModel {
   parentTitleY: number;
   subtasksHeadingY?: number;
   subtasks: SubtaskRowModel[];
-  // Present on a parent's first section (absent on its "(continued)"
-  // overflow sections), whether or not the task actually has an assignee —
-  // an unassigned task gets a "No assignee" placeholder instead, drawn in a
-  // muted color via `assigneeMuted` so the gap is visible but not shouty.
-  assigneeText?: string;
-  assigneeY?: number;
-  assigneeMuted?: boolean;
-  // Hex without a leading '#' (theme.ts convention), resolved by matching
-  // the assignee's name against peopleStore — undefined exactly when
-  // assigneeMuted is true (no assignee, so nothing to swatch).
-  assigneeColor?: string;
   commentsHeadingY?: number;
   commentsHeadingText?: string;
   comments: CommentModel[];
@@ -705,24 +636,14 @@ function buildOverviewAxes(
   return windows.map((window) => (window ? { ...window, scale, tierDays: widestDays } : null));
 }
 
-/** The slide's timeline zone, as the band a progress label pushed outside its
- * bar is held inside — the same two edges the bars themselves are clamped to. */
-const PROGRESS_LABEL_BOUNDS_IN: ProgressLabelBounds = {
-  zoneStart: TIMELINE_X_IN,
-  zoneEnd: TIMELINE_X_IN + TIMELINE_WIDTH_IN,
-  padding: BAR_PROGRESS_PADDING_IN,
-};
-
 /** Lays out one overview slide: a date-scale axis at the top, then one bar
  * per item. If a task's real dates fall outside `dateWindow`, the bar is
- * clipped to the content edge and flagged with a chevron — but its progress
- * is unaffected by the clip. */
+ * clipped to the content edge and flagged with a chevron. */
 function buildOverviewSlide(
   items: TimelineItem[],
   axis: OverviewAxis | null,
   title: string,
   omission: OverviewOmission,
-  showDependencies: boolean,
   depthById: ReadonlyMap<string, number>,
 ): OverviewSlideModel {
   const bars: OverviewBarModel[] = [];
@@ -792,7 +713,6 @@ function buildOverviewSlide(
 
     items.forEach((item) => {
       const { left, width } = getItemBar(item, minDate, BASE_PX_PER_DAY);
-      const progress = clampProgress(item.progress ?? 0);
       const status = getTaskStatus(item);
 
       // Raw (unclamped) horizontal extent, in inches from TIMELINE_X_IN — used
@@ -810,15 +730,14 @@ function buildOverviewSlide(
       // No label zone to reserve any more: the name and the status live in their
       // own columns, so a bar is free to use the whole timeline zone and is
       // clamped only by that zone's own right edge. A bar can still start at the
-      // very end of the window, in which case MIN_TRACK_WIDTH_IN keeps it
+      // very end of the window, in which case MIN_BAR_WIDTH_IN keeps it
       // visible — it just can't spill past TIMELINE_X_IN + TIMELINE_WIDTH_IN.
-      const maxLeftIn = Math.max(0, windowWidthIn - MIN_TRACK_WIDTH_IN);
+      const maxLeftIn = Math.max(0, windowWidthIn - MIN_BAR_WIDTH_IN);
       const barX = TIMELINE_X_IN + Math.min(clippedLeftIn, maxLeftIn);
 
-      const maxTrackWidth = Math.max(MIN_TRACK_WIDTH_IN, TIMELINE_X_IN + windowWidthIn - barX);
+      const maxBarWidth = Math.max(MIN_BAR_WIDTH_IN, TIMELINE_X_IN + windowWidthIn - barX);
       const windowClippedWidth = Math.max(clippedRightIn - (barX - TIMELINE_X_IN), 0);
-      const trackWidth = Math.min(Math.max(windowClippedWidth, MIN_TRACK_WIDTH_IN), maxTrackWidth);
-      const fillWidth = progress > 0 ? Math.max((trackWidth * progress) / 100, 0.05) : 0;
+      const barWidth = Math.min(Math.max(windowClippedWidth, MIN_BAR_WIDTH_IN), maxBarWidth);
       const barColor = resolveBarColor(item);
       // Nesting is judged against the items the overview draws *in total*, not
       // against this page's slice of them (see buildOverviewSlides): a task
@@ -829,45 +748,6 @@ function buildOverviewSlide(
       // that.
       const depth = depthById.get(item.id) ?? 0;
       const { height: barHeight, offset: barOffsetY } = resolveBarGeometry(BAR_HEIGHT_IN, depth);
-
-      // Where the progress percentage goes. Vertically, nowhere new: both
-      // exporters center it on the row's own center line, which is every bar's
-      // center line whatever its height (see resolveBarGeometry), so a
-      // shortened bar keeps its percentage on the same line a full-height one
-      // has it on.
-      //
-      // Horizontally there are three placements, in order of preference:
-      //   1. centered in the fill — the bar is tall enough to hold text at all
-      //      *and* the fill measurably holds it at the size it is actually
-      //      drawn. Measured, not a percentage of the bar, which says nothing
-      //      about how wide "100%" renders on a track that may itself be a
-      //      fraction of an inch;
-      //   2. just past the fill, on the pale track — tall enough, fill too
-      //      short;
-      //   3. clear of the bar altogether — the bar itself is too short to hold
-      //      text. This is the case the lower rungs of the height ladder
-      //      create, and the reason that ladder is free to go as low as it now
-      //      does: the percentage no longer has to fit inside every bar, so bar
-      //      height no longer has to be traded against reading it.
-      const progressText = `${progress}%`;
-      const progressTextWidth = measureTextWidthIn(progressText, BAR_PROGRESS_FONT_SIZE_PT);
-      // Keyed on the height this bar is actually drawn at, never on its depth —
-      // one shared rule, one call site per surface. See progressLabelFitsInBar.
-      const progressFitsInBar = progressLabelFitsInBar(barHeight, BAR_PROGRESS_FONT_SIZE_PT / 72);
-      const progressInsideFill =
-        progressFitsInBar && fillWidth >= progressTextWidth + BAR_PROGRESS_PADDING_IN * 2;
-      const progressX = progressInsideFill
-        ? barX
-        : progressFitsInBar
-          ? // Past the fill, on the bar's own track — but held off the zone's
-            // right edge all the same: a bar ending there with a short fill
-            // would otherwise put its label past the edge of the timeline.
-            Math.min(
-              barX + fillWidth + BAR_PROGRESS_PADDING_IN,
-              PROGRESS_LABEL_BOUNDS_IN.zoneEnd - progressTextWidth,
-            )
-          : progressLabelXOutsideBar(barX, trackWidth, progressTextWidth, PROGRESS_LABEL_BOUNDS_IN);
-      const progressWidth = progressInsideFill ? fillWidth : progressTextWidth;
 
       // The name lives in the Task column: same x on every row, whatever the
       // bar is doing. Nothing about the bar feeds into this any more.
@@ -882,73 +762,20 @@ function buildOverviewSlide(
       const statusText = TASK_STATUS_LABELS[status];
       const statusScale = TASK_STATUS_SCALE[status];
 
-      // The name and the tag pills share the Task column, and inside that
-      // column the name outranks them.
-      //
-      // It used to be the other way round: every pill's measured width was
-      // reserved first and the name was cut against whatever survived. Three
-      // tags is ~1.0in of pills, so a name at the third nesting level was left
-      // the column minus its depth indent minus all of that — which is how an
-      // overview came to read "M...", "C...", "Arc...". A tag qualifies a name;
-      // it cannot be worth more of the row than the name it qualifies.
-      //
-      // So the order of giving way is: pills drop from the end of the row
-      // first, and only once a single pill is left does the name itself start
-      // to truncate. Concretely, the name is measured against the column less
-      // one pill's reservation, and the pills are then laid out from where the
-      // name actually ends — so a short name keeps all three, a longer one
-      // pushes the third and then the second off the row, and the longest one
-      // truncates beside the one pill that is always kept.
-      //
-      // Pills are dropped whole rather than truncated to "Bil...": a slide
-      // cannot be hovered to see the rest, so a half-tag spends the same width
-      // on a word that no longer says anything.
-      const tagTexts = item.tags ?? [];
-      const tagPillWidth = (text: string) =>
-        measureTextWidthIn(text, TAG_PILL_FONT_SIZE_PT) + TAG_PILL_PADDING_IN * 2;
-      // What the name gives up for the pill that is always kept — and the cap
-      // that stops it giving up too much. A pill may never take more of the
-      // column than it leaves the name: at the deepest indent, with a long tag,
-      // reserving unconditionally would starve the name exactly the way the old
-      // rule did. Past that point the tags go entirely and the name takes the
-      // column, which is the priority this whole block exists to state.
-      const tagReservedWidth = tagTexts.length > 0 ? tagPillWidth(tagTexts[0]) + LABEL_TAG_GAP_IN : 0;
-      const labelMaxWidth =
-        tagReservedWidth * 2 <= labelBoxWidth ? labelBoxWidth - tagReservedWidth : labelBoxWidth;
-
-      const label = truncateToWidth(item.label, BAR_LABEL_FONT_SIZE_PT, labelMaxWidth);
-      const labelTextWidth = Math.min(measureTextWidthIn(label, BAR_LABEL_FONT_SIZE_PT), labelMaxWidth);
-
-      // Pills start right after the name's own actual (already truncated)
-      // text, not at the edge of its reserved box — otherwise a short name
-      // would leave a visible gap before the first pill.
-      const tagsEndX = labelX + labelBoxWidth;
-      let tagX = labelX + labelTextWidth + LABEL_TAG_GAP_IN;
-      const tags: OverviewBarTagModel[] = [];
-      for (const text of tagTexts) {
-        const width = tagPillWidth(text);
-        // Strictly inside the column: a pill is a filled shape, so one
-        // overhanging by a rounding error shows in a way a glyph's side
-        // bearing does not.
-        if (tagX + width > tagsEndX) break;
-        tags.push({ text, x: tagX, width });
-        tagX += width + TAG_PILL_GAP_IN;
-      }
-
-      // The box the name is drawn in and clicked on: up to the first pill when
-      // the row has one, otherwise the whole rest of the column. Not the
-      // measured text width in both cases, because this is also the PDF's link
-      // target for the task — an untagged row has nothing to its right to
-      // avoid, and a name of five letters should still be as easy to hit as
+      // The name has the Task column to itself: nothing else is drawn in it,
+      // so it truncates against the whole width rather than against what a
+      // row of tag pills left over.
+      const label = truncateToWidth(item.label, BAR_LABEL_FONT_SIZE_PT, labelBoxWidth);
+      // Not the measured text width: this is also the PDF's link target for
+      // the task, and a name of five letters should still be as easy to hit as
       // the bar beside it.
-      const labelWidth = tags.length > 0 ? labelTextWidth : labelBoxWidth;
+      const labelWidth = labelBoxWidth;
 
       bars.push({
         id: item.id,
         label,
         labelX,
         labelWidth,
-        tags,
         color: barColor,
         statusText,
         statusColor: TASK_STATUS_COLORS[status],
@@ -962,20 +789,7 @@ function buildOverviewSlide(
         barX,
         barY: y + barOffsetY,
         barHeight,
-        trackWidth,
-        fillWidth,
-        progressText,
-        progressX,
-        progressWidth,
-        progressInsideFill,
-        // Inside the fill, whichever of the two text tokens actually measures
-        // more contrast against it (status fills clear 4.5:1 with the light one
-        // by construction; a user's own item.color might not, and then the dark
-        // one wins). Anywhere else the label is on the pale track or on the
-        // slide itself, and the dark token is the readable one on both.
-        progressColor: progressInsideFill
-          ? readableTextOn(barColor).replace('#', '')
-          : COLORS.textOnSurface,
+        barWidth,
         chevronLeft,
         chevronRight,
       });
@@ -983,8 +797,6 @@ function buildOverviewSlide(
       y += ROW_HEIGHT_IN;
     });
   }
-
-  const dependencyConnectors = showDependencies ? buildDependencyConnectors(items, bars) : [];
 
   return {
     kind: 'overview',
@@ -998,7 +810,6 @@ function buildOverviewSlide(
     dividerTop: dateAxisY,
     dividerBottom: CONTENT_BOTTOM_IN,
     bars,
-    dependencyConnectors,
     windowStart,
     windowEnd,
     windowTierDays,
@@ -1059,7 +870,6 @@ function buildOverviewSlides(
   plan: OverviewPlan,
   timeframe: ExportTimeframe | null,
   exportMode: ExportMode,
-  showDependencies: boolean,
   candidateItems: TimelineItem[],
   sectionedIds: ReadonlySet<string>,
 ): OverviewSlideModel[] {
@@ -1101,7 +911,7 @@ function buildOverviewSlides(
 
   if (!isPaged) {
     return [
-      buildOverviewSlide(drawnItems, axes[0], 'Timeline Overview', omission, showDependencies, depthById),
+      buildOverviewSlide(drawnItems, axes[0], 'Timeline Overview', omission, depthById),
     ];
   }
 
@@ -1114,120 +924,9 @@ function buildOverviewSlides(
       // repeated under every page — and the counts go with it so they stay
       // summable across the deck.
       index === pages.length - 1 ? omission : NO_OMISSION,
-      showDependencies,
       depthById,
     ),
   );
-}
-
-/** One connector per (successor, predecessor-id) pair, reusing each bar's
- * already-computed position — never recomputed from item dates. A
- * predecessor/successor missing from `barById` means it isn't on this slide
- * (excluded from export, outside the timeframe window, cut by compact-mode
- * truncation, or sitting on another page in 'full' mode), so that connector
- * is dropped rather than drawn to nowhere.
- *
- * Both ends land on a bar's vertical *edge*, and the path is routed to stay
- * off the bars in between — the exporters draw connectors under the bars
- * (matching the on-screen z-stack), but "hidden behind the bar" is a weaker
- * guarantee than "never there in the first place": a line emerging from the
- * middle of a bar still reads as crossing it.
- *
- * The path is a polyline through five points, degenerate legs dropped:
- *   1. out of the predecessor's right edge by one jog — the width of
- *      BAR_LABEL_PADDING_IN, so the stub sits in the gap before the label;
- *   2. off that row entirely, into the gutter between it and the next
- *      (ROW_GAP_IN), which is the one horizontal band with no bar, label,
- *      tag pill or status text in it;
- *   3. along that gutter to the successor's approach column;
- *   4. down/up that column to the successor's row;
- *   5. one jog back into the successor's edge.
- * Travelling along a row's own center line instead — the obvious elbow, and
- * what this used to do — draws a strikethrough right across whichever
- * label shares that row.
- *
- * Which edge of the successor the line arrives at depends on where that bar
- * sits, since a successor's bar is very often *not* to the right of its
- * predecessor's (overlapping date spans are normal, and any bar can be
- * clipped to the timeframe window, or a sliver at its right edge):
- * approach the left edge when there's room to drop in front of it, and the
- * right edge otherwise — never a point in between. */
-function buildDependencyConnectors(items: TimelineItem[], bars: OverviewBarModel[]): OverviewConnectorModel[] {
-  const barById = new Map(bars.map((bar) => [bar.id, bar]));
-
-  // Every leg is pinned inside the timeline zone. Two of the x's a connector
-  // derives are outside the bars themselves — the stub past the predecessor's
-  // right edge and the approach column in front of the successor — and either
-  // can fall outside the zone now that a bar may end at the zone's right edge
-  // (nothing reserves label room after it any more) or start at its left edge.
-  // Unclamped, the stub would run into the slide's right margin and the
-  // approach column into the Task column, drawing a dependency line straight
-  // through the task names.
-  //
-  // This matters far more with the export sorted by status than it did sorted
-  // by date: rows are no longer in time order, so a connector routinely runs
-  // upwards and diagonally across many rows instead of one step down.
-  const clampX = (x: number) =>
-    Math.min(Math.max(x, TIMELINE_X_IN), TIMELINE_X_IN + TIMELINE_WIDTH_IN);
-  // Vertically the gutter between two rows is always inside the content area,
-  // except for a connector leaving the very first row, whose "gutter above"
-  // would sit a hair above the header rule.
-  const clampY = (y: number) =>
-    Math.min(Math.max(y, CONTENT_TOP_IN + GROUP_HEADER_HEIGHT_IN), CONTENT_BOTTOM_IN);
-
-  return items.flatMap((item) => {
-    const successorBar = barById.get(item.id);
-    if (!successorBar) return [];
-
-    return (item.dependencies ?? []).flatMap((depId) => {
-      const predecessorBar = barById.get(depId);
-      if (!predecessorBar) return [];
-
-      const x1 = clampX(predecessorBar.barX + predecessorBar.trackWidth);
-      const y1 = predecessorBar.y + BAR_HEIGHT_IN / 2;
-      const y2 = successorBar.y + BAR_HEIGHT_IN / 2;
-
-      const successorLeft = successorBar.barX;
-      const successorRight = successorBar.barX + successorBar.trackWidth;
-      // Room to drop in front of the successor means room for the approach
-      // column too, i.e. a full jog either side of the predecessor's stub.
-      const approachFromLeft = successorLeft - DEPENDENCY_JOG_IN >= x1 + DEPENDENCY_JOG_IN;
-
-      const x2 = clampX(approachFromLeft ? successorLeft : successorRight);
-      const stubX = clampX(x1 + DEPENDENCY_JOG_IN);
-      const approachX = clampX(
-        approachFromLeft
-          ? successorLeft - DEPENDENCY_JOG_IN
-          : Math.max(stubX, successorRight + DEPENDENCY_JOG_IN),
-      );
-
-      if (y1 === y2) return [{ id: `${depId}->${item.id}`, segments: [{ x1, y1, x2, y2 }] }];
-
-      const gutterY = clampY(
-        y2 > y1
-          ? predecessorBar.y + BAR_HEIGHT_IN + ROW_GAP_IN / 2
-          : predecessorBar.y - ROW_GAP_IN / 2,
-      );
-
-      const points: [number, number][] = [
-        [x1, y1],
-        [stubX, y1],
-        [stubX, gutterY],
-        [approachX, gutterY],
-        [approachX, y2],
-        [x2, y2],
-      ];
-
-      const segments: DependencyConnectorSegment[] = points
-        .slice(1)
-        .map(([x, y], index) => ({ x1: points[index][0], y1: points[index][1], x2: x, y2: y }))
-        // A zero-length leg (the two columns coinciding, say) is nothing to
-        // draw, and pptxgenjs would still emit a shape for it.
-        .filter((segment) => segment.x1 !== segment.x2 || segment.y1 !== segment.y2);
-
-      return [{ id: `${depId}->${item.id}`, segments }];
-    });
-  });
 }
 
 /** One task listed under a parent's "Subtasks" heading, with its nesting
@@ -1290,7 +989,7 @@ interface CommentFragment {
 }
 
 /** One self-contained chunk of a parent's detail content: a slice of its
- * subtree's rows + assignee + a slice of its comments' fragments. One chunk
+ * subtree's rows + a slice of its comments' fragments. One chunk
  * per parent whenever everything fits on a slide; otherwise the content
  * spills into "(continued)" chunks that repeat the parent's title, so
  * nothing is ever cut off instead of continuing on a new slide:
@@ -1303,13 +1002,6 @@ interface DetailChunk {
   taskId: string;
   parentTitle: string;
   rows: DetailDescendant[];
-  // Whether this chunk carries the parent's assignee row at all — true only
-  // for a parent's first chunk, like its subtasks. Distinct from `assignee`
-  // being undefined, which means the task genuinely has nobody assigned: a
-  // "(continued)" chunk repeating "No assignee" would read as the
-  // continuation itself being unassigned rather than as a repeat.
-  showAssignee: boolean;
-  assignee?: TimelineItem['assignee'];
   commentFragments: CommentFragment[];
   commentsHeadingText: string;
 }
@@ -1375,7 +1067,6 @@ function layoutMarkdownBlocks(blocks: MarkdownBlock[], startY: number): { rows: 
 function buildDetailSection(
   chunk: DetailChunk,
   startY: number,
-  people: Person[],
 ): { section: DetailSectionModel; endY: number } {
   let y = startY;
   const parentTitleY = y;
@@ -1389,14 +1080,13 @@ function buildDetailSection(
     y += ROW_LABEL_HEIGHT_IN + ROW_GAP_IN;
 
     chunk.rows.forEach(({ item: child, depth }) => {
-      const progress = clampProgress(child.progress ?? 0);
       const status = getTaskStatus(child);
       const statusText = TASK_STATUS_LABELS[status];
 
       // Same collision to guard against as an overview bar's label/status
       // (see truncateToWidth): the row's label is the flexible part, so it's
-      // what gets truncated — the trailing dates/progress and the status
-      // all stay intact and fully readable. Dates use formatShortDate (the
+      // what gets truncated — the trailing dates and the status
+      // both stay intact and fully readable. Dates use formatShortDate (the
       // same "Aug 20" the on-screen day header and overview axis already
       // use) rather than the raw ISO string — no year, short month, so the
       // fixed non-truncatable tail stays as narrow as possible.
@@ -1407,7 +1097,6 @@ function buildDetailSection(
       // proportional *plus* its tracking, which neither engine folds into
       // its own metrics.
       const dateText = `${formatShortDate(new Date(child.start))} – ${formatShortDate(new Date(child.end))}`;
-      const progressText = `${progress}%`;
 
       // Depth is drawn as indent, from the same barNesting ladder the
       // on-screen label column steps by (see subtaskRowIndent). These rows
@@ -1420,7 +1109,6 @@ function buildDetailSection(
         dateText,
         letterSpacingPt(SUBTASK_DATE_FONT_SIZE_PT, DATE_LETTER_SPACING_EM),
       );
-      const progressWidth = measureTextWidthIn(progressText, SUBTASK_TEXT_FONT_SIZE_PT);
       const statusTextWidth = statusTextWidthIn(statusText, SUBTASK_STATUS_FONT_SIZE_PT);
 
       const availableWidth =
@@ -1430,8 +1118,7 @@ function buildDetailSection(
         statusTextWidth -
         SUBTASK_META_STATUS_GAP_IN -
         (dateWidth + dateTrackingWidth) -
-        progressWidth -
-        SUBTASK_META_GAP_IN * 2;
+        SUBTASK_META_GAP_IN;
       const label = truncateToWidth(child.label, SUBTASK_TEXT_FONT_SIZE_PT, Math.max(availableWidth, 0));
 
       // Each piece follows the previous one's *actual* drawn width, not its
@@ -1441,7 +1128,6 @@ function buildDetailSection(
       // edge — the same rule as an indented overview bar label.
       const labelX = CONTENT_X_IN + rowIndentIn;
       const dateX = labelX + measureTextWidthIn(label, SUBTASK_TEXT_FONT_SIZE_PT) + SUBTASK_META_GAP_IN;
-      const progressX = dateX + dateWidth + dateTrackingWidth + SUBTASK_META_GAP_IN;
 
       subtasks.push({
         taskId: child.id,
@@ -1450,8 +1136,6 @@ function buildDetailSection(
         labelX,
         dateText,
         dateX,
-        progressText,
-        progressX,
         statusText,
         statusColor: TASK_STATUS_COLORS[status],
         y,
@@ -1460,24 +1144,6 @@ function buildDetailSection(
     });
 
     y += SECTION_GAP_IN;
-  }
-
-  let assigneeText: string | undefined;
-  let assigneeY: number | undefined;
-  let assigneeMuted: boolean | undefined;
-  let assigneeColor: string | undefined;
-
-  if (chunk.showAssignee) {
-    assigneeText = chunk.assignee ? `Assigned to: ${chunk.assignee.name}` : 'No assignee';
-    assigneeMuted = !chunk.assignee;
-    // Matched by name (see the Person.color doc comment) — a real person's
-    // color when one's found, COLORS.assigneeFallback for a name that no
-    // longer matches anyone in peopleStore, nothing at all when unassigned.
-    assigneeColor = chunk.assignee
-      ? (people.find((person) => person.name === chunk.assignee?.name)?.color ?? COLORS.assigneeFallback)
-      : undefined;
-    assigneeY = y;
-    y += LIST_ROW_HEIGHT_IN + SECTION_GAP_IN;
   }
 
   const comments: CommentModel[] = [];
@@ -1515,10 +1181,6 @@ function buildDetailSection(
       parentTitleY,
       subtasksHeadingY,
       subtasks,
-      assigneeText,
-      assigneeY,
-      assigneeMuted,
-      assigneeColor,
       commentsHeadingY,
       commentsHeadingText: chunk.commentFragments.length > 0 ? chunk.commentsHeadingText : undefined,
       comments,
@@ -1561,7 +1223,7 @@ function buildCommentsHeading(shown: number, total: number): string {
 }
 
 /** Splits one parent's detail content into one or more chunks so nothing is
- * silently cut off: if the parent's whole subtree, assignee and comments fit
+ * silently cut off: if the parent's whole subtree and comments fit
  * within one slide's content height, there's a single chunk; otherwise the
  * content spills into "(continued)" chunks that repeat the parent's title.
  *
@@ -1576,15 +1238,13 @@ function buildCommentsHeading(shown: number, total: number): string {
  * the content area. Chunks (possibly from different parents) are then
  * packed onto slides by buildDetailSlides exactly like whole sections used
  * to be. */
-function expandCandidateToChunks(candidate: DetailCandidate, people: Person[]): DetailChunk[] {
+function expandCandidateToChunks(candidate: DetailCandidate): DetailChunk[] {
   const { parent, descendants, relevantComments, totalComments } = candidate;
 
   const makeChunk = (isFirst: boolean): DetailChunk => ({
     taskId: parent.id,
     parentTitle: isFirst ? parent.label : `${parent.label} (continued)`,
     rows: [],
-    showAssignee: isFirst,
-    assignee: isFirst ? parent.assignee : undefined,
     commentFragments: [],
     commentsHeadingText: buildCommentsHeading(relevantComments.length, totalComments),
   });
@@ -1592,12 +1252,12 @@ function expandCandidateToChunks(candidate: DetailCandidate, people: Person[]): 
   const chunks: DetailChunk[] = [];
   let current = makeChunk(true);
 
-  const fits = (chunk: DetailChunk) => buildDetailSection(chunk, 0, people).endY <= CONTENT_HEIGHT_IN;
+  const fits = (chunk: DetailChunk) => buildDetailSection(chunk, 0).endY <= CONTENT_HEIGHT_IN;
   // "Nothing on it yet", not "no comments yet": a chunk already carrying
   // subtree rows has no room to spare, so the best-effort fallbacks below must
   // not mistake it for a blank slate and let oversized content through.
   const isEmpty = (chunk: DetailChunk) =>
-    chunk.rows.length === 0 && chunk.commentFragments.length === 0 && !chunk.showAssignee;
+    chunk.rows.length === 0 && chunk.commentFragments.length === 0;
   const withRows = (chunk: DetailChunk, rows: DetailDescendant[]): DetailChunk => ({
     ...chunk,
     rows: [...chunk.rows, ...rows],
@@ -1635,8 +1295,8 @@ function expandCandidateToChunks(candidate: DetailCandidate, people: Person[]): 
     }
 
     // Doesn't fit here — a chunk of its own may still hold it, since a
-    // continuation carries neither the assignee row nor a full-height title
-    // block. Worth retrying before resorting to breaking the branch up.
+    // continuation carries no full-height title block. Worth retrying before
+    // resorting to breaking the branch up.
     if (!isEmpty(current)) {
       startNewChunk();
       if (fits(withRows(current, branch))) {
@@ -1711,15 +1371,15 @@ function expandCandidateToChunks(candidate: DetailCandidate, people: Person[]): 
  * (not a fixed count per slide — sections vary a lot depending on how many
  * subtasks/comments a parent has), so several chunks share a slide whenever
  * they fit within CONTENT_HEIGHT_IN. */
-function buildDetailSlides(candidates: DetailCandidate[], people: Person[]): DetailSlideModel[] {
-  const chunks = candidates.flatMap((candidate) => expandCandidateToChunks(candidate, people));
+function buildDetailSlides(candidates: DetailCandidate[]): DetailSlideModel[] {
+  const chunks = candidates.flatMap((candidate) => expandCandidateToChunks(candidate));
   if (chunks.length === 0) return [];
 
   const withHeight = chunks.map((chunk) => ({
     chunk,
     // Height is independent of the starting Y (the layout math is purely
     // additive), so probing at startY = 0 gives the chunk's own height.
-    heightIn: buildDetailSection(chunk, 0, people).endY,
+    heightIn: buildDetailSection(chunk, 0).endY,
   }));
 
   const groups: DetailChunk[][] = [];
@@ -1744,7 +1404,7 @@ function buildDetailSlides(candidates: DetailCandidate[], people: Person[]): Det
   return groups.map((group, index) => {
     let y = CONTENT_TOP_IN;
     const sections = group.map((chunk) => {
-      const { section, endY } = buildDetailSection(chunk, y, people);
+      const { section, endY } = buildDetailSection(chunk, y);
       y = endY + PARENT_SECTION_GAP_IN;
       return section;
     });
@@ -1795,10 +1455,8 @@ export function getExportOverviewItems(items: TimelineItem[]): TimelineItem[] {
 export function buildExportSlides(
   items: TimelineItem[],
   comments: TaskComment[],
-  people: Person[],
   commentMode: ExportOptions['commentMode'],
   exportTimeframe: ExportTimeframe | null,
-  showDependencies: boolean,
   exportMode: ExportMode = 'compact',
 ): ExportSlideModel[] {
   const exportableItems = items.filter((item) => item.includeInExport !== false);
@@ -1852,11 +1510,10 @@ export function buildExportSlides(
       overviewPlan,
       exportTimeframe,
       exportMode,
-      showDependencies,
       exportableItems,
       sectionedIds,
     ),
-    ...buildDetailSlides(detailCandidates, people),
+    ...buildDetailSlides(detailCandidates),
   ];
 
   slides.push(buildSummarySlide(exportableItems));

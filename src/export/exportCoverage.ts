@@ -6,7 +6,6 @@ import type { OrderedSlideModel } from './slideOrder';
 import type { SlideLinks } from './slideLinks';
 import {
   BAR_HEIGHT_IN,
-  COLUMN_TEXT_INSET_IN,
   CONTENT_BOTTOM_IN,
   CONTENT_TOP_IN,
   CONTENT_X_IN,
@@ -15,11 +14,7 @@ import {
   DASHBOARD_TABLE_WIDTH_IN,
   LIST_ROW_HEIGHT_IN,
   ROW_LABEL_HEIGHT_IN,
-  STATUS_COL_WIDTH_IN,
   subtaskRowIndent,
-  TASK_COL_WIDTH_IN,
-  TIMELINE_X_IN,
-  TIMELINE_WIDTH_IN,
   tableColumnTextWidthIn,
   tableRowHeightIn,
 } from './slideLayout';
@@ -328,35 +323,20 @@ export function analyzeExportCoverage(
         // A bar's name has to say *something*. Truncation is expected — the
         // column is fixed and names are not — but a row rendering "" or a bare
         // "..." has spent a line of the overview identifying nothing, and that
-        // is not a state a reader can tell from a bug. It is reachable whenever
-        // something else in the Task column is allowed to reserve width ahead of
-        // the name (tag pills, once), so it is checked rather than reasoned
-        // about.
+        // is not a state a reader can tell from a bug. It became reachable
+        // once before, when something else in the Task column was allowed to
+        // reserve width ahead of the name, so it is checked rather than
+        // reasoned about.
         if (bar.label.replace(/\.+$/, '').length === 0) {
           failures.push(
             `slide ${slideNumber}: bar "${bar.id}" renders no name (label "${bar.label}")`,
           );
         }
 
-        // Nothing in the Task column may cross into the gutter: the name is
-        // truncated against the column and the pills are laid out from where it
-        // ends, so an overhanging pill means one of the two measured against a
-        // width the other did not.
-        const columnRight = CONTENT_X_IN + STATUS_COL_WIDTH_IN + TASK_COL_WIDTH_IN - COLUMN_TEXT_INSET_IN;
-        const lastTag = bar.tags[bar.tags.length - 1];
-        if (lastTag !== undefined && lastTag.x + lastTag.width > columnRight + EPSILON_IN) {
-          failures.push(
-            `slide ${slideNumber}: bar "${bar.id}" tag "${lastTag.text}" ends at ` +
-              `${(lastTag.x + lastTag.width).toFixed(4)}in, past the Task column's ` +
-              `${columnRight.toFixed(4)}in`,
-          );
-        }
-
         // The row pitch is what every overlay, the date grid and the
         // bars-per-slide ceiling are pinned to, so a shortened bar has to give
-        // its height back evenly to both sides. Off-center by even a little and
-        // the dependency connectors — which aim at the row's center line — stop
-        // meeting the bars they connect.
+        // its height back evenly to both sides: a bar drifting off its row's
+        // center line reads as a row of a different height.
         const rowCenter = bar.y + BAR_HEIGHT_IN / 2;
         const barCenter = bar.barY + bar.barHeight / 2;
         if (Math.abs(barCenter - rowCenter) > EPSILON_IN) {
@@ -366,20 +346,6 @@ export function analyzeExportCoverage(
           );
         }
 
-        // Wherever the progress label ended up — in the fill, on the track, or
-        // clear of a bar too short to hold it — it stays inside the timeline
-        // zone. This is the one piece of a bar that is placed relative to the
-        // fill rather than clamped with the track, so it is the one that can
-        // walk off the slide.
-        const labelLeft = bar.progressX;
-        const labelRight = bar.progressX + bar.progressWidth;
-        if (labelLeft < TIMELINE_X_IN - EPSILON_IN || labelRight > TIMELINE_X_IN + TIMELINE_WIDTH_IN + EPSILON_IN) {
-          failures.push(
-            `slide ${slideNumber}: bar "${bar.id}" progress label spans ` +
-              `${labelLeft.toFixed(4)}-${labelRight.toFixed(4)}in, outside the timeline zone ` +
-              `(${TIMELINE_X_IN.toFixed(4)}-${(TIMELINE_X_IN + TIMELINE_WIDTH_IN).toFixed(4)}in)`,
-          );
-        }
       });
 
       if (slide.windowStart !== null && slide.windowEnd !== null && slide.windowTierDays !== null) {
@@ -469,9 +435,6 @@ export function analyzeExportCoverage(
             .forEach((depth) => lastRowAtDepth.delete(depth));
         });
 
-        if (section.assigneeY !== undefined) {
-          maxContentY = Math.max(maxContentY, section.assigneeY + LIST_ROW_HEIGHT_IN);
-        }
         section.comments.forEach((comment) => {
           if (comment.meta) {
             maxContentY = Math.max(maxContentY, comment.meta.y + COMMENT_META_ROW_HEIGHT_IN);

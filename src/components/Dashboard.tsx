@@ -113,10 +113,6 @@ function StatusDonut({ segments }: { segments: StatusSegment[] }) {
   );
 }
 
-function assigneeText(item: TimelineItem): string {
-  return item.assignee?.name ?? '—';
-}
-
 function DelayedTable({ items, today }: { items: TimelineItem[]; today: Date }) {
   if (items.length === 0) {
     return <p className="text-sm text-muted-foreground">No delayed tasks.</p>;
@@ -130,7 +126,6 @@ function DelayedTable({ items, today }: { items: TimelineItem[]; today: Date }) 
             <th className="py-2 pr-3 font-medium">Task</th>
             <th className="py-2 pr-3 font-medium">End date</th>
             <th className="py-2 pr-3 font-medium">Days overdue</th>
-            <th className="py-2 font-medium">Assignee</th>
           </tr>
         </thead>
         <tbody>
@@ -139,7 +134,6 @@ function DelayedTable({ items, today }: { items: TimelineItem[]; today: Date }) 
               <td className="py-2 pr-3 font-medium text-foreground">{item.label}</td>
               <td className="py-2 pr-3 font-mono text-xs tabular-nums text-muted-foreground">{formatShortDate(new Date(item.end))}</td>
               <td className="py-2 pr-3 font-medium text-destructive">{getDaysOverdue(item, today)}</td>
-              <td className="py-2 text-muted-foreground">{assigneeText(item)}</td>
             </tr>
           ))}
         </tbody>
@@ -160,7 +154,6 @@ function AtRiskTable({ items }: { items: TimelineItem[] }) {
           <tr className="border-b border-border text-xs font-medium text-muted-foreground">
             <th className="py-2 pr-3 font-medium">Task</th>
             <th className="py-2 pr-3 font-medium">End date</th>
-            <th className="py-2 font-medium">Assignee</th>
           </tr>
         </thead>
         <tbody>
@@ -168,7 +161,6 @@ function AtRiskTable({ items }: { items: TimelineItem[] }) {
             <tr key={item.id} className="border-b border-border last:border-0">
               <td className="py-2 pr-3 font-medium text-foreground">{item.label}</td>
               <td className="py-2 pr-3 font-mono text-xs tabular-nums text-muted-foreground">{formatShortDate(new Date(item.end))}</td>
-              <td className="py-2 text-muted-foreground">{assigneeText(item)}</td>
             </tr>
           ))}
         </tbody>

@@ -26,8 +26,8 @@ export const COLORS = {
   // --border
   border: 'E5E5E5',
   // --muted-foreground. The product has exactly one muted grey, so footer
-  // captions and de-emphasised body text (e.g. a detail section's "No
-  // assignee" placeholder) share it rather than drifting into two greys.
+  // captions and de-emphasised body text share it rather than drifting into
+  // two greys.
   footerText: '737373',
   mutedText: '737373',
   // --kind-project / --kind-phase / --kind-task: the work-item kind colours.
@@ -68,24 +68,6 @@ export const COLORS = {
   // where one year ends and the next begins.
   yearGridLine: 'B0B0B0',
   dayGridLine: 'E0E0E0',
-  // On-screen connector strokes. Relocated here unchanged so no hex lives
-  // outside this file; they have no design-system counterpart (the product's
-  // Gantt is outside the system) and deliberately keep their existing values,
-  // since retuning connectors is not part of the contrast work.
-  //
-  // Note they do not match `dependencyLine` below, which the export uses for
-  // the same relationship — a divergence that predates this and is left as a
-  // decision rather than silently unified.
-  screenDependencyLine: '8A94A0',
-  screenHierarchyLine: 'C7CDD4',
-  // Dependency connector lines between overview bars. Also derived — secondary
-  // to the bars it links, but readable on slideBg.
-  dependencyLine: 'A3A3A3',
-  // Fallback swatch fill for a detail slide's "Assigned to" line when the
-  // assignee's name no longer matches any saved Person (e.g. removed from
-  // peopleStore after the task was assigned) — a neutral badge instead of
-  // silently guessing a color that isn't really theirs.
-  assigneeFallback: '9CA3AF',
 } as const;
 
 export function withHash(hex: string) {

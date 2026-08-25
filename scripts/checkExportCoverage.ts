@@ -13,8 +13,8 @@
  * It also checks the two things a deep tree can break that a task count alone
  * would not notice: that a slide break never lands inside a level (a row's
  * parent is always its section's title or a row above it on the same slide),
- * and that the depth indent still steps by the same ratio as the on-screen
- * label column. And, on the dashboard's own tables, that a list cut down to fit
+ * and that the depth indent still steps by the same ratio as the reference
+ * ladder. And, on the dashboard's own tables, that a list cut down to fit
  * its slide says how many rows it cut and ends inside the content area.
  *
  * The fixture is deterministic — 100 exportable tasks, four levels, dependencies
@@ -26,19 +26,12 @@
  */
 import { buildDashboardSlides } from '../src/export/dashboardSlides';
 import { analyzeExportCoverage } from '../src/export/exportCoverage';
-import { BAR_HEIGHT_IN, BAR_PROGRESS_FONT_SIZE_PT, subtaskRowIndent } from '../src/export/slideLayout';
+import { BAR_HEIGHT_IN, subtaskRowIndent } from '../src/export/slideLayout';
 import { buildSlideLinks } from '../src/export/slideLinks';
 import { orderExportSlides } from '../src/export/slideOrder';
 import { buildExportSlides, type ExportMode } from '../src/export/timelineExportModel';
-import { BAR_HEIGHT_PX, PROGRESS_FONT_SIZE_PX } from '../src/components/ganttLayout';
-import {
-  BAR_HEIGHT_RATIO_BY_DEPTH,
-  buildDepthMap,
-  labelIndent,
-  MAX_LABEL_INDENT_STEPS,
-  progressLabelFitsInBar,
-  resolveBarGeometry,
-} from '../src/utils/barNesting';
+import { BAR_HEIGHT_PX } from '../src/components/ganttLayout';
+import { buildDepthMap, labelIndent, MAX_LABEL_INDENT_STEPS } from '../src/utils/barNesting';
 import { sortItemsForExport } from '../src/utils/sortItemsForExport';
 import { buildFixturePlan, isoDay, type FixturePlan } from './fixturePlan';
 import type { ExportOptions, ExportTimeframe } from '../src/types/timeline';
@@ -70,10 +63,8 @@ export function buildDeck(plan: FixturePlan, scenario: Pick<Scenario, 'exportMod
   const slides = buildExportSlides(
     sortedItems,
     plan.comments,
-    plan.people,
     scenario.commentMode,
     scenario.timeframe,
-    true,
     scenario.exportMode,
   );
   const dashboardSlides = buildDashboardSlides(sortedItems, new Date('2026-08-18T00:00:00Z'));
@@ -131,47 +122,6 @@ function checkIndentParity(): { rows: string[][]; failures: string[] } {
   return { rows, failures };
 }
 
-/** The height ladder in each unit, and where each rung puts its progress
- * percentage.
- *
- * The heights are shared by construction (one ladder, two base units), so what
- * this is really auditing is the *second* rule: the two surfaces set that label
- * at different sizes relative to their bars — 11px on a 32px bar, 9pt on a
- * 0.28in one — so "tall enough to hold the label" is a question they could
- * answer differently for the same rung without either being wrong on its own.
- * A rung where they disagree means the same plan reads one way on screen and
- * another in the file, which is the whole thing this check exists to catch. */
-function checkBarHeightParity(): { rows: string[][]; failures: string[] } {
-  const rows: string[][] = [];
-  const failures: string[] = [];
-
-  for (let depth = 0; depth < BAR_HEIGHT_RATIO_BY_DEPTH.length; depth += 1) {
-    const slideHeight = resolveBarGeometry(BAR_HEIGHT_IN, depth).height;
-    const screenHeight = resolveBarGeometry(BAR_HEIGHT_PX, depth).height;
-    const slideInside = progressLabelFitsInBar(slideHeight, BAR_PROGRESS_FONT_SIZE_PT / 72);
-    const screenInside = progressLabelFitsInBar(screenHeight, PROGRESS_FONT_SIZE_PX);
-
-    rows.push([
-      `depth ${depth}${depth === BAR_HEIGHT_RATIO_BY_DEPTH.length - 1 ? '+' : ''}`,
-      BAR_HEIGHT_RATIO_BY_DEPTH[depth].toFixed(2),
-      `${slideHeight.toFixed(4)}in`,
-      `${screenHeight}px`,
-      slideInside ? 'inside' : 'outside',
-      screenInside ? 'inside' : 'outside',
-      slideInside === screenInside ? 'match' : 'DIVERGED',
-    ]);
-
-    if (slideInside !== screenInside) {
-      failures.push(
-        `depth ${depth}: the slide puts its progress label ${slideInside ? 'inside' : 'outside'} the bar ` +
-          `and the screen puts it ${screenInside ? 'inside' : 'outside'} — the surfaces would read differently`,
-      );
-    }
-  }
-
-  return { rows, failures };
-}
-
 // --- reporting ---------------------------------------------------------------
 
 function printTable(rows: string[][], indent = '   ') {
@@ -215,14 +165,8 @@ function main() {
   console.log('Depth indent, slide vs screen (ratios, not sizes — the units differ)');
   printTable([['', 'slide step', '/ bar h', 'screen step', '/ bar h', ''], ...parity.rows]);
 
-  const heights = checkBarHeightParity();
-  console.log('');
-  console.log('Bar height by depth, and where the progress label sits');
-  printTable([['', 'ratio', 'slide bar', 'screen bar', 'slide %', 'screen %', ''], ...heights.rows]);
-
-  let totalFailures = parity.failures.length + heights.failures.length;
+  let totalFailures = parity.failures.length;
   parity.failures.forEach((failure) => console.log(`   FAIL  ${failure}`));
-  heights.failures.forEach((failure) => console.log(`   FAIL  ${failure}`));
 
   SCENARIOS.forEach((scenario, index) => {
     const { orderedSlides, links } = buildDeck(plan, scenario);

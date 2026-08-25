@@ -88,10 +88,11 @@ while its row keeps the same pitch. Three consequences worth knowing:
 - **The pre-flight check counts every task**, not the roots (`App.tsx`,
   `getExportOverviewItems`). Counting roots alone would promise the user that
   everything fits and then hand them a truncated slide.
-- **A shortened bar hands its progress percentage out to the side** rather than
-  holding it at an unreadable size (`progressLabelFitsInBar`). The switch is a
-  measurement against the label's own text height, not a depth, and it is one
-  function shared with the screen.
+- **A bar says when a task runs and nothing else.** It is one solid rectangle
+  in the task's colour, with no paler track behind it: the percentage it used
+  to carry — as a figure on the bar and as the width of a fill inside it — was
+  removed from both surfaces, so there is no fraction left for a track to be
+  the remainder of.
 
 ### A3. A comment on a non-root task is never rendered  ❌ silent
 
@@ -270,10 +271,7 @@ comment mode, with and without a timeframe — and fails when:
   same slide (a level torn across a slide break);
 - a row's drawn depth or indent disagrees with `buildDepthMap` / `subtaskRowIndent`;
 - an overview bar's height is no rung of `BAR_HEIGHT_RATIO_BY_DEPTH`, or the bar
-  is not centered on its row's center line (which is where the dependency
-  connectors aim), or its progress label lands outside the timeline zone;
-- the screen and the slides disagree about which rungs hold their progress label
-  inside the bar (`checkBarHeightParity`);
+  is not centered on its row's center line;
 - a continuation is unlabelled, or a first section claims to be one;
 - content is laid out past `CONTENT_BOTTOM_IN` — including a dashboard table,
   re-measured from the rows it actually drew rather than taken from the model;

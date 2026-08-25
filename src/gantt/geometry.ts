@@ -55,12 +55,6 @@ export const RESIZE_HANDLE_WIDTH_PX = 11;
  * half off the bar's top-right corner. */
 export const EDGE_DOT_SIZE_PX = 9;
 
-/** Assignee avatars: 20px circles set 8px past the bar's right end. */
-export const AVATAR_SIZE_PX = 20;
-export const AVATAR_GAP_PX = 8;
-/** How much each avatar after the first slides back over the one before it. */
-export const AVATAR_OVERLAP_PX = -6;
-
 /** The Edit Task panel, closed and expanded. */
 export const PANEL_WIDTH_PX = 348;
 export const PANEL_WIDE_WIDTH_PX = 520;
