@@ -18,8 +18,6 @@ interface EditTaskPanelProps {
   item: TimelineItem;
   minDate: Date;
   spans: Map<string, Span>;
-  slackOf: (id: string) => number;
-  criticalIds: Set<string>;
 }
 
 /** The tag vocabulary the handoff offers. Widened at render time with
@@ -111,7 +109,7 @@ const DATE_FIELD_STYLE: React.CSSProperties = {
  * usually reasoned about: what it is, when it happens, how it is labelled,
  * and what has been said about it.
  */
-export function EditTaskPanel({ item, minDate, spans, slackOf, criticalIds }: EditTaskPanelProps) {
+export function EditTaskPanel({ item, minDate, spans }: EditTaskPanelProps) {
   const items = useTimelineStore((state) => state.items);
   const comments = useTimelineStore((state) => state.comments);
   const updateItem = useTimelineStore((state) => state.updateItem);
@@ -384,13 +382,13 @@ export function EditTaskPanel({ item, minDate, spans, slackOf, criticalIds }: Ed
             </label>
           </div>
 
-          <span className="text-muted-foreground" style={{ fontSize: 12 }}>
-            {isGroup
-              ? 'Rolled up from sub-tasks'
-              : criticalIds.has(item.id)
-                ? 'On the critical path'
-                : `${slackOf(item.id)} days of slack`}
-          </span>
+          {/* Why a group's dates are not editable here. A leaf needs no such
+              line: its fields say what they are by being usable. */}
+          {isGroup && (
+            <span className="text-muted-foreground" style={{ fontSize: 12 }}>
+              Rolled up from sub-tasks
+            </span>
+          )}
 
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
             <button

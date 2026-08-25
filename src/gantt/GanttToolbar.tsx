@@ -9,6 +9,9 @@ import type { StatusFilter } from './rows';
 import { useGanttViewStore } from './viewStore';
 
 interface GanttToolbarProps {
+  /** Opens the export settings. Handed to the plan menu, which is where the
+   * app's own plan-level actions live now that the toolbar has none. */
+  onOpenSettings: () => void;
   /** The app's own actions — import, settings, the two exports, and the
    * view switch — rendered at the right of the top row after the plan's
    * own controls. Passed in rather than built here so this file stays about
@@ -45,7 +48,7 @@ const FILTER_CHIPS: { value: StatusFilter; label: string }[] = [
  * row in their most compact legible form — icons where the glyph says it,
  * short labels where it does not — so that row still clears its width budget.
  */
-export function GanttToolbar({ actions, showTimelineControls }: GanttToolbarProps) {
+export function GanttToolbar({ actions, showTimelineControls, onOpenSettings }: GanttToolbarProps) {
   const title = useTimelineStore((state) => state.title);
   const items = useTimelineStore((state) => state.items);
 
@@ -56,8 +59,6 @@ export function GanttToolbar({ actions, showTimelineControls }: GanttToolbarProp
   const setSearch = useGanttViewStore((state) => state.setSearch);
   const filter = useGanttViewStore((state) => state.filter);
   const setFilter = useGanttViewStore((state) => state.setFilter);
-  const showCriticalPath = useGanttViewStore((state) => state.showCriticalPath);
-  const setShowCriticalPath = useGanttViewStore((state) => state.setShowCriticalPath);
 
   // "Links" is the same setting the export slides read, not a second copy of
   // it — turning the arrows off on screen turns them off in the deck.
@@ -73,7 +74,7 @@ export function GanttToolbar({ actions, showTimelineControls }: GanttToolbarProp
   return (
     <div className="flex-none border-b border-border bg-background">
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, height: 50, padding: '0 14px' }}>
-        <PlanMenu>
+        <PlanMenu onOpenSettings={onOpenSettings}>
           <div
             className="bg-primary text-primary-foreground"
             aria-hidden="true"
@@ -206,17 +207,6 @@ export function GanttToolbar({ actions, showTimelineControls }: GanttToolbarProp
               />
               <label htmlFor="gantt-links" className="text-[11px] font-medium text-muted-foreground">
                 Links
-              </label>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-              <Switch
-                id="gantt-critical"
-                checked={showCriticalPath}
-                onCheckedChange={setShowCriticalPath}
-                label="Critical path"
-              />
-              <label htmlFor="gantt-critical" className="text-[11px] font-medium text-muted-foreground">
-                Critical path
               </label>
             </div>
           </div>

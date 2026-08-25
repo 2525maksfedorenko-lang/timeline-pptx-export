@@ -11,8 +11,6 @@ interface TaskListProps {
   progressById: Map<string, number>;
   collapsed: Record<string, boolean>;
   selectedId: string | null;
-  criticalIds: Set<string>;
-  showCriticalPath: boolean;
   onSelect: (id: string) => void;
   onToggleCollapse: (id: string) => void;
   onCycleStatus: (id: string) => void;
@@ -47,8 +45,6 @@ export function TaskList({
   progressById,
   collapsed,
   selectedId,
-  criticalIds,
-  showCriticalPath,
   onSelect,
   onToggleCollapse,
   onCycleStatus,
@@ -104,7 +100,6 @@ export function TaskList({
           progress={progressById.get(row.item.id) ?? 0}
           isSelected={selectedId === row.item.id}
           isCollapsed={collapsed[row.item.id] === true}
-          showsCriticalBadge={showCriticalPath && criticalIds.has(row.item.id)}
           isEditing={renamingId === row.item.id}
           editText={renameDraft}
           onEditTextChange={setRenameDraft}

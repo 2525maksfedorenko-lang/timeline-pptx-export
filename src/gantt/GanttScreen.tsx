@@ -28,7 +28,6 @@ import {
 } from './scale';
 import { childrenOf, progressOf } from './rollup';
 import { visibleRows } from './rows';
-import { criticalPath } from './criticalPath';
 import { descendantLeafIds, groupMoveDays, previewSpans, type DragState } from './drag';
 import { avatarColor, STATUS_CYCLE, STATUS_LABEL } from './tone';
 import { TimelineHeader } from './TimelineHeader';
@@ -70,7 +69,6 @@ export function GanttScreen() {
   const filter = useGanttViewStore((state) => state.filter);
   const collapsed = useGanttViewStore((state) => state.collapsed);
   const selectedId = useGanttViewStore((state) => state.selectedId);
-  const showCriticalPath = useGanttViewStore((state) => state.showCriticalPath);
   const select = useGanttViewStore((state) => state.select);
   const toggleCollapsed = useGanttViewStore((state) => state.toggleCollapsed);
   const collapseBranch = useGanttViewStore((state) => state.collapseBranch);
@@ -127,7 +125,6 @@ export function GanttScreen() {
     () => previewSpans(items, minDate, renderedDays, drag),
     [items, minDate, renderedDays, drag],
   );
-  const { critical, slackOf } = useMemo(() => criticalPath(items, minDate), [items, minDate]);
   const headerCells = useMemo(
     () => buildHeaderCells(minDate, renderedDays, scale),
     [minDate, renderedDays, scale],
@@ -560,8 +557,6 @@ export function GanttScreen() {
               progressById={progressById}
               collapsed={collapsed}
               selectedId={selectedId}
-              criticalIds={critical}
-              showCriticalPath={showCriticalPath}
               minHeight={bodyHeight}
               onSelect={select}
               onToggleCollapse={toggleCollapsed}
@@ -605,8 +600,6 @@ export function GanttScreen() {
               dateRangeById={dateRangeById}
               statusLabelById={statusLabelById}
               selectedId={selectedId}
-              criticalIds={critical}
-              showCriticalPath={showCriticalPath}
               showDependencies={showDependencies}
               drag={drag}
               dragLabel={dragLabel}
@@ -641,8 +634,6 @@ export function GanttScreen() {
           item={selectedItem}
           minDate={minDate}
           spans={spans}
-          slackOf={slackOf}
-          criticalIds={critical}
         />
       )}
     </div>

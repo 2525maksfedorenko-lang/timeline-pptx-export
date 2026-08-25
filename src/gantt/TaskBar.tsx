@@ -32,8 +32,6 @@ interface TaskBarProps {
   canvasWidth: number;
   progress: number;
   isSelected: boolean;
-  /** On the critical path *and* the toolbar's switch is on. */
-  isCritical: boolean;
   assignees: BarAssignee[];
   /** Human date range for the bar's tooltip, e.g. "Aug 17 – Aug 24". */
   dateRange: string;
@@ -63,7 +61,6 @@ export function TaskBar({
   canvasWidth,
   progress,
   isSelected,
-  isCritical,
   assignees,
   dateRange,
   statusLabel,
@@ -122,7 +119,7 @@ export function TaskBar({
           display: 'flex',
           alignItems: 'center',
           cursor: 'grab',
-          border: isCritical ? '1.5px solid var(--gantt-link-critical)' : 'none',
+          border: 'none',
           // The only elevation on this screen: a ring in the status' own
           // solid, at half alpha, around the selected bar.
           boxShadow: isSelected ? `0 0 0 2px color-mix(in srgb, ${tone.fill} 50%, transparent)` : 'none',

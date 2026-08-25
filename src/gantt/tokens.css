@@ -69,8 +69,6 @@
 
   /* Badges */
   --gantt-subcount-bg: #475569;
-  --gantt-cp-bg: #fee2e2;
-  --gantt-cp-fg: #b91c1c;
 
   /* Timeline overlays */
   --gantt-today-fill: rgba(254, 240, 138, 0.35);
@@ -93,7 +91,6 @@
 
   /* Connectors */
   --gantt-link: #cbd5e1;
-  --gantt-link-critical: #ef4444;
 
   /* The six-person avatar palette. Assigned by position, so a name keeps its
    * colour across every bar it appears on. */

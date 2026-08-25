@@ -53,9 +53,6 @@ interface GanttViewStore {
   focusId: string | null;
   setFocus: (id: string | null) => void;
 
-  showCriticalPath: boolean;
-  setShowCriticalPath: (value: boolean) => void;
-
   /** The panel's expanded width.  */
   panelWide: boolean;
   togglePanelWide: () => void;
@@ -99,9 +96,6 @@ export const useGanttViewStore = create<GanttViewStore>()((set) => ({
   // Entering a focus closes the Edit Task panel: the row it was open on is
   // usually the parent, which is the one row the focused view does not draw.
   setFocus: (focusId) => set({ focusId, selectedId: null }),
-
-  showCriticalPath: false,
-  setShowCriticalPath: (showCriticalPath) => set({ showCriticalPath }),
 
   panelWide: false,
   togglePanelWide: () => set((state) => ({ panelWide: !state.panelWide })),

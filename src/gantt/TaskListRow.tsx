@@ -10,8 +10,6 @@ interface TaskListRowProps {
   progress: number;
   isSelected: boolean;
   isCollapsed: boolean;
-  /** On the critical path *and* the toolbar's switch is on. */
-  showsCriticalBadge: boolean;
   isEditing: boolean;
   editText: string;
   onEditTextChange: (value: string) => void;
@@ -64,7 +62,6 @@ export function TaskListRow({
   progress,
   isSelected,
   isCollapsed,
-  showsCriticalBadge,
   isEditing,
   editText,
   onEditTextChange,
@@ -280,27 +277,6 @@ export function TaskListRow({
           <Layers size={10} strokeWidth={2.4} aria-hidden="true" />
           {childCount}
         </button>
-      )}
-
-      {showsCriticalBadge && (
-        <span
-          title="On the critical path"
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            flex: 'none',
-            height: 15,
-            padding: '0 4px',
-            borderRadius: 3,
-            background: 'var(--gantt-cp-bg)',
-            color: 'var(--gantt-cp-fg)',
-            fontSize: 8.5,
-            fontWeight: 800,
-            letterSpacing: '.06em',
-          }}
-        >
-          CP
-        </span>
       )}
 
       {/* Any row can take a sub-task — a task with one is simply a group from

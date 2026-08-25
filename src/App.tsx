@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Settings, Upload } from 'lucide-react'
+import { Upload } from 'lucide-react'
 import { GanttScreen } from './gantt/GanttScreen'
 import { GanttToolbar } from './gantt/GanttToolbar'
 import { Dashboard, type DashboardSection } from './components/Dashboard'
@@ -46,7 +46,10 @@ function App() {
   const loadPeople = usePeopleStore((state) => state.loadPeople)
 
   const [highlightSection] = useState<DashboardSection | null>(readDashboardViewParam)
-  const [activeTab, setActiveTab] = useState<Tab>(highlightSection ? 'dashboard' : 'timeline')
+  // Fixed at startup, not switched: the toolbar no longer offers the two
+  // views. The dashboard is what a deck's QR codes open (?dashboardView=…),
+  // which is the only thing that still selects it.
+  const [activeTab] = useState<Tab>(highlightSection ? 'dashboard' : 'timeline')
   const [overflow, setOverflow] = useState<PendingOverflowExport | null>(null)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isImportOpen, setIsImportOpen] = useState(false)
@@ -92,6 +95,7 @@ function App() {
           live once the screen is the plan. */}
       <GanttToolbar
         showTimelineControls={activeTab === 'timeline'}
+        onOpenSettings={() => setIsSettingsOpen(true)}
         actions={
           <>
             <button
@@ -102,15 +106,6 @@ function App() {
               className={buttonBaseClass('ghost', 'h-8 w-8 flex-none text-muted-foreground')}
             >
               <Upload size={16} strokeWidth={2} aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsSettingsOpen(true)}
-              title="Export settings"
-              aria-label="Export settings"
-              className={buttonBaseClass('ghost', 'h-8 w-8 flex-none text-muted-foreground')}
-            >
-              <Settings size={16} strokeWidth={2} aria-hidden="true" />
             </button>
             {/* Two exports, labelled by the file they produce rather than by
                 the verb — the verb is the same for both, and the row has no
@@ -131,25 +126,6 @@ function App() {
             >
               PPTX
             </button>
-            <span className="h-5 w-px flex-none bg-border" />
-            {/* The same tray the scale switch uses, so the two read as one
-                kind of control rather than two. */}
-            <div className="bg-muted flex flex-none gap-0.5 rounded-lg p-0.5">
-              {([['timeline', 'Timeline'], ['dashboard', 'Dashboard']] as const).map(([tab, label]) => (
-                <button
-                  key={tab}
-                  type="button"
-                  onClick={() => setActiveTab(tab)}
-                  aria-pressed={activeTab === tab}
-                  className={buttonBaseClass(
-                    activeTab === tab ? 'default' : 'ghost',
-                    'h-7 whitespace-nowrap px-3 text-[11px] font-semibold',
-                  )}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
           </>
         }
       />

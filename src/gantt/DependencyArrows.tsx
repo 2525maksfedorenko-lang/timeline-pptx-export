@@ -7,8 +7,6 @@ interface DependencyArrowsProps {
   spans: Map<string, Span>;
   columnWidth: number;
   width: number;
-  criticalIds: Set<string>;
-  showCriticalPath: boolean;
 }
 
 /** The links between a task and the tasks it waits on: an elbow out of the
@@ -30,8 +28,6 @@ export function DependencyArrows({
   spans,
   columnWidth,
   width,
-  criticalIds,
-  showCriticalPath,
 }: DependencyArrowsProps) {
   const rowIndexById = new Map(rows.map((row, index) => [row.item.id, index]));
 
@@ -48,16 +44,13 @@ export function DependencyArrows({
       const x2 = to.start * columnWidth;
       const y2 = toRow * ROW_HEIGHT_PX + ROW_HEIGHT_PX / 2;
       const turn = Math.max(x1 + 10, x2 - 12);
-      const isCritical =
-        showCriticalPath && criticalIds.has(dependencyId) && criticalIds.has(row.item.id);
-
       return [
         {
           key: `${dependencyId}->${row.item.id}`,
           d: `M${x1} ${y1} H${turn} V${y2} H${x2 - 6}`,
           arrow: `${x2 - 6},${y2 - 3.5} ${x2},${y2} ${x2 - 6},${y2 + 3.5}`,
-          color: isCritical ? 'var(--gantt-link-critical)' : 'var(--gantt-link)',
-          width: isCritical ? 1.6 : 1.1,
+          color: 'var(--gantt-link)',
+          width: 1.1,
         },
       ];
     }),

@@ -22,8 +22,6 @@ interface TimelineBodyProps {
   dateRangeById: Map<string, string>;
   statusLabelById: Map<string, string>;
   selectedId: string | null;
-  criticalIds: Set<string>;
-  showCriticalPath: boolean;
   showDependencies: boolean;
   drag: DragState | null;
   /** The pill's text while a drag is in flight, e.g. "Aug 13 → Aug 18  (6d)". */
@@ -59,8 +57,6 @@ export function TimelineBody({
   dateRangeById,
   statusLabelById,
   selectedId,
-  criticalIds,
-  showCriticalPath,
   showDependencies,
   drag,
   dragLabel,
@@ -155,8 +151,6 @@ export function TimelineBody({
           spans={spans}
           columnWidth={columnWidth}
           width={width}
-          criticalIds={criticalIds}
-          showCriticalPath={showCriticalPath}
         />
       )}
 
@@ -173,7 +167,6 @@ export function TimelineBody({
             canvasWidth={width}
             progress={progressById.get(row.item.id) ?? 0}
             isSelected={selectedId === row.item.id}
-            isCritical={showCriticalPath && criticalIds.has(row.item.id)}
             assignees={assigneesById.get(row.item.id) ?? []}
             dateRange={dateRangeById.get(row.item.id) ?? ''}
             statusLabel={statusLabelById.get(row.item.id) ?? ''}
