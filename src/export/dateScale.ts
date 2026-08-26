@@ -78,7 +78,7 @@ const FULL_MONTH_NAMES = [
  * strings) so the displayed month never shifts with the local timezone. */
 export function buildExportFilename(
   timeframe: { start: string; end: string } | null,
-  extension: 'pptx' | 'pdf',
+  extension: 'pptx' | 'pdf' | 'csv',
 ): string {
   if (!timeframe) return `timeline-export.${extension}`;
 

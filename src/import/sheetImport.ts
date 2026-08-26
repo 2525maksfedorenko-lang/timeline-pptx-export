@@ -25,6 +25,7 @@ const COLUMN_ALIASES: Record<string, keyof ColumnIndex> = {
   owner: 'assignee',
   parent: 'parent',
   'parent id': 'parent',
+  tags: 'tags',
 };
 
 interface ColumnIndex {
@@ -35,6 +36,7 @@ interface ColumnIndex {
   status?: number;
   assignee?: number;
   parent?: number;
+  tags?: number;
 }
 
 /** Which of the two table formats these bytes are. It is not cosmetic: an
@@ -448,6 +450,14 @@ export function parseSheet(
 
       const assigneeName = String(cell('assignee') ?? '').trim();
 
+      // One cell, comma-separated — the shape the CSV export writes and the
+      // one a person filling in a spreadsheet reaches for. Empty entries are
+      // dropped rather than imported as blank tags, so "a, b," is two tags.
+      const tags = String(cell('tags') ?? '')
+        .split(',')
+        .map((tag) => tag.trim())
+        .filter((tag) => tag !== '');
+
       const parentText = String(cell('parent') ?? '').trim();
       let parentId: string | undefined;
       if (parentText !== '') {
@@ -483,6 +493,7 @@ export function parseSheet(
           ...(status !== undefined ? { status } : {}),
           ...(progress !== null ? { progress } : {}),
           ...(assigneeName !== '' ? { assignee: { name: assigneeName } } : {}),
+          ...(tags.length > 0 ? { tags } : {}),
           ...(parentId !== undefined ? { parentId } : {}),
         },
         `Row ${rowNumber}`,
