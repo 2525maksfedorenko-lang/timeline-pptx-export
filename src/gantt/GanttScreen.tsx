@@ -700,6 +700,7 @@ export function GanttScreen() {
               rows={rows}
               spans={spans}
               scale={scale}
+              cells={headerCells}
               columnWidth={columnWidth}
               width={canvasWidth}
               height={bodyHeight}

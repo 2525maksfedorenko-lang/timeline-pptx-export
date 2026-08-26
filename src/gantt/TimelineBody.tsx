@@ -1,5 +1,7 @@
+import { useMemo } from 'react';
+
 import { ROW_HEIGHT_PX } from './geometry';
-import { PERIOD_DAYS, type TimeScale } from './scale';
+import { periodRuleLayer, type HeaderCell, type TimeScale } from './scale';
 import type { Span } from './rollup';
 import type { GanttRowModel } from './rows';
 import type { DragState } from './drag';
@@ -9,6 +11,9 @@ interface TimelineBodyProps {
   rows: GanttRowModel[];
   spans: Map<string, Span>;
   scale: TimeScale;
+  /** The header's cells — the grid's period lines are ruled at their edges,
+   * so the two can't drift apart. */
+  cells: HeaderCell[];
   columnWidth: number;
   width: number;
   height: number;
@@ -30,11 +35,11 @@ interface TimelineBodyProps {
 /** The timeline half of the canvas: the ruled grid, the three washes that
  * mark time on it, the links, and the bars.
  *
- * The grid is painted, not drawn — three layered repeating gradients rather
- * than a line per day, so a two-year plan at the day scale costs the same as
- * a two-week one. Each rule is 1px on the last pixel of its period: faint day
- * lines (week scale only, where a day is too narrow to rule strongly), strong
- * period lines at whatever the scale groups by, and soft row lines.
+ * The grid is painted, not drawn — layered gradients rather than an element
+ * per line, so a two-year plan at the day scale costs the same as a two-week
+ * one. Each rule is 1px on the last pixel of its period: faint day lines
+ * (week scale only, where a day is too narrow to rule strongly), strong
+ * period lines on the header's own cell edges, and soft row lines.
  *
  * Everything above the grid is stacked deliberately: weekend tint (0), the
  * today band (2), the links (4), the bars (5) with their edge dots (6), and
@@ -43,6 +48,7 @@ export function TimelineBody({
   rows,
   spans,
   scale,
+  cells,
   columnWidth,
   width,
   height,
@@ -57,17 +63,18 @@ export function TimelineBody({
   onContextMenuBar,
   onSelectBar,
 }: TimelineBodyProps) {
-  const period = columnWidth * PERIOD_DAYS[scale];
   // Day rules appear only at the week scale: the day scale already rules
   // every column as its period, and at the month scale 7px columns would
   // fill in solid.
   const dayLine = scale === 'week' ? columnWidth : 0;
 
+  const periodLayer = useMemo(() => periodRuleLayer(cells, columnWidth), [cells, columnWidth]);
+
   const gridLayers = [
     dayLine
       ? `repeating-linear-gradient(to right, transparent 0 ${dayLine - 1}px, var(--gantt-rule-faint) ${dayLine - 1}px ${dayLine}px)`
       : '',
-    `repeating-linear-gradient(to right, transparent 0 ${period - 1}px, var(--gantt-rule-strong) ${period - 1}px ${period}px)`,
+    periodLayer,
     `repeating-linear-gradient(to bottom, transparent 0 ${ROW_HEIGHT_PX - 1}px, var(--gantt-rule-soft) ${ROW_HEIGHT_PX - 1}px ${ROW_HEIGHT_PX}px)`,
   ].filter(Boolean);
 

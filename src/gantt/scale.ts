@@ -29,11 +29,6 @@ export const COLUMN_WIDTH_PX: Record<TimeScale, number> = {
   month: 7,
 };
 
-/** How many days one header cell spans at each scale — what the grid's
- * period lines are ruled at (`repeating-linear-gradient` period =
- * columnWidth × this). */
-export const PERIOD_DAYS: Record<TimeScale, number> = { day: 1, week: 7, month: 30 };
-
 /** Midnight UTC of `date`, as a Date. Every index in this module counts whole
  * UTC days, matching how the rest of the app reads date-only ISO strings. */
 function utcMidnight(date: Date): Date {
@@ -196,6 +191,53 @@ export function buildHeaderCells(minDate: Date, totalDays: number, scale: TimeSc
   }
 
   return cells;
+}
+
+/** Where the body rules a strong period line, in canvas pixels: the right
+ * edge of every header cell.
+ *
+ * This is the whole of the header/body agreement. The bars were always on the
+ * calendar's own ruler — a bar's x is `dayIndexOf(iso) × cw`, so a task that
+ * starts on 1 September lands exactly on the September cell's left edge — but
+ * the grid used to be ruled at a fixed period instead (`columnWidth × 30` at
+ * the month scale), which is a month no calendar has. The two rulers drifted
+ * apart by up to 140px, and the prototype's own grid drifts the same way.
+ *
+ * Ruling from the cells makes the calendar the single source: a 31-day month
+ * is 31 columns wide in the header and in the grid, and the line under a
+ * cell's border is the same line. */
+export function periodEdges(cells: HeaderCell[], columnWidth: number): number[] {
+  return cells.map((cell) => (cell.index + cell.days) * columnWidth);
+}
+
+/** The strong period rules, as one background layer.
+ *
+ * Cells of equal width tile from x=0, so they are a repeating gradient and one
+ * paint — the day scale always, and the week scale when the canvas happens to
+ * begin on a Monday and end on a Sunday. A calendar that does not tile evenly
+ * — a clipped first week, months of 28 to 31 days — is spelled out stop by
+ * stop instead. Either way the rules land on the header's cell edges, which is
+ * the point: one ruler, not two.
+ *
+ * Still a background rather than a line per period, so the layer order the
+ * grid is built on (day lines over period lines over row lines, all of it
+ * under the weekend tint) survives a scale change untouched. */
+export function periodRuleLayer(cells: HeaderCell[], columnWidth: number): string {
+  const edges = periodEdges(cells, columnWidth);
+  if (edges.length === 0) return '';
+
+  if (cells.every((cell) => cell.days === cells[0].days)) {
+    const period = cells[0].days * columnWidth;
+    return `repeating-linear-gradient(to right, transparent 0 ${period - 1}px, var(--gantt-rule-strong) ${period - 1}px ${period}px)`;
+  }
+
+  const stops = edges.flatMap((x) => [
+    `transparent ${x - 1}px`,
+    `var(--gantt-rule-strong) ${x - 1}px`,
+    `var(--gantt-rule-strong) ${x}px`,
+    `transparent ${x}px`,
+  ]);
+  return `linear-gradient(to right, transparent 0, ${stops.join(', ')})`;
 }
 
 /** Column indices that start a Saturday — the left edge of each weekend
