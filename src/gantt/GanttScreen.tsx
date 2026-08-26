@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Eye, EyeOff, FilePlus, Layers, Pencil, Plus, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Eye, EyeOff, Layers, Pencil, Plus, Trash2 } from 'lucide-react';
 import { buttonBaseClass } from '../components/systemUi';
 import { ContextMenu, type ContextMenuAction } from '../components/ContextMenu';
 import { useTimelineStore } from '../store/timelineStore';
@@ -62,8 +62,6 @@ export function GanttScreen() {
   const activePlanId = useTimelineStore((state) => state.activePlanId);
 
   const scale = useGanttViewStore((state) => state.scale);
-  const search = useGanttViewStore((state) => state.search);
-  const filter = useGanttViewStore((state) => state.filter);
   const collapsed = useGanttViewStore((state) => state.collapsed);
   const selectedId = useGanttViewStore((state) => state.selectedId);
   const select = useGanttViewStore((state) => state.select);
@@ -97,8 +95,8 @@ export function GanttScreen() {
   const columnWidth = COLUMN_WIDTH_PX[scale];
 
   const rows = useMemo(
-    () => visibleRows(items, { collapsed, search, filter, focusId: activeFocusId }),
-    [items, collapsed, search, filter, activeFocusId],
+    () => visibleRows(items, { collapsed, focusId: activeFocusId }),
+    [items, collapsed, activeFocusId],
   );
 
   const bodyHeight = Math.max(rows.length * ROW_HEIGHT_PX + ADD_ROW_HEIGHT_PX, MIN_BODY_HEIGHT_PX);
@@ -340,8 +338,8 @@ export function GanttScreen() {
   /** The sub-task count badge's action: this row and everything under it,
    * copied into a plan of its own, which then opens.
    *
-   * A copy and not a view — that is the whole difference between this and the
-   * focus below it. The plan it was taken from keeps every task it had and is
+   * A copy and not a view — that is the whole difference between this and
+   * "Show only sub-tasks", which is the same branch left where it is. The plan it was taken from keeps every task it had and is
    * still in the switcher; the new one is a plan like any other, so it is
    * edited, saved and exported like any other. */
   const makePlanFromBranch = (id: string) => {
@@ -351,8 +349,8 @@ export function GanttScreen() {
     setFocus(null);
   };
 
-  /** This item and every group under it — what "the branch" means to the two
-   * actions that act on one. */
+  /** This item and every group under it — what "the branch" means to the
+   * action that folds one away. */
   const branchGroupIds = (id: string): string[] => {
     const children = childrenOf(items, id);
     if (children.length === 0) return [];
@@ -375,14 +373,13 @@ export function GanttScreen() {
     if (selectedId === id) select(null);
   };
 
-  /** The rows a right-click offers, on the name and on the bar alike. Seven at
-   * most, and three of them only where they mean anything: a task with no
-   * sub-tasks has no branch to copy out, to fold away, or to look at on its
-   * own.
+  /** The rows a right-click offers, on the name and on the bar alike. Six at
+   * most, and two of them only where they mean anything: a task with no
+   * sub-tasks has no branch to fold away or to look at on its own.
    *
-   * The badge on the row and the first of those three do the same thing, on
-   * purpose: the badge is a small pill whose click now creates something, and
-   * a menu naming the action in words is where that is discovered. */
+   * Making a plan out of a branch is not among them: it is the sub-task count
+   * badge's click, and the badge is the one thing on a row that already names
+   * the sub-tasks that would come along. */
   const menuActions = (id: string): ContextMenuAction[] => {
     const isGroup = childrenOf(items, id).length > 0;
     const isIncluded = items.find((candidate) => candidate.id === id)?.includeInExport !== false;
@@ -402,11 +399,6 @@ export function GanttScreen() {
       },
       ...(isGroup
         ? [
-            {
-              label: 'Make a plan from this branch',
-              icon: <FilePlus size={14} strokeWidth={2} aria-hidden="true" />,
-              onSelect: () => makePlanFromBranch(id),
-            },
             {
               label: 'Show only sub-tasks',
               icon: <Layers size={14} strokeWidth={2} aria-hidden="true" />,
@@ -490,7 +482,7 @@ export function GanttScreen() {
             </button>
             <span className="h-4 w-px flex-none" style={{ background: 'var(--gantt-rule-strong)' }} />
             <Layers size={13} strokeWidth={2.2} aria-hidden="true" color="var(--gantt-text-secondary)" />
-            {/* Says both what is on screen and what is not: a filtered chart
+            {/* Says both what is on screen and what is not: a narrowed chart
                 with no such line reads as a plan that has lost its other
                 tasks. */}
             <span style={{ fontSize: 12, color: 'var(--gantt-text-secondary)', minWidth: 0 }}>

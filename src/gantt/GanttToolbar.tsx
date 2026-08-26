@@ -1,50 +1,36 @@
-import { buttonBaseClass, INPUT_SHELL_CLASS } from '../components/systemUi';
+import { buttonBaseClass } from '../components/systemUi';
 import { PlanMenu } from '../components/PlanMenu';
 import { useTimelineStore } from '../store/timelineStore';
-import { TASK_STATUS_VALUES } from '../types/timeline';
 import { TIME_SCALE_LABELS, TIME_SCALES } from './scale';
-import { STATUS_LABEL } from './tone';
-import type { StatusFilter } from './rows';
 import { useGanttViewStore } from './viewStore';
 
 interface GanttToolbarProps {
   /** Opens the export settings. Handed to the plan menu, which is where the
    * app's own plan-level actions live now that the toolbar has none. */
   onOpenSettings: () => void;
-  /** The app's own actions — import, settings, the two exports, and the
-   * view switch — rendered at the right of the top row after the plan's
-   * own controls. Passed in rather than built here so this file stays about
-   * the plan and not about what surrounds it. */
+  /** The app's own actions — import, settings and the two exports — rendered
+   * at the right of the row after the plan's own controls. Passed in rather
+   * than built here so this file stays about the plan and not about what
+   * surrounds it. */
   actions?: React.ReactNode;
-  /** False on any view that is not the plan: the scale switch, Today, and
-   * the whole second row belong to the timeline and to nothing else. */
+  /** False on any view that is not the plan: the scale switch and Today
+   * belong to the timeline and to nothing else. */
   showTimelineControls: boolean;
 }
 
-/** Which statuses get a filter chip, in the handoff's order. "All" first,
- * then the states worth singling out; "Not started" has no chip, because the
- * plan is mostly that and the chip would select nearly everything. */
-const FILTER_CHIPS: { value: StatusFilter; label: string }[] = [
-  { value: 'all', label: 'All' },
-  ...TASK_STATUS_VALUES.filter((status) => status !== 'todo').map((status) => ({
-    value: status as StatusFilter,
-    label: STATUS_LABEL[status],
-  })),
-];
-
-/** The app's one header, in two rows.
+/** The app's one header, in a single row: what the plan *is* on the left, how
+ * it is scaled and what can be done to it on the right.
  *
- * Two rows and not one because a single row overflows at about 950px — the
- * handoff says so in as many words, and names the failure: the search box
- * gets squeezed under 130px long before anything else gives. So the top row
- * is what the plan *is*, how it is scaled and what can be done to it, and the
- * second is what is being looked for in it.
+ * The handoff puts a search box and status chips on a second row beneath.
+ * Neither is here — the plan screen shows the whole plan, and nothing narrows
+ * it but a fold or a focus — so the row the handoff needed for them is gone
+ * and the header is one 50px band.
  *
  * It carries more than the handoff's toolbar does: this app also has an
- * import, an export in two formats, a settings panel and a second view, and
- * the handoff has no slot for any of them. They sit at the right of the top
- * row in their most compact legible form — icons where the glyph says it,
- * short labels where it does not — so that row still clears its width budget.
+ * import, an export in two formats and a settings panel, and the handoff has
+ * no slot for any of them. They sit at the right in their most compact
+ * legible form — icons where the glyph says it, short labels where it does
+ * not — so the row still clears its width budget.
  */
 export function GanttToolbar({ actions, showTimelineControls, onOpenSettings }: GanttToolbarProps) {
   const title = useTimelineStore((state) => state.title);
@@ -53,10 +39,6 @@ export function GanttToolbar({ actions, showTimelineControls, onOpenSettings }: 
   const scale = useGanttViewStore((state) => state.scale);
   const setScale = useGanttViewStore((state) => state.setScale);
   const requestToday = useGanttViewStore((state) => state.requestToday);
-  const search = useGanttViewStore((state) => state.search);
-  const setSearch = useGanttViewStore((state) => state.setSearch);
-  const filter = useGanttViewStore((state) => state.filter);
-  const setFilter = useGanttViewStore((state) => state.setFilter);
 
   // A group is an item something else calls its parent; everything else is a
   // work item. Two passes over the list rather than one, because the counts
@@ -148,48 +130,6 @@ export function GanttToolbar({ actions, showTimelineControls, onOpenSettings }: 
           {actions}
         </div>
       </div>
-
-      {showTimelineControls && (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-            height: 42,
-            padding: '0 14px',
-            borderTop: '1px solid hsl(var(--border))',
-          }}
-        >
-          <div style={{ flex: '0 1 230px', minWidth: 140 }}>
-            <input
-              type="text"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search tasks…"
-              aria-label="Search tasks"
-              className={`${INPUT_SHELL_CLASS} h-8 text-xs`}
-            />
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: '0 0 auto' }}>
-            {FILTER_CHIPS.map((chip) => (
-              <button
-                key={chip.value}
-                type="button"
-                onClick={() => setFilter(chip.value)}
-                aria-pressed={filter === chip.value}
-                className={buttonBaseClass(
-                  filter === chip.value ? 'secondary' : 'ghost',
-                  'h-7 whitespace-nowrap rounded-full px-3 text-[11px] font-semibold',
-                )}
-              >
-                {chip.label}
-              </button>
-            ))}
-          </div>
-
-        </div>
-      )}
     </div>
   );
 }

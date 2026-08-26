@@ -51,13 +51,8 @@ export function barWidth(spanDays: number, columnWidth: number): number {
 /** The grab strips at each end of a bar. */
 export const RESIZE_HANDLE_WIDTH_PX = 11;
 
-/** The dot on a bar's right edge: 9px, ringed in the surface colour, hung
- * half off the bar's top-right corner. */
-export const EDGE_DOT_SIZE_PX = 9;
-
-/** The Edit Task panel, closed and expanded. */
+/** The Edit Task panel's width. */
 export const PANEL_WIDTH_PX = 348;
-export const PANEL_WIDE_WIDTH_PX = 520;
 
 /** How far left of today the view opens — on mount and on the Today button,
  * so today lands a comfortable way into the viewport rather than against its

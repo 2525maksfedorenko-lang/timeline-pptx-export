@@ -1,26 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, FileText, Presentation } from 'lucide-react';
-import {
-  buttonBaseClass,
-  MENU_ITEM_CLASS,
-  MENU_LABEL_CLASS,
-  MENU_SEPARATOR_CLASS,
-  MENU_SURFACE_CLASS,
-} from './systemUi';
+import { buttonBaseClass, MENU_ITEM_CLASS, MENU_SURFACE_CLASS } from './systemUi';
 
 export type ExportFormat = 'pptx' | 'pdf';
 
-/** What the deck will hold when the plan screen is filtered down to one
- * status: the chip's own word, and how many tasks are left under it. Null
- * when the whole plan is on screen and the deck holds all of it. */
-export interface ExportScope {
-  label: string;
-  count: number;
-}
-
 interface ExportMenuProps {
   onExport: (format: ExportFormat) => void;
-  scope?: ExportScope | null;
 }
 
 /** The toolbar's Export button: one word, and the choice of file behind it.
@@ -32,7 +17,7 @@ interface ExportMenuProps {
  *
  * Drawn to the design system's menu contract, like the plan menu and the row
  * context menu — see MENU_SURFACE_CLASS in systemUi.ts. */
-export function ExportMenu({ onExport, scope = null }: ExportMenuProps) {
+export function ExportMenu({ onExport }: ExportMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
@@ -54,13 +39,7 @@ export function ExportMenu({ onExport, scope = null }: ExportMenuProps) {
     };
   }, [isOpen]);
 
-  // Nothing left under the chip is not an empty deck to hand someone — it is
-  // an export there is no point starting, so the formats say so instead of
-  // producing a file with one title slide in it.
-  const isEmpty = scope !== null && scope.count === 0;
-
   const choose = (format: ExportFormat) => {
-    if (isEmpty) return;
     setIsOpen(false);
     onExport(format);
   };
@@ -80,26 +59,10 @@ export function ExportMenu({ onExport, scope = null }: ExportMenuProps) {
 
       {isOpen && (
         <div role="menu" className={`absolute right-0 top-[calc(100%+4px)] ${MENU_SURFACE_CLASS}`}>
-          {/* Said here rather than on the button: the deck following the chip
-              is the right behaviour, but a file that quietly holds a third of
-              the plan is not something to find out about afterwards. */}
-          {scope !== null && (
-            <>
-              {/* nowrap, so the surface widens to the sentence instead of
-                  breaking "In progress only · 3 tasks" across two lines. */}
-              <div className={`${MENU_LABEL_CLASS} whitespace-nowrap font-normal text-muted-foreground`}>
-                {isEmpty
-                  ? `No ${scope.label.toLowerCase()} tasks to export`
-                  : `${scope.label} only · ${scope.count} ${scope.count === 1 ? 'task' : 'tasks'}`}
-              </div>
-              <div className={MENU_SEPARATOR_CLASS} />
-            </>
-          )}
           <button
             type="button"
             role="menuitem"
             onClick={() => choose('pptx')}
-            disabled={isEmpty}
             className={MENU_ITEM_CLASS}
           >
             <Presentation size={14} strokeWidth={2} aria-hidden="true" />
@@ -109,7 +72,6 @@ export function ExportMenu({ onExport, scope = null }: ExportMenuProps) {
             type="button"
             role="menuitem"
             onClick={() => choose('pdf')}
-            disabled={isEmpty}
             className={MENU_ITEM_CLASS}
           >
             <FileText size={14} strokeWidth={2} aria-hidden="true" />
