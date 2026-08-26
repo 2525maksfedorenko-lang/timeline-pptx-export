@@ -40,8 +40,9 @@ const node = (...children: Shape[]): Shape => ({ children });
  * on any single slide (which is what makes the appendix paging load-bearing
  * rather than theoretical), one mixed tree, one four-level chain — and then
  * cycles small ones. Sized so the plan ends up with more roots than a single
- * overview slide holds (MAX_OVERVIEW_BARS_PER_SLIDE = 12), because the compact
- * truncation and the 'full' paging are otherwise never exercised. */
+ * overview slide holds (MAX_OVERVIEW_BARS_PER_SLIDE, 15 at the deck's row
+ * pitch), because the compact truncation and the 'full' paging are otherwise
+ * never exercised. */
 const OPENING_SHAPES: Shape[] = [
   node(...Array.from({ length: 9 }, () => node(leaf, leaf))),
   node(node(leaf, leaf), node(leaf, node(leaf, leaf)), leaf, node(leaf)),

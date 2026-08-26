@@ -444,3 +444,108 @@ So the task loads, reads as **to do**, and the plan carries a repair notice
 naming it. That is the same path an unknown status from a spreadsheet has
 always taken; it is a one-way door, and re-selecting the old value is not
 possible because no control offers it.
+
+---
+
+# Phase 5 — the customer's consistency pass (`fix/deck-consistency`)
+
+Four changes asked for by the customer after reading a real deck. Three of them
+are **deliberate divergences from the handoff or reversals of our own earlier
+decisions**, so this section exists to stop a future pass "fixing" them back.
+Where the handoff and the customer disagree here, the customer wins — that is
+the standing instruction for this branch.
+
+## 1. A parent's name is bold, not underlined
+
+The overview's task name is the deck's one clickable task label (it jumps to
+that task's appendix section), and pptxgenjs stamps `u="sng"` on any run
+carrying a hyperlink. Only tasks with an appendix section get a link, and those
+are the parents — so every parent name, and nothing else, came out underlined.
+
+Fixed by setting `underline: { style: 'none' }` on that run. The link still
+works; only PowerPoint's default styling is overridden. **PDF was never
+affected** — jsPDF's `link()` draws no decoration — so this is a PPTX-only
+change and the two engines now agree.
+
+The "Back to overview" link on appendix slides keeps its underline. It is a
+navigation affordance rather than a task name, and the customer's note was
+about task rows.
+
+## 2. One date window for the whole deck
+
+**Reverses `fix/per-slide-timeframe`.** That branch gave each overview slide a
+window computed from its own tasks; the section it wrote in docs/export-sort.md
+is now marked superseded. Every overview slide is drawn against a single
+window — the first day of what the overview draws to the last — so the same x
+means the same date on every slide and two slides can be laid side by side.
+
+**The accepted cost:** a slide whose tasks all fall late in the plan draws them
+against an axis that starts at the plan's beginning, so the left part of that
+slide is empty track. The customer was told this and accepted it. Slide 7/7 of
+the fixture deck is the example: ten rows, all in Sep '26 – Jan '27, on an axis
+running Jan '26 – Feb '27.
+
+One consequence worth naming: with the automatic window covering everything the
+overview draws, no bar is ever clipped, so the timeframe chevrons only appear
+when the reader sets an explicit export timeframe. They are not dead code — the
+explicit path still reaches them.
+
+### The today rule
+
+It is drawn on every overview slide, at the same x on each, because they share
+one window. If today falls **outside** the plan's span — a plan wholly in the
+future, or one that ended before today — `todayX` is null and **no slide of the
+deck draws the rule at all**. There is no edge marker and no fallback: a rule
+pinned to the left or right edge would assert a date the axis does not carry.
+Verified both ways; there is no longer a middle case where the same day is on
+one slide and off the next.
+
+## 3. One row height, everywhere
+
+**Diverges from the handoff.** The handoff makes a row `flex:1`, so rows share
+the card's height and their pitch depends on how many a slide carries — which
+is why a slide of four rows drew them three times taller than a slide of
+fifteen. `OVERVIEW_ROW_HEIGHT_IN` is now a fixed 48px on every slide: the
+handoff's own densest row (16 rows in ~761px), the same number that used to
+serve as the floor.
+
+**The accepted cost:** a slide with fewer rows is part-empty, its card ruled
+down to a blank lower half. The customer proposed this themselves with their own
+example, slide 34 half filled, and accepted it.
+
+Two derivations to keep intact:
+
+- `MAX_OVERVIEW_BARS_PER_SLIDE = floor(ROWS_AREA_HEIGHT_IN / OVERVIEW_ROW_HEIGHT_IN)`
+  — 15 rows. Both the Compact truncation (`planOverview`) and the Full pager
+  read that constant, so changing the row height re-pages the deck by itself.
+  Nothing carries a copy of the number.
+- Because 15 × 48px = 720px against a 743.4px rows area, **even a full slide
+  keeps a ~23px strip below its last row**. That is the remainder of the floor
+  division, not a bug; it is what a fixed pitch costs against a fixed card.
+
+The coverage audit was tightened in the same move. It used to check that a row
+matched *the first row of its own card* — which passed happily while two slides
+of one deck disagreed. It now holds every row to `OVERVIEW_ROW_HEIGHT_IN`
+itself, so the pitch cannot drift without the check failing.
+
+## 4. The deck's mark, and what happened to the footer
+
+The overview's two captions are gone: the window line beside the title
+("5 months · Aug 01 – Dec 31, 2028") and the zoom caption at the right of the
+legend row ("Zoom: months"). With one window for the deck, a per-slide caption
+had nothing left to say that the axis does not.
+
+**`Exported by aicoo` took the slot beside the title**, and it did so on every
+slide, not only the overview — the deck holds one chrome, and leaving the mark
+in the footer on some slides and at the top on others would have made two.
+
+**The footer now carries the coverage note and nothing else.** The note —
+`+N tasks not shown`, the deck's promise that nothing was dropped silently — is
+untouched, and it gained the width the mark used to reserve beside it
+(`CONTENT_WIDTH_IN`, previously `CONTENT_WIDTH_IN - 2.4`). `FOOTER_HEIGHT_IN`
+is still reserved on every slide whether or not there is a note to put in it,
+which is why none of the geometry above moved.
+
+Appendix slides are the one exception to the mark: "Back to overview" already
+owns the right of their title line, so `drawChrome` is called with
+`markRight: false` there. One slot, one occupant.

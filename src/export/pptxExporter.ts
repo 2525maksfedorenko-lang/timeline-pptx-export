@@ -19,7 +19,7 @@ import {
 import { getQrCodeDataUrl, getSummaryQrCodes, type QrCodeModel } from './qrCode';
 import { buildSlideLinks, type SlideLinks } from './slideLinks';
 import { orderExportSlides } from './slideOrder';
-import { COLORS, FOOTER_TEXT, PPTX_FONT_FACE, PPTX_MONO_FONT_FACE } from './theme';
+import { COLORS, EXPORT_MARK_TEXT, PPTX_FONT_FACE, PPTX_MONO_FONT_FACE } from './theme';
 import {
   BACK_LINK_FONT_SIZE_PT,
   BACK_LINK_HEIGHT_IN,
@@ -113,9 +113,16 @@ const COMMENT_HEADING_FONT_SIZE: Record<1 | 2 | 3, number> = { 1: 16, 2: 14, 3: 
 type PptxSlide = ReturnType<pptxgen['addSlide']>;
 
 /** The frame every slide wears: a white page, the title at its top left, and
- * the footer line at the bottom. No header band any more — the export handoff
- * puts the title on the slide itself (docs/export-handoff-map.md). */
-function drawChrome(slide: PptxSlide, title: string, meta?: string) {
+ * the deck's mark at the right of the title's line. No header band any more —
+ * the export handoff puts the title on the slide itself
+ * (docs/export-handoff-map.md).
+ *
+ * The footer is *not* drawn here. It carries one thing, the coverage note, and
+ * only the slides that have one draw it (drawOmittedNote).
+ *
+ * `markRight` is false on the appendix slides, where "Back to overview" owns
+ * that end of the title's line. One slot, one occupant. */
+function drawChrome(slide: PptxSlide, title: string, markRight = true) {
   slide.background = { color: COLORS.slideBg };
 
   slide.addText(title, {
@@ -136,8 +143,8 @@ function drawChrome(slide: PptxSlide, title: string, meta?: string) {
     wrap: false,
   });
 
-  if (meta) {
-    slide.addText(meta, {
+  if (markRight) {
+    slide.addText(EXPORT_MARK_TEXT, {
       x: CONTENT_X_IN,
       y: FRAME_TOP_IN,
       w: CONTENT_WIDTH_IN,
@@ -151,20 +158,6 @@ function drawChrome(slide: PptxSlide, title: string, meta?: string) {
       wrap: false,
     });
   }
-
-  const footerY = PAGE_HEIGHT_IN - FRAME_BOTTOM_IN - FOOTER_HEIGHT_IN;
-  slide.addText(FOOTER_TEXT, {
-    x: CONTENT_X_IN,
-    y: footerY,
-    w: CONTENT_WIDTH_IN,
-    h: FOOTER_HEIGHT_IN,
-    fontSize: FOOTER_FONT_SIZE_PT,
-    color: COLORS.mutedText,
-    fontFace: PPTX_FONT_FACE,
-    valign: 'middle',
-    align: 'right',
-    margin: 0,
-  });
 }
 
 /** One status glyph, drawn from primitives at `size` inches (see
@@ -228,8 +221,9 @@ function drawStatusIcon(slide: PptxSlide, status: TaskStatus, x: number, y: numb
   }
 }
 
-/** The status legend and the zoom caption, on the line under the title. */
-function drawLegend(slide: PptxSlide, zoomCaption: string) {
+/** The status legend, on the line under the title. The zoom caption that used
+ * to sit at the right of this row is gone with the per-slide window. */
+function drawLegend(slide: PptxSlide) {
   let x = CONTENT_X_IN;
 
   LEGEND_ITEMS.forEach((item) => {
@@ -256,20 +250,6 @@ function drawLegend(slide: PptxSlide, zoomCaption: string) {
     });
     x = labelX + labelWidth + LEGEND_ITEM_GAP_IN;
   });
-
-  slide.addText(zoomCaption, {
-    x: CONTENT_X_IN,
-    y: CONTENT_TOP_IN,
-    w: CONTENT_WIDTH_IN,
-    h: LEGEND_ROW_HEIGHT_IN,
-    fontSize: LEGEND_FONT_SIZE_PT,
-    color: COLORS.mutedText,
-    fontFace: PPTX_FONT_FACE,
-    valign: 'middle',
-    align: 'right',
-    margin: 0,
-    wrap: false,
-  });
 }
 
 /** The model's own "not shown" note (see buildOmittedNote) — both exporters
@@ -277,10 +257,13 @@ function drawLegend(slide: PptxSlide, zoomCaption: string) {
 function drawOmittedNote(slide: PptxSlide, note: string | null) {
   if (!note) return;
 
+  // Full width: the provenance mark used to sit at the right of this line and
+  // 2.4in were held clear for it. It is on the title's line now, so the note
+  // has the footer to itself.
   slide.addText(note, {
     x: CONTENT_X_IN,
     y: PAGE_HEIGHT_IN - FRAME_BOTTOM_IN - FOOTER_HEIGHT_IN,
-    w: CONTENT_WIDTH_IN - 2.4,
+    w: CONTENT_WIDTH_IN,
     h: FOOTER_HEIGHT_IN,
     fontSize: FOOTER_FONT_SIZE_PT,
     bold: true,
@@ -335,9 +318,9 @@ function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel, links: S
   const barJump = (bar: OverviewSlideModel['bars'][number]) =>
     slideJump(links.detailSlideNumberByTaskId.get(bar.id), 'Open subtasks & comments');
 
-  drawChrome(slide, model.title, model.meta);
+  drawChrome(slide, model.title);
   drawOmittedNote(slide, model.omittedNote);
-  drawLegend(slide, model.zoomCaption);
+  drawLegend(slide);
 
   // The card: one white surface with a hairline border, holding everything
   // below it.
@@ -520,6 +503,13 @@ function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel, links: S
       valign: 'middle',
       margin: 0,
       wrap: false,
+      // A parent's name is the deck's one clickable task label, and pptxgenjs
+      // stamps `u="sng"` on any run carrying a hyperlink — which is what put
+      // an underline under every parent and nothing else. The weight already
+      // says "parent"; the underline said "link" in a deck where the only
+      // other underline is the back link. Turned off explicitly, since the
+      // default is PowerPoint's, not ours.
+      underline: { style: 'none' },
       ...barJump(bar),
     });
   });
@@ -630,7 +620,7 @@ function drawCommentBlock(slide: PptxSlide, block: CommentBlockRowModel) {
 }
 
 function drawDetailSlide(slide: PptxSlide, model: DetailSlideModel, links: SlideLinks) {
-  drawChrome(slide, model.title);
+  drawChrome(slide, model.title, false);
   drawBackToOverviewLink(slide, links.overviewSlideNumber);
 
   // Every single-line row on this slide is centered in a box of its own row

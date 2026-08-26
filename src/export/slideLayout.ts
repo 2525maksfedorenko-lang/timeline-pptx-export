@@ -111,10 +111,15 @@ export const CARD_MARGIN_TOP_IN = px(16);
 export const CARD_RADIUS_IN = px(14);
 export const CARD_BORDER_WIDTH_PT = 0.75;
 
-/** The footer line — the file's provenance on the right, and the coverage
- * note ("+N tasks not shown") on the left. Not in the handoff, which has no
- * footer at all; kept because the note is the deck's own promise that nothing
- * was dropped silently, and sized at the handoff's 24px floor for that reason. */
+/** The footer line — the coverage note ("+N tasks not shown"), and nothing
+ * else. Not in the handoff, which has no footer at all; kept because the note
+ * is the deck's own promise that nothing was dropped silently, and sized at
+ * the handoff's 24px floor for that reason.
+ *
+ * The provenance mark used to share this line. It moved to the right of the
+ * title (EXPORT_MARK_TEXT), which is where the overview's window caption and
+ * zoom caption used to be — so the line is reserved whether or not a slide
+ * has a note to put on it, and the geometry below is unchanged by the move. */
 export const FOOTER_HEIGHT_IN = px(28);
 export const FOOTER_FONT_SIZE_PT = pxPt(24);
 
@@ -162,15 +167,28 @@ export const COLUMN_HEADER_TRACKING_EM = 0.08;
 export const ROWS_AREA_TOP_IN = CARD_TOP_IN + COLUMN_HEADER_HEIGHT_IN;
 export const ROWS_AREA_HEIGHT_IN = CARD_BOTTOM_IN - ROWS_AREA_TOP_IN;
 
-// A row is `flex:1` in the handoff — the rows share the area equally, so their
-// pitch is a result of how many there are rather than a constant. What has to
-// be a constant is the floor: the smallest row that still holds a 26px name
-// with air around it, which is what decides how many rows a slide can take
-// before the overflow rules (Compact/Full) have to split it.
+// One row height, on every slide of the deck.
 //
-// 48px is the densest row the prototype draws (16 rows in ~761px).
-export const MIN_ROW_HEIGHT_IN = px(48);
-export const MAX_OVERVIEW_BARS_PER_SLIDE = Math.floor(ROWS_AREA_HEIGHT_IN / MIN_ROW_HEIGHT_IN);
+// **This is a deliberate divergence from the handoff**, asked for by the
+// customer. The handoff makes a row `flex:1`, so the rows share the card's
+// height and their pitch is a result of how many a slide carries — which
+// means a slide of four rows draws them three times taller than a slide of
+// fifteen, and two slides of the same deck cannot be read against each other.
+// A fixed pitch costs the opposite: a slide with few rows is left part-empty,
+// its card ruled down to a blank lower half. That was put to the customer with
+// their own example (slide 34, half filled) and accepted. See Phase 5 in
+// docs/export-handoff-map.md.
+//
+// The number is the one the floor already used: 48px, the densest row the
+// prototype draws (16 rows in ~761px). So a row is exactly as tall as the
+// tightest row the handoff itself draws, and never tighter.
+export const OVERVIEW_ROW_HEIGHT_IN = px(48);
+
+/** How many rows a slide holds — the rows area divided by the pitch above,
+ * which is also what the Compact/Full overflow rules cut to. Derived rather
+ * than written down, so the capacity can never disagree with the height the
+ * rows are actually drawn at. */
+export const MAX_OVERVIEW_BARS_PER_SLIDE = Math.floor(ROWS_AREA_HEIGHT_IN / OVERVIEW_ROW_HEIGHT_IN);
 
 /** The hairline under a row (`:67`) — `--border` at 0.6 alpha, against the
  * full-strength border the card and the column rules use. */

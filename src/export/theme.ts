@@ -118,4 +118,8 @@ export const PDF_FONT_FACE = 'helvetica';
 export const PPTX_MONO_FONT_FACE = 'Courier New';
 export const PDF_MONO_FONT_FACE = 'courier';
 
-export const FOOTER_TEXT = 'Exported from aicoo';
+/** The deck's provenance mark. It sits at the right of the title's line, not
+ * in the footer where it used to: the footer's other tenant is the coverage
+ * note, and that note is the one thing down there that must never compete for
+ * attention. See docs/export-handoff-map.md, Phase 5. */
+export const EXPORT_MARK_TEXT = 'Exported by aicoo';

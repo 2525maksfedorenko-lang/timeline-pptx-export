@@ -5,7 +5,7 @@ import { buildDepthMap } from '../utils/barNesting';
 import type { OrderedSlideModel } from './slideOrder';
 import type { SlideLinks } from './slideLinks';
 import {
-  MIN_ROW_HEIGHT_IN,
+  OVERVIEW_ROW_HEIGHT_IN,
   OVERVIEW_BAR_HEIGHT_IN,
   OVERVIEW_NESTED_BAR_HEIGHT_IN,
   CONTENT_BOTTOM_IN,
@@ -323,18 +323,15 @@ export function analyzeExportCoverage(
           );
         }
 
-        // Rows share the card's height, so every row on a slide is the same
-        // height and they tile the rows area without a gap or an overlap.
-        if (Math.abs(bar.rowHeight - slide.bars[0].rowHeight) > EPSILON_IN) {
+        // One pitch, deck-wide. Not "the same as the first row of this card" —
+        // that was the check when rows shared the card's height and a slide of
+        // four drew them taller than a slide of fifteen, and it passed happily
+        // while two slides of one deck disagreed. Held to the constant itself,
+        // so the only way to change the pitch is to change the constant.
+        if (Math.abs(bar.rowHeight - OVERVIEW_ROW_HEIGHT_IN) > EPSILON_IN) {
           failures.push(
             `slide ${slideNumber}: row "${bar.id}" is ${bar.rowHeight.toFixed(4)}in tall against ` +
-              `${slide.bars[0].rowHeight.toFixed(4)}in for the first row of the same card`,
-          );
-        }
-        if (bar.rowHeight + EPSILON_IN < MIN_ROW_HEIGHT_IN) {
-          failures.push(
-            `slide ${slideNumber}: row "${bar.id}" is ${bar.rowHeight.toFixed(4)}in tall, ` +
-              `under the ${MIN_ROW_HEIGHT_IN.toFixed(4)}in floor a 26px name needs`,
+              `the deck's ${OVERVIEW_ROW_HEIGHT_IN.toFixed(4)}in row`,
           );
         }
 
