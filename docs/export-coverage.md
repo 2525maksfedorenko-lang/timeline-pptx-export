@@ -77,8 +77,11 @@ screen and inert here, which is why the height ladder could be tuned without
 anything in the file changing.
 
 **Closed.** `planOverview` is fed every exportable task at every depth, and a bar
-is drawn shorter by its depth (`BAR_HEIGHT_RATIO_BY_DEPTH`, 1 / 0.7 / 0.55)
-while its row keeps the same pitch. Three consequences worth knowing:
+is drawn shorter when it is nested — since the export-handoff redesign, the two
+heights the handoff draws (`OVERVIEW_BAR_HEIGHT_IN` 26px for a top-level bar,
+`OVERVIEW_NESTED_BAR_HEIGHT_IN` 20px for anything under one) rather than the
+screen's three-rung ladder. Its row keeps the slide's pitch either way. Three
+consequences worth knowing:
 
 - **Depth is judged once for the whole overview**, not per page
   (`buildOverviewSlides`). A task whose parent the timeframe or the compact cut
@@ -105,11 +108,13 @@ deliberately.
 
 ### B1. Overview capacity  ⚠️ marked
 
-`MAX_OVERVIEW_BARS_PER_SLIDE` (`slideLayout.ts:247`) is derived, not hardcoded:
-`floor((CONTENT_HEIGHT_IN − GROUP_HEADER_HEIGHT_IN) / ROW_HEIGHT_IN)` =
-`floor((4.10625 − 0.26) / 0.32)` = **12** bars.
+`MAX_OVERVIEW_BARS_PER_SLIDE` is derived, not hardcoded. Rows share the chart
+card's height (the handoff draws them `flex:1`), so what the ceiling comes from
+is the *floor* on a row: `floor(ROWS_AREA_HEIGHT_IN / MIN_ROW_HEIGHT_IN)` =
+`floor(5.162 / 0.333)` = **15** bars, where 48px is the densest row the handoff's
+own prototype draws.
 
-- Compact mode: `inRange.slice(0, 12)`; the rest are dropped from the overview
+- Compact mode: `inRange.slice(0, 15)`; the rest are dropped from the overview
   and counted in `omittedCount`, drawn in the footer as
   `+N tasks not shown …` (`pptxExporter.ts:130`, `pdfExporter.ts:186`).
 - Full mode: paged across `ceil(N/12)` overview slides, `omittedCount` 0.
@@ -270,8 +275,9 @@ comment mode, with and without a timeframe — and fails when:
 - a subtask row's parent is neither its section's title nor a row above it on the
   same slide (a level torn across a slide break);
 - a row's drawn depth or indent disagrees with `buildDepthMap` / `subtaskRowIndent`;
-- an overview bar's height is no rung of `BAR_HEIGHT_RATIO_BY_DEPTH`, or the bar
-  is not centered on its row's center line;
+- an overview bar's height is neither of the handoff's two, the rows of one card
+  are not all the same height or fall under the 48px floor, or a bar is not
+  centered on its row's center line;
 - a continuation is unlabelled, or a first section claims to be one;
 - content is laid out past `CONTENT_BOTTOM_IN` — including a dashboard table,
   re-measured from the rows it actually drew rather than taken from the model;

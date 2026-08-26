@@ -1,11 +1,13 @@
 import type { TimelineItem } from '../types/timeline';
 import type { DashboardTableSlideModel } from './dashboardSlides';
 import { buildDateGrid, DATE_GRID_LEVELS, DATE_GRID_MIN_GAP_PT } from './dateGrid';
-import { BAR_HEIGHT_RATIO_BY_DEPTH, buildDepthMap } from '../utils/barNesting';
+import { buildDepthMap } from '../utils/barNesting';
 import type { OrderedSlideModel } from './slideOrder';
 import type { SlideLinks } from './slideLinks';
 import {
-  BAR_HEIGHT_IN,
+  MIN_ROW_HEIGHT_IN,
+  OVERVIEW_BAR_HEIGHT_IN,
+  OVERVIEW_NESTED_BAR_HEIGHT_IN,
   CONTENT_BOTTOM_IN,
   CONTENT_TOP_IN,
   CONTENT_X_IN,
@@ -302,21 +304,37 @@ export function analyzeExportCoverage(
         taskIds.push(bar.id);
         present.add(bar.id);
         barredIds.add(bar.id);
-        maxContentY = Math.max(maxContentY, bar.y + BAR_HEIGHT_IN);
+        maxContentY = Math.max(maxContentY, bar.y + bar.rowHeight);
 
-        // A bar's height is one of the ladder's rungs and nothing else — a
-        // height arrived at any other way means some caller is scaling bars on
-        // its own, which is exactly the drift barNesting exists to stop. Not
-        // checked against this task's depth in the *plan*: the overview judges
-        // depth against the set it draws, so a task whose parent the timeframe
-        // or the compact cut removed is legitimately drawn as a root.
-        const isLadderHeight = BAR_HEIGHT_RATIO_BY_DEPTH.some(
-          (ratio) => Math.abs(bar.barHeight - BAR_HEIGHT_IN * ratio) <= EPSILON_IN,
+        // A bar is one of the export handoff's two heights and nothing else: a
+        // top-level bar is solid and 26px, anything nested is 20px of the same
+        // hue. A height arrived at any other way means some caller is scaling
+        // bars on its own. Not checked against this task's depth in the
+        // *plan*: the overview judges depth against the set it draws, so a task
+        // whose parent the timeframe or the compact cut removed is legitimately
+        // drawn as a root.
+        const isHandoffHeight = [OVERVIEW_BAR_HEIGHT_IN, OVERVIEW_NESTED_BAR_HEIGHT_IN].some(
+          (height) => Math.abs(bar.barHeight - height) <= EPSILON_IN,
         );
-        if (!isLadderHeight) {
+        if (!isHandoffHeight) {
           failures.push(
             `slide ${slideNumber}: bar "${bar.id}" is ${bar.barHeight.toFixed(4)}in tall, ` +
-              `which is no rung of the depth ladder`,
+              `which is neither of the handoff's two bar heights`,
+          );
+        }
+
+        // Rows share the card's height, so every row on a slide is the same
+        // height and they tile the rows area without a gap or an overlap.
+        if (Math.abs(bar.rowHeight - slide.bars[0].rowHeight) > EPSILON_IN) {
+          failures.push(
+            `slide ${slideNumber}: row "${bar.id}" is ${bar.rowHeight.toFixed(4)}in tall against ` +
+              `${slide.bars[0].rowHeight.toFixed(4)}in for the first row of the same card`,
+          );
+        }
+        if (bar.rowHeight + EPSILON_IN < MIN_ROW_HEIGHT_IN) {
+          failures.push(
+            `slide ${slideNumber}: row "${bar.id}" is ${bar.rowHeight.toFixed(4)}in tall, ` +
+              `under the ${MIN_ROW_HEIGHT_IN.toFixed(4)}in floor a 26px name needs`,
           );
         }
 
@@ -333,11 +351,10 @@ export function analyzeExportCoverage(
           );
         }
 
-        // The row pitch is what every overlay, the date grid and the
-        // bars-per-slide ceiling are pinned to, so a shortened bar has to give
-        // its height back evenly to both sides: a bar drifting off its row's
+        // A nested bar is shorter than its row, so it has to give the
+        // difference back evenly to both sides: a bar drifting off its row's
         // center line reads as a row of a different height.
-        const rowCenter = bar.y + BAR_HEIGHT_IN / 2;
+        const rowCenter = bar.y + bar.rowHeight / 2;
         const barCenter = bar.barY + bar.barHeight / 2;
         if (Math.abs(barCenter - rowCenter) > EPSILON_IN) {
           failures.push(

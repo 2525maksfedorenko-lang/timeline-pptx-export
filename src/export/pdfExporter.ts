@@ -2,7 +2,7 @@ import { jsPDF } from 'jspdf';
 import type { TextOptionsLight } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import type { ExportOptions } from '../store/timelineStore';
-import type { TaskComment, TimelineItem } from '../types/timeline';
+import type { TaskComment, TaskStatus, TimelineItem } from '../types/timeline';
 import { sortItemsForExport } from '../utils/sortItemsForExport';
 import {
   buildExportSlides,
@@ -29,17 +29,25 @@ import {
   BACK_LINK_TEXT,
   BACK_LINK_WIDTH_IN,
   BACK_LINK_Y_IN,
-  BAR_HEIGHT_IN,
-  BAR_LABEL_FONT_SIZE_PT,
   BAR_RADIUS_IN,
-  BAR_STATUS_FONT_SIZE_PT,
-  AXIS_MONTH_FONT_SIZE_PT,
-  AXIS_WEEK_FONT_SIZE_PT,
+  CARD_BORDER_WIDTH_PT,
+  CARD_BOTTOM_IN,
+  CARD_HEIGHT_IN,
+  CARD_RADIUS_IN,
+  CARD_TOP_IN,
+  CARD_WIDTH_IN,
+  CARD_X_IN,
+  CHEVRON_HEIGHT_IN,
+  CHEVRON_WIDTH_IN,
+  COLUMN_HEADER_FONT_SIZE_PT,
+  COLUMN_HEADER_LINE_IN,
+  COLUMN_HEADER_SUB_LINE_Y_IN,
+  COLUMN_HEADER_TOP_LINE_Y_IN,
+  COLUMN_HEADER_TRACKING_EM,
   COMMENT_BODY_FONT_SIZE_PT,
+  COMMENT_LINE_HEIGHT_IN,
   COMMENT_TABLE_CELL_PADDING_IN,
   COMMENT_TABLE_FONT_SIZE_PT,
-  COMMENT_LINE_HEIGHT_IN,
-  CONTENT_BOTTOM_IN,
   CONTENT_TOP_IN,
   CONTENT_WIDTH_IN,
   CONTENT_X_IN,
@@ -48,33 +56,56 @@ import {
   DASHBOARD_TABLE_QR_SIZE_IN,
   DASHBOARD_TABLE_TOP_IN,
   DASHBOARD_TABLE_WIDTH_IN,
-  STATUS_RIGHT_PADDING_IN,
+  DATE_LETTER_SPACING_EM,
+  FOOTER_FONT_SIZE_PT,
   FOOTER_HEIGHT_IN,
-  GROUP_HEADER_HEIGHT_IN,
-  HEADER_HEIGHT_IN,
-  TITLE_FONT_SIZE_PT,
+  FRAME_BOTTOM_IN,
+  FRAME_TOP_IN,
+  LEGEND_FONT_SIZE_PT,
+  LEGEND_ICON_GAP_IN,
+  LEGEND_ITEM_GAP_IN,
+  LEGEND_ITEMS,
+  LEGEND_ROW_HEIGHT_IN,
+  letterSpacingPt,
   LIST_ROW_HEIGHT_IN,
+  META_FONT_SIZE_PT,
   PAGE_HEIGHT_IN,
   PAGE_WIDTH_IN,
   ROW_LABEL_HEIGHT_IN,
+  ROW_RULE_ALPHA,
+  ROW_RULE_WIDTH_PT,
+  ROWS_AREA_TOP_IN,
   rowCenterY,
+  STATUS_ICON_GEOMETRY,
+  STATUS_ICON_GRID,
+  STATUS_ICON_RING_RADIUS_UNITS,
+  STATUS_ICON_SIZE_IN,
+  STATUS_ICON_STROKE_UNITS,
+  STATUS_LETTER_SPACING_EM,
+  STATUS_RIGHT_PADDING_IN,
   SUBTASK_DATE_FONT_SIZE_PT,
   SUBTASK_STATUS_FONT_SIZE_PT,
-  SUMMARY_LEGEND_STATUS_FONT_SIZE_PT,
   SUBTASK_TEXT_FONT_SIZE_PT,
-  STATUS_LETTER_SPACING_EM,
-  COLUMN_HEADER_FONT_SIZE_PT,
-  COLUMN_DIVIDER_WIDTH_PT,
-  STATUS_CHIP_RADIUS_IN,
-  STATUS_CHIP_TEXT_INSET_IN,
-  STATUS_CHIP_BORDER_WIDTH_PT,
-  DATE_LETTER_SPACING_EM,
-  letterSpacingPt,
+  SUMMARY_LEGEND_STATUS_FONT_SIZE_PT,
+  TASK_CELL_PAD_IN,
+  TASK_NAME_FONT_SIZE_PT,
+  TITLE_FONT_SIZE_PT,
+  TITLE_LINE_HEIGHT_IN,
+  TITLE_TRACKING_EM,
+  TODAY_LINE_ALPHA,
+  TODAY_LINE_WIDTH_PT,
 } from './slideLayout';
-import { DATE_GRID_LEVELS, DATE_GRID_STYLES } from './dateGrid';
+
+/** What each status icon is stroked in — the same table the PPTX exporter
+ * uses, and for the same reasons (see STATUS_ICON_GEOMETRY). */
+const STATUS_ICON_COLORS: Record<TaskStatus, string> = {
+  done: COLORS.textOnSurface,
+  in_progress: COLORS.textOnSurface,
+  todo: COLORS.iconTodo,
+  blocked: COLORS.blocked,
+};
 
 const PT_TO_IN = 1 / 72;
-const CHEVRON_WIDTH_IN = 0.14;
 
 // Comment blocks are indented slightly from the section's left edge, same as
 // the subtask rows above them.
@@ -123,9 +154,22 @@ function drawBackToOverviewLink(doc: jsPDF, overviewSlideNumber: number | null) 
   doc.setFont(PDF_FONT_FACE, 'bold');
   doc.setFontSize(BACK_LINK_FONT_SIZE_PT);
   doc.setTextColor(withHash(COLORS.link));
-  drawText(doc, BACK_LINK_TEXT, CONTENT_X_IN, BACK_LINK_Y_IN + BACK_LINK_HEIGHT_IN / 2, { baseline: 'middle' });
+  drawText(
+    doc,
+    BACK_LINK_TEXT,
+    CONTENT_X_IN + CONTENT_WIDTH_IN,
+    BACK_LINK_Y_IN + BACK_LINK_HEIGHT_IN / 2,
+    { align: 'right', baseline: 'middle' },
+  );
 
-  linkToPage(doc, overviewSlideNumber, CONTENT_X_IN, BACK_LINK_Y_IN, BACK_LINK_WIDTH_IN, BACK_LINK_HEIGHT_IN);
+  linkToPage(
+    doc,
+    overviewSlideNumber,
+    CONTENT_X_IN + CONTENT_WIDTH_IN - BACK_LINK_WIDTH_IN,
+    BACK_LINK_Y_IN,
+    BACK_LINK_WIDTH_IN,
+    BACK_LINK_HEIGHT_IN,
+  );
 }
 
 function drawText(doc: jsPDF, text: string, x: number, y: number, options?: TextOptionsLight) {
@@ -157,26 +201,96 @@ function drawTrackedText(
   doc.setCharSpace(0);
 }
 
-function drawChrome(doc: jsPDF, title: string) {
+/** The frame every slide wears: a white page, the title at its top left, and
+ * the footer line at the bottom — the export handoff's frame, shared by every
+ * slide of the deck so a reader never meets two chromes in one file. */
+function drawChrome(doc: jsPDF, title: string, meta?: string) {
   doc.setFillColor(withHash(COLORS.slideBg));
   doc.rect(0, 0, PAGE_WIDTH_IN, PAGE_HEIGHT_IN, 'F');
 
-  doc.setFillColor(withHash(COLORS.navy));
-  doc.rect(0, 0, PAGE_WIDTH_IN, HEADER_HEIGHT_IN, 'F');
-
   doc.setFont(PDF_FONT_FACE, 'bold');
   doc.setFontSize(TITLE_FONT_SIZE_PT);
-  doc.setTextColor(withHash(COLORS.lightText));
-  drawText(doc, title, CONTENT_X_IN, HEADER_HEIGHT_IN / 2, { baseline: 'middle' });
+  doc.setTextColor(withHash(COLORS.textOnSurface));
+  drawTrackedText(
+    doc,
+    title,
+    CONTENT_X_IN,
+    FRAME_TOP_IN + TITLE_LINE_HEIGHT_IN / 2,
+    letterSpacingPt(TITLE_FONT_SIZE_PT, TITLE_TRACKING_EM),
+    { baseline: 'middle' },
+  );
 
-  const footerY = PAGE_HEIGHT_IN - FOOTER_HEIGHT_IN;
-  doc.setFillColor(withHash(COLORS.border));
-  doc.rect(0, footerY, PAGE_WIDTH_IN, FOOTER_HEIGHT_IN, 'F');
+  if (meta) {
+    doc.setFont(PDF_FONT_FACE, 'normal');
+    doc.setFontSize(META_FONT_SIZE_PT);
+    doc.setTextColor(withHash(COLORS.mutedText));
+    drawText(doc, meta, CONTENT_X_IN + CONTENT_WIDTH_IN, FRAME_TOP_IN + TITLE_LINE_HEIGHT_IN / 2, {
+      align: 'right',
+      baseline: 'middle',
+    });
+  }
+
+  const footerY = PAGE_HEIGHT_IN - FRAME_BOTTOM_IN - FOOTER_HEIGHT_IN;
+  doc.setFont(PDF_FONT_FACE, 'normal');
+  doc.setFontSize(FOOTER_FONT_SIZE_PT);
+  doc.setTextColor(withHash(COLORS.mutedText));
+  drawText(doc, FOOTER_TEXT, CONTENT_X_IN + CONTENT_WIDTH_IN, footerY + FOOTER_HEIGHT_IN / 2, {
+    align: 'right',
+    baseline: 'middle',
+  });
+}
+
+/** One status glyph, drawn from primitives at `size` inches — the same
+ * geometry the PPTX exporter draws, in jsPDF's own calls. */
+function drawStatusIcon(doc: jsPDF, status: TaskStatus, x: number, y: number, size: number) {
+  const unit = size / STATUS_ICON_GRID;
+  const color = withHash(STATUS_ICON_COLORS[status]);
+  const radius = STATUS_ICON_RING_RADIUS_UNITS * unit;
+
+  doc.setDrawColor(color);
+  doc.setLineWidth(STATUS_ICON_STROKE_UNITS * unit);
+  doc.circle(x + size / 2, y + size / 2, radius, 'S');
+
+  const geometry = STATUS_ICON_GEOMETRY[status];
+
+  geometry.polyline?.forEach((point, index) => {
+    const next = geometry.polyline?.[index + 1];
+    if (!next) return;
+    doc.line(x + point[0] * unit, y + point[1] * unit, x + next[0] * unit, y + next[1] * unit);
+  });
+
+  if (geometry.bars) {
+    doc.setFillColor(color);
+    geometry.bars.forEach((bar) => {
+      doc.rect(x + bar.x * unit, y + bar.y * unit, bar.w * unit, bar.h * unit, 'F');
+    });
+  }
+}
+
+/** The status legend and the zoom caption, on the line under the title. */
+function drawLegend(doc: jsPDF, zoomCaption: string) {
+  let x = CONTENT_X_IN;
+  const centerY = rowCenterY(CONTENT_TOP_IN, LEGEND_ROW_HEIGHT_IN);
 
   doc.setFont(PDF_FONT_FACE, 'normal');
-  doc.setFontSize(8);
-  doc.setTextColor(withHash(COLORS.footerText));
-  drawText(doc, FOOTER_TEXT, CONTENT_X_IN + CONTENT_WIDTH_IN, footerY + FOOTER_HEIGHT_IN / 2, {
+  doc.setFontSize(LEGEND_FONT_SIZE_PT);
+  doc.setTextColor(withHash(COLORS.mutedText));
+
+  LEGEND_ITEMS.forEach((item) => {
+    drawStatusIcon(
+      doc,
+      item.status,
+      x,
+      CONTENT_TOP_IN + (LEGEND_ROW_HEIGHT_IN - STATUS_ICON_SIZE_IN) / 2,
+      STATUS_ICON_SIZE_IN,
+    );
+    const labelX = x + STATUS_ICON_SIZE_IN + LEGEND_ICON_GAP_IN;
+    doc.setTextColor(withHash(COLORS.mutedText));
+    drawText(doc, item.label, labelX, centerY, { baseline: 'middle' });
+    x = labelX + measureTextWidthIn(item.label, LEGEND_FONT_SIZE_PT) + LEGEND_ITEM_GAP_IN;
+  });
+
+  drawText(doc, zoomCaption, CONTENT_X_IN + CONTENT_WIDTH_IN, centerY, {
     align: 'right',
     baseline: 'middle',
   });
@@ -187,167 +301,163 @@ function drawChrome(doc: jsPDF, title: string) {
 function drawOmittedNote(doc: jsPDF, note: string | null) {
   if (!note) return;
 
-  const footerY = PAGE_HEIGHT_IN - FOOTER_HEIGHT_IN;
-
+  const footerY = PAGE_HEIGHT_IN - FRAME_BOTTOM_IN - FOOTER_HEIGHT_IN;
   doc.setFont(PDF_FONT_FACE, 'bold');
-  doc.setFontSize(8);
+  doc.setFontSize(FOOTER_FONT_SIZE_PT);
   doc.setTextColor(withHash(COLORS.warning));
-  drawText(doc, note, CONTENT_X_IN, footerY + FOOTER_HEIGHT_IN / 2, {
-    baseline: 'middle',
-    align: 'left',
-  });
+  drawText(doc, note, CONTENT_X_IN, footerY + FOOTER_HEIGHT_IN / 2, { baseline: 'middle' });
 }
 
-/** Painted strictly back to front, because jsPDF has no z-index — draw order
- * *is* z-order:
- *   1. the three date-grid densities (palest first)
- *   2. the bars, over the grid
- *   3. every piece of text, over both, so nothing can cut through a label or
- *      a status
- * Splitting the bars into a shapes pass and a text pass is what buys step 3;
- * drawing each bar's shapes and text together would put the first bars' text
- * under the later bars again. Mirrors pptxExporter.ts's identical ordering. */
+/** Runs `draw` at `alpha`, then puts the page back to opaque. jsPDF has no
+ * per-shape alpha — the tinted bars, the row rules and the today line each
+ * need one, and leaving it set would fade everything drawn after. */
+function withAlpha(doc: jsPDF, alpha: number, draw: () => void) {
+  const GState = (doc as unknown as { GState: new (options: { opacity: number }) => unknown }).GState;
+  doc.setGState(new GState({ opacity: alpha }) as never);
+  draw();
+  doc.setGState(new GState({ opacity: 1 }) as never);
+}
+
+/** The overview slide of the export handoff, painted back to front (jsPDF has
+ * no z-index — draw order is paint order): the card and its rules, then the
+ * bars, then the today rule, then every icon and every word. */
 function drawOverviewSlide(doc: jsPDF, model: OverviewSlideModel, links: SlideLinks) {
-  drawChrome(doc, model.title);
+  drawChrome(doc, model.title, model.meta);
   drawOmittedNote(doc, model.omittedNote);
+  drawLegend(doc, model.zoomCaption);
 
-  const axisLineY = model.dateAxisY + GROUP_HEADER_HEIGHT_IN;
+  doc.setFillColor(withHash(COLORS.cardBg));
+  doc.setDrawColor(withHash(COLORS.border));
+  doc.setLineWidth(CARD_BORDER_WIDTH_PT * PT_TO_IN);
+  doc.roundedRect(
+    CARD_X_IN,
+    CARD_TOP_IN,
+    CARD_WIDTH_IN,
+    CARD_HEIGHT_IN,
+    CARD_RADIUS_IN,
+    CARD_RADIUS_IN,
+    'FD',
+  );
 
-  // "Status" and "Task" on the axis row, sharing its line and its size with the
-  // month captions — sans rather than the dates' mono, since they are words.
-  if (model.columnHeaders.length > 0) {
+  doc.setFont(PDF_FONT_FACE, 'normal');
+  doc.setFontSize(COLUMN_HEADER_FONT_SIZE_PT);
+  doc.setTextColor(withHash(COLORS.mutedText));
+  drawTrackedText(
+    doc,
+    'TASK',
+    CARD_X_IN + TASK_CELL_PAD_IN,
+    CARD_TOP_IN + COLUMN_HEADER_SUB_LINE_Y_IN + COLUMN_HEADER_LINE_IN / 2,
+    letterSpacingPt(COLUMN_HEADER_FONT_SIZE_PT, COLUMN_HEADER_TRACKING_EM),
+    { baseline: 'middle' },
+  );
+
+  model.columns.forEach((column) => {
+    const centerX = column.x + column.width / 2;
     doc.setFont(PDF_FONT_FACE, 'bold');
-    doc.setFontSize(COLUMN_HEADER_FONT_SIZE_PT);
-    doc.setTextColor(withHash(COLORS.footerText));
-    model.columnHeaders.forEach((header) => {
-      drawText(doc, header.text, header.x, rowCenterY(model.dateAxisY, GROUP_HEADER_HEIGHT_IN), {
-        baseline: 'middle',
-      });
-    });
-  }
+    doc.setTextColor(withHash(COLORS.textOnSurface));
+    drawText(
+      doc,
+      column.top,
+      centerX,
+      CARD_TOP_IN + COLUMN_HEADER_TOP_LINE_Y_IN + COLUMN_HEADER_LINE_IN / 2,
+      { align: 'center', baseline: 'middle' },
+    );
+    doc.setFont(PDF_FONT_FACE, 'normal');
+    doc.setTextColor(withHash(COLORS.mutedText));
+    drawText(
+      doc,
+      column.sub,
+      centerX,
+      CARD_TOP_IN + COLUMN_HEADER_SUB_LINE_Y_IN + COLUMN_HEADER_LINE_IN / 2,
+      { align: 'center', baseline: 'middle' },
+    );
+  });
 
-  // The vertical rule before the timeline, and the hairline under the whole
-  // header row — the same two lines the on-screen chart draws.
-  if (model.dividerX !== null) {
-    doc.setDrawColor(withHash(COLORS.border));
-    doc.setLineWidth(COLUMN_DIVIDER_WIDTH_PT * PT_TO_IN);
-    doc.line(model.dividerX, model.dividerTop, model.dividerX, model.dividerBottom);
-  }
-
+  doc.setDrawColor(withHash(COLORS.border));
+  doc.setLineWidth(CARD_BORDER_WIDTH_PT * PT_TO_IN);
   if (model.headerRuleY !== null) {
-    doc.setDrawColor(withHash(COLORS.border));
-    doc.setLineWidth(0.01);
-    doc.line(CONTENT_X_IN, model.headerRuleY, CONTENT_X_IN + CONTENT_WIDTH_IN, model.headerRuleY);
+    doc.line(CARD_X_IN, model.headerRuleY, CARD_X_IN + CARD_WIDTH_IN, model.headerRuleY);
   }
+  if (model.dividerX !== null) {
+    doc.line(model.dividerX, CARD_TOP_IN, model.dividerX, CARD_BOTTOM_IN);
+  }
+  model.gridLines.forEach((gridLine) => {
+    doc.line(gridLine.x, CARD_TOP_IN, gridLine.x, CARD_BOTTOM_IN);
+  });
 
-  if (model.gridLines.length > 0) {
-    doc.setDrawColor(withHash(COLORS.border));
-    doc.setLineWidth(0.01);
-
-    // Day/week/month lines, all full height through the bar area and all
-    // drawn from the one shared style table — only the weight and color
-    // differ per level. Grouped by level (rather than following the model's
-    // flat order) purely so jsPDF's stroke state is set three times instead
-    // of once per line; palest level first either way.
-    DATE_GRID_LEVELS.forEach((level) => {
-      const levelLines = model.gridLines.filter((gridLine) => gridLine.level === level);
-      if (levelLines.length === 0) return;
-
-      const style = DATE_GRID_STYLES[level];
-      doc.setDrawColor(withHash(style.color));
-      doc.setLineWidth(style.widthPt * PT_TO_IN);
-      levelLines.forEach((gridLine) => doc.line(gridLine.x, axisLineY, gridLine.x, CONTENT_BOTTOM_IN));
+  doc.setLineWidth(ROW_RULE_WIDTH_PT * PT_TO_IN);
+  withAlpha(doc, ROW_RULE_ALPHA, () => {
+    model.bars.slice(0, -1).forEach((bar) => {
+      const ruleY = bar.y + bar.rowHeight;
+      doc.line(CARD_X_IN, ruleY, CARD_X_IN + CARD_WIDTH_IN, ruleY);
     });
-  }
+  });
 
-  // One solid rectangle per task, spanning the days it runs.
   model.bars.forEach((bar) => {
     doc.setFillColor(withHash(bar.color));
-    doc.roundedRect(bar.barX, bar.barY, bar.barWidth, bar.barHeight, BAR_RADIUS_IN, BAR_RADIUS_IN, 'F');
+    const drawBar = () =>
+      doc.roundedRect(bar.barX, bar.barY, bar.barWidth, bar.barHeight, BAR_RADIUS_IN, BAR_RADIUS_IN, 'F');
+    if (bar.fillAlpha >= 1) drawBar();
+    else withAlpha(doc, bar.fillAlpha, drawBar);
+
+    // Chevrons mark a bar the export timeframe clipped. Triangles, not
+    // characters — glyph icons are the handoff's first export trap.
+    const chevronTop = bar.barY + (bar.barHeight - CHEVRON_HEIGHT_IN) / 2;
+    doc.setFillColor(withHash(COLORS.textOnSurface));
+    if (bar.chevronLeft) {
+      doc.triangle(
+        bar.barX,
+        chevronTop + CHEVRON_HEIGHT_IN / 2,
+        bar.barX + CHEVRON_WIDTH_IN,
+        chevronTop,
+        bar.barX + CHEVRON_WIDTH_IN,
+        chevronTop + CHEVRON_HEIGHT_IN,
+        'F',
+      );
+    }
+    if (bar.chevronRight) {
+      const right = bar.barX + bar.barWidth;
+      doc.triangle(
+        right,
+        chevronTop + CHEVRON_HEIGHT_IN / 2,
+        right - CHEVRON_WIDTH_IN,
+        chevronTop,
+        right - CHEVRON_WIDTH_IN,
+        chevronTop + CHEVRON_HEIGHT_IN,
+        'F',
+      );
+    }
   });
 
-  // Month captions at the axis's normal size, week captions a notch smaller
-  // (the model has already thinned any that would collide). Monospace, like
-  // every other date — see the matching note in pptxExporter for why these
-  // two keep their sizes while other dates shrink a point.
-  doc.setFont(PDF_MONO_FONT_FACE, 'normal');
-  doc.setTextColor(withHash(COLORS.footerText));
-  model.axisLabels.forEach((label) => {
-    const fontSize = label.level === 'month' ? AXIS_MONTH_FONT_SIZE_PT : AXIS_WEEK_FONT_SIZE_PT;
-    doc.setFontSize(fontSize);
-    drawTrackedText(
-      doc,
-      label.text,
-      label.x,
-      model.dateAxisY + GROUP_HEADER_HEIGHT_IN / 2,
-      letterSpacingPt(fontSize, DATE_LETTER_SPACING_EM),
-      { baseline: 'middle' },
-    );
-  });
+  const todayX = model.todayX;
+  if (todayX !== null) {
+    doc.setDrawColor(withHash(COLORS.today));
+    doc.setLineWidth(TODAY_LINE_WIDTH_PT * PT_TO_IN);
+    withAlpha(doc, TODAY_LINE_ALPHA, () => {
+      doc.line(todayX, ROWS_AREA_TOP_IN, todayX, CARD_BOTTOM_IN);
+    });
+  }
 
   model.bars.forEach((bar) => {
-    const centerY = bar.y + BAR_HEIGHT_IN / 2;
+    if (bar.icon !== null) {
+      drawStatusIcon(
+        doc,
+        bar.icon,
+        bar.iconX,
+        bar.y + (bar.rowHeight - STATUS_ICON_SIZE_IN) / 2,
+        STATUS_ICON_SIZE_IN,
+      );
+    }
 
-    // A bar is clickable exactly when its task has an appendix slide to open.
-    // The name and the track are no longer contiguous — the name sits in its
-    // column, the track past the divider — so this is two annotations covering
-    // the same two handles the PPTX makes clickable, rather than one spanning
-    // the gap (which would also swallow clicks on the empty gutter).
+    const centerY = rowCenterY(bar.y, bar.rowHeight);
     const detailPage = links.detailSlideNumberByTaskId.get(bar.id);
-    linkToPage(doc, detailPage, bar.labelX, bar.y, bar.labelWidth, BAR_HEIGHT_IN);
-    linkToPage(doc, detailPage, bar.barX, bar.y, bar.barWidth, BAR_HEIGHT_IN);
+    linkToPage(doc, detailPage, bar.labelX, bar.y, bar.labelWidth, bar.rowHeight);
+    linkToPage(doc, detailPage, bar.barX, bar.barY, bar.barWidth, bar.barHeight);
 
-    // The name sits in the Task column, at the same x on every row — it no
-    // longer tracks the bar. The model has already truncated it to the column's
-    // width, so no `maxWidth` here: jsPDF's own wrapping would otherwise push a
-    // measurement-approximation edge case onto a second line.
-    doc.setFontSize(BAR_LABEL_FONT_SIZE_PT);
-    doc.setTextColor(withHash(COLORS.navy));
+    doc.setFont(PDF_FONT_FACE, bar.labelBold ? 'bold' : 'normal');
+    doc.setFontSize(TASK_NAME_FONT_SIZE_PT);
+    doc.setTextColor(withHash(COLORS.textOnSurface));
     drawText(doc, bar.label, bar.labelX, centerY, { baseline: 'middle' });
-
-    // The status chip in the Status column: the app's own chip — pale surface,
-    // hairline border, dark text, lowercase — and no dropdown chevron, which
-    // would promise an interaction a slide can't honour.
-    doc.setFillColor(withHash(bar.statusChipBg));
-    doc.setDrawColor(withHash(bar.statusChipBorder));
-    doc.setLineWidth(STATUS_CHIP_BORDER_WIDTH_PT * PT_TO_IN);
-    doc.roundedRect(
-      bar.statusChipX,
-      bar.statusChipY,
-      bar.statusChipWidth,
-      bar.statusChipHeight,
-      STATUS_CHIP_RADIUS_IN,
-      STATUS_CHIP_RADIUS_IN,
-      'FD',
-    );
-    doc.setFont(PDF_FONT_FACE, 'bold');
-    doc.setFontSize(BAR_STATUS_FONT_SIZE_PT);
-    doc.setTextColor(withHash(bar.statusColor));
-    drawTrackedText(
-      doc,
-      bar.statusText,
-      bar.statusChipX + STATUS_CHIP_TEXT_INSET_IN,
-      centerY,
-      letterSpacingPt(BAR_STATUS_FONT_SIZE_PT, STATUS_LETTER_SPACING_EM),
-      { baseline: 'middle' },
-    );
-
-    // Chevrons mark a bar clipped by the export timeframe window: "starts
-    // earlier" on the left, "continues further" on the right.
-    doc.setFont(PDF_FONT_FACE, 'bold');
-    doc.setFontSize(9);
-    doc.setTextColor(withHash(COLORS.navy));
-
-    if (bar.chevronLeft) {
-      drawText(doc, '◀', bar.barX, centerY, { baseline: 'middle', align: 'left' });
-    }
-
-    if (bar.chevronRight) {
-      drawText(doc, '▶', bar.barX + bar.barWidth - CHEVRON_WIDTH_IN, centerY, {
-        baseline: 'middle',
-        align: 'left',
-      });
-    }
   });
 }
 
@@ -739,14 +849,18 @@ export async function exportTimelineToPdf(
   exportMode: ExportMode = 'compact',
 ): Promise<void> {
   const sortedItems = sortItemsForExport(items, exportOptions.sortMode);
+  // One clock reading for the whole deck: the overview's today rule and the
+  // dashboard's overdue counts have to agree about what day it is.
+  const now = new Date();
   const slides = buildExportSlides(
     sortedItems,
     comments,
     exportOptions.commentMode,
     exportOptions.exportTimeframe,
     exportMode,
+    now,
   );
-  const dashboardSlides = buildDashboardSlides(sortedItems, new Date());
+  const dashboardSlides = buildDashboardSlides(sortedItems, now);
   const summaryQrCodes = await getSummaryQrCodes();
   // Keyed by the slide model itself rather than by position, so the deck
   // order (see slideOrder.ts) can change without silently pairing a slide

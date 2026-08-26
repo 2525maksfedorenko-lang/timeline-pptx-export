@@ -2,37 +2,28 @@ import type { ExportOptions, ExportTimeframe } from '../store/timelineStore';
 import {
   getTaskStatus,
   TASK_STATUS_COLORS,
-  TASK_STATUS_SCALE,
   TASK_STATUS_LABELS,
   type TaskComment,
+  type TaskStatus,
   type TimelineItem,
 } from '../types/timeline';
 import { parseMarkdownBlocks, type MarkdownBlock } from '../utils/renderMarkdown';
 import { getStatusSegments, type StatusSegment } from '../utils/dashboardMetrics';
-import { resolveBarColor } from '../utils/barColor';
-import {
-  buildDepthMap,
-  labelIndent,
-  resolveBarGeometry,
-} from '../utils/barNesting';
+import { buildDepthMap } from '../utils/barNesting';
 import { buildTaskHierarchy, type TaskNode } from '../utils/taskHierarchy';
+import { phaseColor } from './theme';
 import {
   daysBetween,
   BASE_PX_PER_DAY,
-  formatMonthYear,
   formatShortDate,
   getDateRange,
   getItemBar,
 } from './dateScale';
 import {
   buildDateGrid,
-  DATE_GRID_MIN_GAP_PT,
-  getVisibleGridLevels,
-  MAX_VISIBLE_DAYS_FOR_WEEK_LINES,
-  resolveGridStrokes,
+  DATE_GRID_LEVELS,
   type DateGrid,
   type DateGridLevel,
-  type DateGridMark,
 } from './dateGrid';
 import {
   estimateWrappedLines,
@@ -41,15 +32,9 @@ import {
   measureTextWidthIn,
 } from './textMetrics';
 import {
-  BAR_HEIGHT_IN,
-  BAR_LABEL_FONT_SIZE_PT,
-  AXIS_LABEL_GAP_IN,
-  AXIS_MONTH_FONT_SIZE_PT,
-  AXIS_WEEK_FONT_SIZE_PT,
-  DATE_LETTER_SPACING_EM,
-  letterSpacingPt,
-  SUBTASK_DATE_FONT_SIZE_PT,
-  SUBTASK_META_GAP_IN,
+  CARD_TOP_IN,
+  CARD_X_IN,
+  COLUMN_HEADER_HEIGHT_IN,
   COMMENT_BLOCK_GAP_IN,
   COMMENT_BODY_FONT_SIZE_PT,
   COMMENT_GAP_IN,
@@ -58,27 +43,26 @@ import {
   COMMENT_META_ROW_HEIGHT_IN,
   CONTENT_HEIGHT_IN,
   CONTENT_TOP_IN,
-  CONTENT_BOTTOM_IN,
   CONTENT_X_IN,
   CONTENT_WIDTH_IN,
-  GROUP_HEADER_HEIGHT_IN,
+  DATE_LETTER_SPACING_EM,
+  letterSpacingPt,
   LIST_ROW_HEIGHT_IN,
   MAX_OVERVIEW_BARS_PER_SLIDE,
   MIN_BAR_WIDTH_IN,
+  OVERVIEW_BAR_HEIGHT_IN,
+  OVERVIEW_NESTED_BAR_HEIGHT_IN,
   OVERVIEW_WINDOW_PAD_RATIO,
-  TIMELINE_X_IN,
-  TIMELINE_WIDTH_IN,
-  STATUS_COL_WIDTH_IN,
-  TASK_COL_WIDTH_IN,
-  COLUMN_TEXT_INSET_IN,
-  COLUMN_DIVIDER_X_IN,
-  STATUS_CHIP_HEIGHT_IN,
   PARENT_SECTION_GAP_IN,
   ROW_GAP_IN,
-  ROW_HEIGHT_IN,
   ROW_LABEL_HEIGHT_IN,
+  ROWS_AREA_HEIGHT_IN,
+  ROWS_AREA_TOP_IN,
   SECTION_GAP_IN,
+  STATUS_ICON_SIZE_IN,
   STATUS_RIGHT_PADDING_IN,
+  SUBTASK_DATE_FONT_SIZE_PT,
+  SUBTASK_META_GAP_IN,
   SUBTASK_META_STATUS_GAP_IN,
   SUBTASK_STATUS_FONT_SIZE_PT,
   SUBTASK_TEXT_FONT_SIZE_PT,
@@ -86,6 +70,13 @@ import {
   subtaskRowIndent,
   tableColumnTextWidthIn,
   tableRowHeightIn,
+  TASK_CELL_PAD_IN,
+  TASK_COL_WIDTH_IN,
+  TASK_ICON_GAP_IN,
+  TASK_NAME_FONT_SIZE_PT,
+  taskCellIndent,
+  TIMELINE_X_IN,
+  TIMELINE_WIDTH_IN,
 } from './slideLayout';
 
 /** Shortens `text` with a trailing "..." until it measures at or under
@@ -108,97 +99,83 @@ function truncateToWidth(text: string, fontSizePt: number, maxWidthIn: number): 
   return end > 0 ? text.slice(0, end) + ellipsis : ellipsis;
 }
 
-export interface OverviewColumnHeaderModel {
-  text: string;
+/** One time column of the chart card: an equal slice of the timeline zone,
+ * captioned on two lines (`gantt-export.html:31`). Equal, not proportional to
+ * the days it covers — the handoff draws `repeat(N, 1fr)` and places bars as a
+ * percentage of the window, so a 28-day February column is as wide as the
+ * 31-day January beside it. */
+export interface OverviewColumnModel {
+  /** Left edge, inches from the page's left. */
   x: number;
   width: number;
+  /** The heavier line: a day number, `W3`, a month name, `Q2`. */
+  top: string;
+  /** The muted line under it: a weekday letter, a week-start date, `1–15`,
+   * `'26`. */
+  sub: string;
 }
+
+/** One row of the chart card: a task's name in the task column, its bar in the
+ * timeline zone, and — unless it is a parent — the icon its status is read
+ * from. The rows of a slide share the card's height equally (the handoff's
+ * `flex:1`), so `rowHeight` is a fact about how many rows this slide carries. */
 export interface OverviewBarModel {
   id: string;
   label: string;
-  // Where the label starts and how much room it gets. Fixed: the left edge of
-  // the Task column plus its inset, on every row, however the bar moves.
   labelX: number;
   labelWidth: number;
+  /** Parents are set in the heavier weight, exactly as the handoff sets a
+   * phase (`:101` against `:142`). */
+  labelBold: boolean;
+  /** The status this row's icon states, or null for a parent — whose status is
+   * its children's, and which the handoff draws no icon for. */
+  icon: TaskStatus | null;
+  iconX: number;
+  /** The colour of the branch this task belongs to (see buildPhaseColors),
+   * hex without '#'. */
   color: string;
-  // The status chip in the Status column: the same pale-surface / dark-text /
-  // hairline-border chip the app draws, minus the dropdown chevron, which
-  // would imply an interaction a slide cannot offer. `statusColor` is its
-  // text; the two chip colours are the other two steps of the same scale.
-  statusText: string;
-  statusColor: string;
-  statusChipX: number;
-  statusChipY: number;
-  statusChipWidth: number;
-  statusChipHeight: number;
-  statusChipBg: string;
-  statusChipBorder: string;
-  // The row's top edge. Everything drawn on the bar's *line* — its label and
-  // its status — is positioned against this and a full BAR_HEIGHT_IN box, so
-  // those stay put whatever height the bar itself is.
+  /** 1 for a top-level bar, the palette's tint for anything nested. */
+  fillAlpha: number;
+  /** The row's own box: its top edge and the height it shares out of the card. */
   y: number;
+  rowHeight: number;
   barX: number;
-  // The bar's own rectangle. A nested task's bar is drawn shorter than a
-  // top-level one and centered in the same slot (see resolveBarGeometry), so
-  // this is `y` plus a centering offset rather than `y` itself. One solid
-  // rectangle in the task's colour: it says when the task runs, and nothing
-  // else — there is no second, paler rectangle behind it, because there is no
-  // longer a fraction of it to fill.
   barY: number;
   barHeight: number;
   barWidth: number;
-  // True when the task's real start/end falls outside the export timeframe
-  // window, so the bar is drawn clipped at that edge with a chevron marker.
+  /** True when the task's real start/end falls outside the export timeframe
+   * window, so the bar is drawn clipped at that edge with a chevron marker. */
   chevronLeft: boolean;
   chevronRight: boolean;
 }
 
-// One vertical date line behind the bars. `level` picks its weight/color out
-// of DATE_GRID_STYLES — the same table the on-screen grid draws from.
+// One vertical rule behind the bars: a column boundary, which is also a real
+// calendar date at a real level. `level` is carried for the coverage audit,
+// which holds every stroke to being a mark its window's calendar actually has
+// — see auditGrid. Nothing is drawn from it: the handoff rules every boundary
+// as the same 1px hairline.
 export interface OverviewGridLineModel {
-  /** The calendar day this stroke marks, yyyy-mm-dd. Nothing is drawn from it
-   * — it is what lets an audit confirm a line is a real date at its own level
-   * rather than a stroke the layout invented (see exportCoverage.ts). */
+  /** The calendar day this stroke marks, yyyy-mm-dd. */
   date: string;
   level: DateGridLevel;
-  x: number;
-}
-
-// A date caption on the overview's axis. Month-level captions are the
-// primary scale and set at the axis's normal size; week-level ones are
-// smaller and get thinned out when they'd collide (see buildAxisLabels).
-// Daily lines are deliberately never labeled — one caption per day would be
-// an unreadable smear at any realistic range.
-export interface OverviewAxisLabelModel {
-  // 'day' only ever appears through the minimum-captions rule (see
-  // AXIS_MIN_LABELS): the density tiers themselves never caption days. Both
-  // exporters size anything that isn't 'month' at the finer caption size, so
-  // a day caption looks like a week one — which is what it is, a
-  // "Aug 17"-format date on a line the grid drew.
-  level: 'month' | 'week' | 'day';
-  text: string;
   x: number;
 }
 
 export interface OverviewSlideModel {
   kind: 'overview';
   title: string;
-  dateAxisY: number;
-  // Ordered palest-first (day, then week, then month) so a renderer can draw
-  // the array straight through without a month line being overpainted by the
-  // day line at the same x.
-  gridLines: OverviewGridLineModel[];
-  axisLabels: OverviewAxisLabelModel[];
-  // The "Status" / "Task" headings, on the same line and at the same size as
-  // the month captions so the three read as one header row. Empty when the
-  // slide has no bars — an empty export gets no column scaffolding.
-  columnHeaders: OverviewColumnHeaderModel[];
-  // The hairline under the whole header row, and the vertical rule between the
-  // two columns and the timeline. Both null on an empty slide.
-  headerRuleY: number | null;
+  /** The line beside the title: how much time this slide covers, and when. */
+  meta: string;
+  /** The caption at the right of the legend row — "Zoom: weeks". */
+  zoomCaption: string;
+  columns: OverviewColumnModel[];
+  /** The vertical rule between the task column and the timeline, and the
+   * hairline under the column header. Both null on an empty slide. */
   dividerX: number | null;
-  dividerTop: number;
-  dividerBottom: number;
+  headerRuleY: number | null;
+  /** Where the "today" rule falls, or null when today is outside the window. */
+  todayX: number | null;
+  gridLines: OverviewGridLineModel[];
   bars: OverviewBarModel[];
   // The date span this slide's axis covers, yyyy-mm-dd, or null when the slide
   // draws nothing. Carried for the same reason the grid lines carry their
@@ -207,9 +184,7 @@ export interface OverviewSlideModel {
   windowStart: string | null;
   windowEnd: string | null;
   // The day count the grid's density tier was chosen from — the widest
-  // window's, shared by every slide (see OverviewAxis.tierDays). Carried so an
-  // audit reproduces the tier this slide actually used instead of guessing it
-  // from the window, which would be a different tier and a different count.
+  // window's, shared by every slide (see OverviewAxis.tierDays).
   windowTierDays: number | null;
   // --- what this overview leaves out ------------------------------------------
   // Two different facts, kept apart because conflating them is what made the
@@ -218,18 +193,8 @@ export interface OverviewSlideModel {
   // (genuinely gone). All three fields are carried on the last overview slide
   // only — 'full' mode's pages each draw a subset, so a per-page count would
   // count the same task once per page it isn't on instead of once per deck.
-  //
-  // Exportable roots the overview draws no bar for, whatever the reason: past
-  // a 'compact' slide's capacity, or outside the export timeframe.
   omittedFromOverviewCount: number;
-  // Of those, the ones that appear nowhere in the deck at all — no bar, no
-  // appendix section, no subtask row. The number that actually matters, and
-  // the one the coverage check holds to zero-or-announced: see
-  // docs/export-coverage.md and src/export/exportCoverage.ts.
   absentTaskCount: number;
-  // The footer sentence built from the two, or null when the overview shows
-  // every root. Resolved here rather than in each exporter because both would
-  // otherwise build the same sentence from the same counts.
   omittedNote: string | null;
 }
 
@@ -341,132 +306,142 @@ function buildSummarySlide(items: TimelineItem[]): SummarySlideModel {
   };
 }
 
-/** Drops any caption that would start before the previous kept one has
- * ended (plus a gap), walking left to right. Measuring each caption's own
- * drawn width beats the fixed pitch this used to use: "Jan 2027" is half as
- * wide again as "Sep 01", so one constant could only ever be right for one
- * of the two formats. */
-function thinAxisLabels(
-  labels: OverviewAxisLabelModel[],
-  widthOf: (label: OverviewAxisLabelModel) => number,
-): OverviewAxisLabelModel[] {
-  const kept: OverviewAxisLabelModel[] = [];
-  let nextFreeX = -Infinity;
+/** The zoom levels the handoff draws, and the column each rules at.
+ *
+ * The app has no zoom control and this branch does not add one, so the level
+ * is read off the window the deck is drawn against: the widest window of the
+ * export, which is the one whose density every slide shares. The bands are the
+ * points where a column stops being legible at the 24px floor — 13 weeks fit a
+ * quarter, 12 half-months fit half a year, 12 months fit a year and a half. */
+export type SlideZoom = 'days' | 'weeks' | 'halfMonths' | 'months' | 'quarters';
 
-  labels.forEach((label) => {
-    if (label.x < nextFreeX) return;
-    kept.push(label);
-    nextFreeX = label.x + widthOf(label) + AXIS_LABEL_GAP_IN;
+export function slideZoomFor(days: number): SlideZoom {
+  if (days <= 45) return 'days';
+  if (days <= 130) return 'weeks';
+  if (days <= 200) return 'halfMonths';
+  if (days <= 550) return 'months';
+  return 'quarters';
+}
+
+const ZOOM_CAPTION: Record<SlideZoom, string> = {
+  days: 'Zoom: days',
+  weeks: 'Zoom: weeks',
+  halfMonths: 'Zoom: half-months',
+  months: 'Zoom: months',
+  quarters: 'Zoom: quarters',
+};
+
+/** How the meta line names the span a slide covers — the handoff's
+ * "1 month · Mar 2 – Apr 2, 2026" (gantt-export.html:17). */
+const ZOOM_SPAN_LABEL: Record<SlideZoom, (days: number) => string> = {
+  days: (days) => `${days} days`,
+  weeks: (days) => `${Math.round(days / 7)} weeks`,
+  halfMonths: (days) => `${Math.round(days / 30)} months`,
+  months: (days) => `${Math.round(days / 30)} months`,
+  quarters: (days) => `${Math.round((days / 365) * 10) / 10} years`,
+};
+
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+/** Monday-first initials, the single letter a 46px day column can hold. */
+const WEEKDAY_INITIALS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
+/** True when `date` opens a column at this zoom. */
+function isColumnStart(zoom: SlideZoom, date: Date): boolean {
+  const day = date.getUTCDate();
+  switch (zoom) {
+    case 'days':
+      return true;
+    case 'weeks':
+      return date.getUTCDay() === 1;
+    case 'halfMonths':
+      return day === 1 || day === 16;
+    case 'months':
+      return day === 1;
+    case 'quarters':
+      return day === 1 && date.getUTCMonth() % 3 === 0;
+  }
+}
+
+/** The dates that open a column, across the whole ruled zone.
+ *
+ * The window's own first day always opens one, whether or not the calendar
+ * agrees: a window the reader chose in the export settings can start anywhere,
+ * and a first column labelled by the day it actually starts on is truer than
+ * one silently widened to the nearest boundary. */
+function columnStarts(zoom: SlideZoom, minDate: Date, zoneDays: number): Date[] {
+  const starts: Date[] = [];
+  for (let offset = 0; offset < zoneDays; offset += 1) {
+    const date = addDays(minDate, offset);
+    if (offset === 0 || isColumnStart(zoom, date)) starts.push(date);
+  }
+  return starts;
+}
+
+/** A column's two caption lines (gantt-export.html:31, and the zoom table in
+ * the handoff's README). */
+function columnCaption(zoom: SlideZoom, date: Date, index: number): { top: string; sub: string } {
+  const month = MONTH_NAMES[date.getUTCMonth()];
+  const year = `'${String(date.getUTCFullYear()).slice(2)}`;
+
+  switch (zoom) {
+    case 'days':
+      return {
+        top: String(date.getUTCDate()).padStart(2, '0'),
+        sub: WEEKDAY_INITIALS[date.getUTCDay()],
+      };
+    case 'weeks':
+      return { top: `W${index + 1}`, sub: `${month} ${date.getUTCDate()}` };
+    case 'halfMonths':
+      return { top: month, sub: date.getUTCDate() < 16 ? '1–15' : '16–end' };
+    case 'months':
+      return { top: month, sub: year };
+    case 'quarters':
+      return { top: `Q${Math.floor(date.getUTCMonth() / 3) + 1}`, sub: year };
+  }
+}
+
+/** The strongest level of `calendar` that claims `date`, or null when none
+ * does. A column boundary is drawn as a grid stroke only if it is a mark the
+ * calendar actually has — which is what lets the coverage audit hold every
+ * stroke to a real date at a real level (see auditGrid). */
+function levelOfDate(date: Date, calendar: DateGrid): DateGridLevel | null {
+  const iso = date.toISOString().slice(0, 10);
+  let found: DateGridLevel | null = null;
+  DATE_GRID_LEVELS.forEach((level) => {
+    if (calendar[level].some((mark) => mark.date.toISOString().slice(0, 10) === iso)) found = level;
+  });
+  return found;
+}
+
+/** The colour of every task's bar, keyed by task id.
+ *
+ * Colour means branch, not status: a root takes the next colour of the phase
+ * palette (or its own `color`, which is a choice someone made), and everything
+ * under it inherits that colour whatever colour it carries itself — a subtree
+ * drawn in four colours would say nothing about what belongs to what. Status
+ * is the icon beside the name instead.
+ *
+ * Built once for the whole export, from the whole exportable set, so a task
+ * keeps its colour whichever page of a 'full' export it lands on. */
+export function buildPhaseColors(items: TimelineItem[]): Map<string, PhaseColor> {
+  const { roots } = buildTaskHierarchy(items);
+  const colors = new Map<string, PhaseColor>();
+
+  roots.forEach((root, index) => {
+    const color = phaseColor(index, root.item.color?.trim() || undefined);
+    const paint = (node: TaskNode) => {
+      colors.set(node.item.id, color);
+      node.children.forEach(paint);
+    };
+    paint(root);
   });
 
-  return kept;
+  return colors;
 }
 
-/** How few captions leave a slide without a usable scale.
- *
- * The timeline zone is TIMELINE_WIDTH_IN (5.53in) wide. Three captions leave
- * two intervals across it, so a bar in the middle can sit ~1.8in from the
- * nearest date; two leave one interval and the middle is 2.8in from either
- * end — at that point the axis names the range but stops measuring it, which
- * is what a reader uses it for. Four is the smallest count that puts a date
- * within about 1.8in of any point on the axis, and it is a floor rather than
- * a target: once a level is admitted, thinning decides how many of its
- * captions actually fit, which on a two-week window is closer to seven.
- *
- * Deliberately not a density *maximum* — that is thinAxisLabels' job, and it
- * measures each caption's drawn width rather than counting. */
-const AXIS_MIN_LABELS = 4;
-
-/** How dense a range buildDateGrid should assume when asked for a grid whose
- * levels are all populated: any span at or under MAX_VISIBLE_DAYS_FOR_DAY_LINES
- * draws all three levels, so this asks for the finest tier there is without
- * hard-coding a level list next to getVisibleGridLevels' own. */
-const FINE_GRID_VISIBLE_DAYS = 1;
-
-/** Date captions for the overview axis, thinned to what actually fits.
- *
- * Which lines get captioned follows the grid's own density (see
- * getVisibleGridLevels): a range past a year has no week lines to caption at
- * all, and its month captions carry the year — "Jan 2027" rather than
- * "Jan 01", since on a multi-year axis the day of the month is noise and the
- * year is the thing you need. Month captions are thinned the same way week
- * captions always were, because 36 of them across a 9in axis collide just as
- * readily as weekly ones do. Day and year lines get no caption of their own:
- * a caption per day is an unreadable smear at any range, and every 1 January
- * already carries a month caption that names its year. */
-function labelWidthIn(label: OverviewAxisLabelModel): number {
-  return measureMonoTextWidthIn(
-    label.text,
-    label.level === 'month' ? AXIS_MONTH_FONT_SIZE_PT : AXIS_WEEK_FONT_SIZE_PT,
-  );
-}
-
-/** `kept` plus whichever of `marks` still fit: thinned against each other
- * first, then against every caption already kept. Both halves are the same
- * rule the month/week pair always used — a caption may not start before the
- * one before it has ended, plus a gap — applied across levels so a finer
- * level can only ever land in the clear ground the coarser ones left. */
-function addLabelLevel(
-  kept: OverviewAxisLabelModel[],
-  marks: DateGridMark[],
-  level: OverviewAxisLabelModel['level'],
-  toX: (mark: DateGridMark) => number,
-  text: (mark: DateGridMark) => string,
-): OverviewAxisLabelModel[] {
-  const candidates = thinAxisLabels(
-    marks.map((mark) => ({ level, text: text(mark), x: toX(mark) })),
-    labelWidthIn,
-  )
-    // A caption is drawn rightwards from its own line (both exporters place it
-    // at `x`), so one sitting on the last line or two runs out of the zone and
-    // into the slide's margin — "Apr 2027" on a line at 9.49in ends at 10.02in,
-    // which is past the 10in slide. It captions nothing out there, so it is
-    // dropped rather than drawn off the edge. This bites more now that the grid
-    // is ruled across the whole zone: before, a narrow page's lines stopped
-    // short and never reached the edge to begin with.
-    .filter((label) => label.x + labelWidthIn(label) <= TIMELINE_X_IN + TIMELINE_WIDTH_IN)
-    .filter((label) =>
-    kept.every(
-      (other) =>
-        label.x + labelWidthIn(label) + AXIS_LABEL_GAP_IN <= other.x ||
-        label.x >= other.x + labelWidthIn(other) + AXIS_LABEL_GAP_IN,
-    ),
-  );
-
-  return [...kept, ...candidates];
-}
-
-function buildAxisLabels(
-  grid: DateGrid,
-  fineGrid: () => DateGrid,
-  toX: (mark: DateGridMark) => number,
-  isMultiYear: boolean,
-): OverviewAxisLabelModel[] {
-  const monthText = (mark: DateGridMark) =>
-    isMultiYear ? formatMonthYear(mark.date) : formatShortDate(mark.date);
-  const dayText = (mark: DateGridMark) => formatShortDate(mark.date);
-
-  // Months first, then week captions filling the gaps they leave — the axis
-  // as the density tiers alone would caption it.
-  const tiered = addLabelLevel(
-    addLabelLevel([], grid.month, 'month', toX, monthText),
-    grid.week,
-    'week',
-    toX,
-    dayText,
-  );
-  if (tiered.length >= AXIS_MIN_LABELS) return tiered;
-
-  // Too few to read a position off. Descend a level and try again — weeks if
-  // this tier drew none, then days — each pass laying its captions only where
-  // the ones already kept leave room, so descending can add captions but never
-  // move or crowd an existing one.
-  const fine = fineGrid();
-  const withWeeks =
-    grid.week.length > 0 ? tiered : addLabelLevel(tiered, fine.week, 'week', toX, dayText);
-  if (withWeeks.length >= AXIS_MIN_LABELS) return withWeeks;
-
-  return addLabelLevel(withWeeks, fine.day, 'day', toX, dayText);
+export interface PhaseColor {
+  solid: string;
+  tintAlpha: number;
 }
 
 /** The items that overlap the given export timeframe window (any part of the
@@ -545,6 +520,9 @@ interface OverviewAxis extends OverviewWindow {
    * window drawn across half an inch has its Mondays 2pt apart, and calling
    * that a week-level range because 112 < 365 produces a comb, not a grid. */
   tierDays: number;
+  /** The column granularity every slide of this export is ruled at, read off
+   * `tierDays` — see slideZoomFor. */
+  zoom: SlideZoom;
 }
 
 function addDays(date: Date, days: number): Date {
@@ -553,44 +531,22 @@ function addDays(date: Date, days: number): Date {
   return moved;
 }
 
-/** The Monday on or before `date` — the same anchor getWeekMarkers uses, so a
- * snapped edge lands on a week line the grid actually draws. */
-function startOfWeek(date: Date): Date {
-  return addDays(date, -((date.getUTCDay() + 6) % 7));
-}
-
-function startOfMonth(date: Date): Date {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
-}
-
-/** Widens a window outward until both edges sit on marks the grid will draw.
+/** Widens a window outward until both edges open a column at `zoom`.
  *
- * Snapped to the *finest* level this window's length draws, not the coarsest:
- * the fine one is the smaller move (at most six days at week level against as
- * much as a month at month level), and an axis that begins and ends on a drawn
- * line reads as a measured range rather than as one cut at an arbitrary date.
- * A day-level window is already on whole days and needs no move at all. */
-function snapWindowToGrid(window: OverviewWindow): OverviewWindow {
-  const days = daysBetween(window.minDate, window.maxDate) + 1;
-  // getVisibleGridLevels returns its levels finest-first.
-  const [finest] = getVisibleGridLevels(days);
+ * A slide whose first column is a stub of two days out of a month reads as a
+ * chart that starts mid-column; widening is the smaller lie, and it is the one
+ * the handoff tells (each of its slides carries a whole number of columns).
+ * A day-level window is already on whole columns and needs no move. */
+function snapWindowToZoom(window: OverviewWindow, zoom: SlideZoom): OverviewWindow {
+  if (zoom === 'days') return window;
 
-  if (finest === 'day') return window;
+  let minDate = window.minDate;
+  while (!isColumnStart(zoom, minDate)) minDate = addDays(minDate, -1);
 
-  if (finest === 'week') {
-    const start = startOfWeek(window.minDate);
-    const lastMonday = startOfWeek(window.maxDate);
-    const end = lastMonday.getTime() === window.maxDate.getTime() ? lastMonday : addDays(lastMonday, 7);
-    return { minDate: start, maxDate: end };
-  }
+  let maxDate = window.maxDate;
+  while (!isColumnStart(zoom, addDays(maxDate, 1))) maxDate = addDays(maxDate, 1);
 
-  const start = startOfMonth(window.minDate);
-  const firstOfMonth = startOfMonth(window.maxDate);
-  const end =
-    firstOfMonth.getTime() === window.maxDate.getTime()
-      ? firstOfMonth
-      : new Date(Date.UTC(firstOfMonth.getUTCFullYear(), firstOfMonth.getUTCMonth() + 1, 1));
-  return { minDate: start, maxDate: end };
+  return { minDate, maxDate };
 }
 
 /** One axis per page, in page order; null for a page with nothing on it.
@@ -603,11 +559,14 @@ function buildOverviewAxes(
   timeframe: ExportTimeframe | null,
 ): (OverviewAxis | null)[] {
   if (timeframe) {
+    // A window the reader chose is drawn exactly as chosen — not snapped to a
+    // column boundary, which would quietly widen the setting.
     const minDate = new Date(timeframe.start);
     const maxDate = new Date(timeframe.end);
     const tierDays = daysBetween(minDate, maxDate) + 1;
     const scale = TIMELINE_WIDTH_IN / (tierDays * BASE_PX_PER_DAY);
-    return pages.map((page) => (page.length > 0 ? { minDate, maxDate, scale, tierDays } : null));
+    const zoom = slideZoomFor(tierDays);
+    return pages.map((page) => (page.length > 0 ? { minDate, maxDate, scale, tierDays, zoom } : null));
   }
 
   const ranges = pages.map((page) => (page.length > 0 ? getDateRange(page) : null));
@@ -616,13 +575,22 @@ function buildOverviewAxes(
   // clear space either side is the same number of inches on every slide.
   const padDays = Math.max(1, Math.round(widestRawDays * OVERVIEW_WINDOW_PAD_RATIO));
 
+  // The zoom is one decision for the whole export — every slide is ruled at
+  // the same density, so every slide is ruled at the same granularity — and it
+  // is taken from the widest window before snapping, since snapping can only
+  // move an edge by less than one column.
+  const zoom = slideZoomFor(widestRawDays + padDays * 2);
+
   const windows = ranges.map((range) =>
     range === null
       ? null
-      : snapWindowToGrid({
-          minDate: addDays(range.minDate, -padDays),
-          maxDate: addDays(range.maxDate, padDays),
-        }),
+      : snapWindowToZoom(
+          {
+            minDate: addDays(range.minDate, -padDays),
+            maxDate: addDays(range.maxDate, padDays),
+          },
+          zoom,
+        ),
   );
 
   // The widest window fills the timeline zone exactly; every other slide runs
@@ -633,92 +601,96 @@ function buildOverviewAxes(
   );
   const scale = TIMELINE_WIDTH_IN / (widestDays * BASE_PX_PER_DAY);
 
-  return windows.map((window) => (window ? { ...window, scale, tierDays: widestDays } : null));
+  return windows.map((window) => (window ? { ...window, scale, tierDays: widestDays, zoom } : null));
 }
 
-/** Lays out one overview slide: a date-scale axis at the top, then one bar
- * per item. If a task's real dates fall outside `dateWindow`, the bar is
- * clipped to the content edge and flagged with a chevron. */
+/** Lays out one overview slide to the export handoff: a title with the window
+ * beside it, the status legend, then a card holding a column header and one
+ * row per task.
+ *
+ * The rows share the card's height (the handoff's `flex:1`), the columns are
+ * equal slices of the timeline zone, and a bar is placed by the fraction of
+ * the window its dates cover — never by column index, so a task's length is
+ * readable against any other task's on any slide of the deck. */
 function buildOverviewSlide(
   items: TimelineItem[],
   axis: OverviewAxis | null,
   title: string,
   omission: OverviewOmission,
   depthById: ReadonlyMap<string, number>,
+  colorByTaskId: ReadonlyMap<string, PhaseColor>,
+  parentIds: ReadonlySet<string>,
+  today: Date,
 ): OverviewSlideModel {
   const bars: OverviewBarModel[] = [];
-  const dateAxisY = CONTENT_TOP_IN;
   const windowStart = axis && items.length > 0 ? axis.minDate.toISOString().slice(0, 10) : null;
   const windowEnd = axis && items.length > 0 ? axis.maxDate.toISOString().slice(0, 10) : null;
   const windowTierDays = axis && items.length > 0 ? axis.tierDays : null;
   let gridLines: OverviewGridLineModel[] = [];
-  let axisLabels: OverviewAxisLabelModel[] = [];
-  let columnHeaders: OverviewColumnHeaderModel[] = [];
+  let columns: OverviewColumnModel[] = [];
   let headerRuleY: number | null = null;
   let dividerX: number | null = null;
+  let todayX: number | null = null;
+  let meta = '';
+  let zoomCaption = '';
 
   if (axis && items.length > 0) {
-    const { minDate, maxDate, scale, tierDays } = axis;
+    const { minDate, maxDate, scale, tierDays, zoom } = axis;
     const totalDays = daysBetween(minDate, maxDate) + 1;
     // How much of the timeline zone this slide's window actually occupies. The
     // widest slide of the export fills it; a narrower one stops short, and
-    // everything below clamps against *this* edge rather than the zone's, so a
-    // bar at the end of a short window is held at the end of that window
-    // instead of being allowed to run on into blank space.
+    // everything below clamps against *this* edge rather than the zone's.
     const windowWidthIn = totalDays * BASE_PX_PER_DAY * scale;
 
-    // Ruled across the whole zone, not across this slide's own window.
-    //
-    // The zone holds exactly `tierDays` days at this scale — that is how the
-    // scale is defined (see buildOverviewAxes: TIMELINE_WIDTH_IN over
-    // tierDays * BASE_PX_PER_DAY) — so ruling that many days from this slide's
-    // own start covers it edge to edge. Handing buildDateGrid the *window*
-    // instead, as this did, ties the grid to a fact about the page's tasks:
-    // on the export's widest page the two coincide and nothing looks wrong,
-    // but a page whose tasks span a third of the widest ruled a third of the
-    // zone and left the rest blank.
-    //
-    // `tierDays` is still what picks the density, so a slide covering four
-    // months draws week lines while one covering three years draws months.
+    // Ruled across the whole zone, not across this slide's own window: the
+    // zone holds exactly `tierDays` days at the shared density, so a page
+    // whose tasks span less than the widest is still ruled edge to edge.
     const gridEnd = addDays(minDate, tierDays - 1);
-    const grid = buildDateGrid(minDate, gridEnd, tierDays);
-    const toX = (mark: DateGridMark) => TIMELINE_X_IN + mark.dayOffset * BASE_PX_PER_DAY * scale;
-    // One stroke per position, owned by the strongest level there — see
-    // resolveGridStrokes. The gap is the shared constant in points, converted
-    // to this surface's inches.
-    gridLines = resolveGridStrokes(grid, toX, DATE_GRID_MIN_GAP_PT / 72);
-    // The slide shows the whole window at once, so the grid's density tier
-    // follows the window's own length — and the axis captions follow the
-    // same tier, so lines and captions can't disagree about how coarse this
-    // range is.
-    // Captions follow the same tier as the lines, so a slide can't caption a
-    // range more finely than it rules it.
-    axisLabels = buildAxisLabels(grid, () => buildDateGrid(minDate, gridEnd, FINE_GRID_VISIBLE_DAYS), toX, tierDays > MAX_VISIBLE_DAYS_FOR_WEEK_LINES);
+    const calendar = buildDateGrid(minDate, gridEnd, tierDays);
+    const starts = columnStarts(zoom, minDate, tierDays);
+    const columnWidth = TIMELINE_WIDTH_IN / starts.length;
 
-    // The two column headings sit on the axis row, so "Status", "Task" and the
-    // month captions all share one line; the hairline under that row and the
-    // vertical rule before the timeline are the same two lines the app draws.
-    columnHeaders = [
-      { text: 'Status', x: CONTENT_X_IN + COLUMN_TEXT_INSET_IN, width: STATUS_COL_WIDTH_IN },
-      {
-        text: 'Task',
-        x: CONTENT_X_IN + STATUS_COL_WIDTH_IN + COLUMN_TEXT_INSET_IN,
-        width: TASK_COL_WIDTH_IN,
-      },
-    ];
-    headerRuleY = dateAxisY + GROUP_HEADER_HEIGHT_IN;
-    dividerX = COLUMN_DIVIDER_X_IN;
+    columns = starts.map((date, index) => ({
+      x: TIMELINE_X_IN + index * columnWidth,
+      width: columnWidth,
+      ...columnCaption(zoom, date, index),
+    }));
 
-    let y = CONTENT_TOP_IN + GROUP_HEADER_HEIGHT_IN;
+    // One stroke per column boundary, and the first boundary is the divider
+    // between the task column and the zone — drawn once, as that divider.
+    gridLines = starts.slice(1).flatMap((date, index) => {
+      const level = levelOfDate(date, calendar);
+      if (level === null) return [];
+      return [
+        {
+          date: date.toISOString().slice(0, 10),
+          level,
+          x: TIMELINE_X_IN + (index + 1) * columnWidth,
+        },
+      ];
+    });
+
+    headerRuleY = CARD_TOP_IN + COLUMN_HEADER_HEIGHT_IN;
+    dividerX = TIMELINE_X_IN;
+
+    const todayOffset = daysBetween(minDate, today);
+    const todayIn = todayOffset * BASE_PX_PER_DAY * scale;
+    todayX = todayIn >= 0 && todayIn <= windowWidthIn ? TIMELINE_X_IN + todayIn : null;
+
+    zoomCaption = ZOOM_CAPTION[zoom];
+    meta = `${ZOOM_SPAN_LABEL[zoom](totalDays)} · ${formatShortDate(minDate)} – ${formatShortDate(maxDate)}, ${maxDate.getUTCFullYear()}`;
+
+    // Rows share the card equally — the handoff's own `flex:1`. The count is
+    // never past MAX_OVERVIEW_BARS_PER_SLIDE (planOverview and the 'full' mode
+    // pager both cut to it), so a row is never thinner than MIN_ROW_HEIGHT_IN.
+    const rowHeight = ROWS_AREA_HEIGHT_IN / items.length;
+    let y = ROWS_AREA_TOP_IN;
 
     items.forEach((item) => {
       const { left, width } = getItemBar(item, minDate, BASE_PX_PER_DAY);
-      const status = getTaskStatus(item);
 
       // Raw (unclamped) horizontal extent, in inches from TIMELINE_X_IN — used
-      // only to detect whether the real task dates spill outside the window;
-      // never used directly to draw, since it can be negative or exceed
-      // TIMELINE_WIDTH_IN.
+      // only to detect whether the real task dates spill outside the window.
       const rawLeftIn = left * scale;
       const rawRightIn = (left + width) * scale;
       const chevronLeft = rawLeftIn < -0.001;
@@ -727,88 +699,63 @@ function buildOverviewSlide(
       const clippedLeftIn = Math.max(rawLeftIn, 0);
       const clippedRightIn = Math.min(rawRightIn, windowWidthIn);
 
-      // No label zone to reserve any more: the name and the status live in their
-      // own columns, so a bar is free to use the whole timeline zone and is
-      // clamped only by that zone's own right edge. A bar can still start at the
-      // very end of the window, in which case MIN_BAR_WIDTH_IN keeps it
-      // visible — it just can't spill past TIMELINE_X_IN + TIMELINE_WIDTH_IN.
       const maxLeftIn = Math.max(0, windowWidthIn - MIN_BAR_WIDTH_IN);
       const barX = TIMELINE_X_IN + Math.min(clippedLeftIn, maxLeftIn);
-
       const maxBarWidth = Math.max(MIN_BAR_WIDTH_IN, TIMELINE_X_IN + windowWidthIn - barX);
       const windowClippedWidth = Math.max(clippedRightIn - (barX - TIMELINE_X_IN), 0);
       const barWidth = Math.min(Math.max(windowClippedWidth, MIN_BAR_WIDTH_IN), maxBarWidth);
-      const barColor = resolveBarColor(item);
+
       // Nesting is judged against the items the overview draws *in total*, not
-      // against this page's slice of them (see buildOverviewSlides): a task
-      // whose parent the timeframe or the capacity cut is a root here and is
-      // drawn full height like one, but a task merely separated from its parent
-      // by a page break keeps its level. Which page a bar landed on is a fact
-      // about how much fits on a slide, and nesting must not be readable as
-      // that.
+      // against this page's slice of them: a task merely separated from its
+      // parent by a page break keeps its level.
       const depth = depthById.get(item.id) ?? 0;
-      const { height: barHeight, offset: barOffsetY } = resolveBarGeometry(BAR_HEIGHT_IN, depth);
+      const isParent = parentIds.has(item.id);
+      const barHeight = depth === 0 ? OVERVIEW_BAR_HEIGHT_IN : OVERVIEW_NESTED_BAR_HEIGHT_IN;
+      const color = colorByTaskId.get(item.id) ?? phaseColor(0, undefined);
 
-      // The name lives in the Task column: same x on every row, whatever the
-      // bar is doing. Nothing about the bar feeds into this any more.
-      // Indented by depth from the column's fixed left edge, by the same rule the
-      // on-screen label column uses — and the box the name truncates against
-      // shrinks by exactly that indent, so an indented name is cut earlier rather
-      // than pushed past the column.
-      const labelIndentIn = labelIndent(BAR_HEIGHT_IN, depth);
-      const labelX = CONTENT_X_IN + STATUS_COL_WIDTH_IN + COLUMN_TEXT_INSET_IN + labelIndentIn;
-      const labelBoxWidth = TASK_COL_WIDTH_IN - COLUMN_TEXT_INSET_IN * 2 - labelIndentIn;
-
-      const statusText = TASK_STATUS_LABELS[status];
-      const statusScale = TASK_STATUS_SCALE[status];
-
-      // The name has the Task column to itself: nothing else is drawn in it,
-      // so it truncates against the whole width rather than against what a
-      // row of tag pills left over.
-      const label = truncateToWidth(item.label, BAR_LABEL_FONT_SIZE_PT, labelBoxWidth);
-      // Not the measured text width: this is also the PDF's link target for
-      // the task, and a name of five letters should still be as easy to hit as
-      // the bar beside it.
-      const labelWidth = labelBoxWidth;
+      // A parent wears no icon, exactly as the handoff draws a phase: its
+      // status is its children's, and the children state it themselves one row
+      // down. A childless task states its own, whatever its depth — which is
+      // the difference between "phase" in the handoff and "root" here.
+      const indentIn = taskCellIndent(depth);
+      const iconX = CARD_X_IN + indentIn;
+      const labelX = isParent ? iconX : iconX + STATUS_ICON_SIZE_IN + TASK_ICON_GAP_IN;
+      const labelWidth = CARD_X_IN + TASK_COL_WIDTH_IN - TASK_CELL_PAD_IN - labelX;
 
       bars.push({
         id: item.id,
-        label,
+        label: truncateToWidth(item.label, TASK_NAME_FONT_SIZE_PT, labelWidth),
         labelX,
         labelWidth,
-        color: barColor,
-        statusText,
-        statusColor: TASK_STATUS_COLORS[status],
-        statusChipX: CONTENT_X_IN + COLUMN_TEXT_INSET_IN,
-        statusChipY: y + (BAR_HEIGHT_IN - STATUS_CHIP_HEIGHT_IN) / 2,
-        statusChipWidth: STATUS_COL_WIDTH_IN - COLUMN_TEXT_INSET_IN * 2,
-        statusChipHeight: STATUS_CHIP_HEIGHT_IN,
-        statusChipBg: statusScale.surface.replace('#', ''),
-        statusChipBorder: statusScale.border.replace('#', ''),
+        labelBold: isParent,
+        icon: isParent ? null : getTaskStatus(item),
+        iconX,
+        color: color.solid,
+        fillAlpha: depth === 0 ? 1 : color.tintAlpha,
         y,
+        rowHeight,
         barX,
-        barY: y + barOffsetY,
+        barY: y + (rowHeight - barHeight) / 2,
         barHeight,
         barWidth,
         chevronLeft,
         chevronRight,
       });
 
-      y += ROW_HEIGHT_IN;
+      y += rowHeight;
     });
   }
 
   return {
     kind: 'overview',
     title,
-    dateAxisY,
-    gridLines,
-    axisLabels,
-    columnHeaders,
-    headerRuleY,
+    meta,
+    zoomCaption,
+    columns,
     dividerX,
-    dividerTop: dateAxisY,
-    dividerBottom: CONTENT_BOTTOM_IN,
+    headerRuleY,
+    todayX,
+    gridLines,
     bars,
     windowStart,
     windowEnd,
@@ -872,6 +819,7 @@ function buildOverviewSlides(
   exportMode: ExportMode,
   candidateItems: TimelineItem[],
   sectionedIds: ReadonlySet<string>,
+  today: Date,
 ): OverviewSlideModel[] {
   const isPaged = exportMode === 'full' && plan.inRange.length > plan.capacity;
   const drawnItems = isPaged ? plan.inRange : plan.included;
@@ -894,6 +842,13 @@ function buildOverviewSlides(
   // missing — the page break between them — does not also reset a subtask to
   // full height, which would make nesting read as pagination.
   const depthById = buildDepthMap(drawnItems);
+  // Colour by branch, and "is this a parent", both resolved from the drawn set
+  // for the same reason depth is: a page break must not repaint a task or turn
+  // a phase into a leaf.
+  const colorByTaskId = buildPhaseColors(drawnItems);
+  const parentIds = new Set(
+    drawnItems.flatMap((item) => (item.parentId === undefined ? [] : [item.parentId])),
+  );
 
   // Paged first, so each page's own tasks are known before its window is: the
   // window is a fact about the page, and the shared density a fact about the
@@ -911,7 +866,16 @@ function buildOverviewSlides(
 
   if (!isPaged) {
     return [
-      buildOverviewSlide(drawnItems, axes[0], 'Timeline Overview', omission, depthById),
+      buildOverviewSlide(
+        drawnItems,
+        axes[0],
+        'Timeline Overview',
+        omission,
+        depthById,
+        colorByTaskId,
+        parentIds,
+        today,
+      ),
     ];
   }
 
@@ -925,6 +889,9 @@ function buildOverviewSlides(
       // summable across the deck.
       index === pages.length - 1 ? omission : NO_OMISSION,
       depthById,
+      colorByTaskId,
+      parentIds,
+      today,
     ),
   );
 }
@@ -1458,6 +1425,10 @@ export function buildExportSlides(
   commentMode: ExportOptions['commentMode'],
   exportTimeframe: ExportTimeframe | null,
   exportMode: ExportMode = 'compact',
+  /** Where the overview draws its "today" rule. Passed in rather than read
+   * off the clock, like buildDashboardSlides's own — the model stays pure, and
+   * a deck built twice in one run marks the same day on every slide. */
+  today: Date = new Date(),
 ): ExportSlideModel[] {
   const exportableItems = items.filter((item) => item.includeInExport !== false);
   const { roots } = buildTaskHierarchy(exportableItems);
@@ -1512,6 +1483,7 @@ export function buildExportSlides(
       exportMode,
       exportableItems,
       sectionedIds,
+      today,
     ),
     ...buildDetailSlides(detailCandidates),
   ];

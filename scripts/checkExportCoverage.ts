@@ -66,8 +66,11 @@ export function buildDeck(plan: FixturePlan, scenario: Pick<Scenario, 'exportMod
     scenario.commentMode,
     scenario.timeframe,
     scenario.exportMode,
+    // The same fixed day the dashboard slides are built against: a check
+    // measured against the wall clock proves something different every run.
+    CHECK_TODAY,
   );
-  const dashboardSlides = buildDashboardSlides(sortedItems, new Date('2026-08-18T00:00:00Z'));
+  const dashboardSlides = buildDashboardSlides(sortedItems, CHECK_TODAY);
   const orderedSlides = orderExportSlides(slides, dashboardSlides);
   return { orderedSlides, links: buildSlideLinks(orderedSlides) };
 }
@@ -146,6 +149,10 @@ function loadPlanArgument(): FixturePlan | null {
     people: raw.people ?? [],
   };
 }
+
+/** The day every scenario is measured against — fixed, so the check proves
+ * the same thing today and next month. */
+const CHECK_TODAY = new Date('2026-08-18T00:00:00Z');
 
 function main() {
   const plan = loadPlanArgument() ?? buildFixturePlan();
