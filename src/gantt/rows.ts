@@ -1,5 +1,5 @@
 import type { TaskStatus, TimelineItem } from '../types/timeline';
-import { childrenOf, statusOf } from './rollup';
+import { childrenOf, isSubtask, statusOf } from './rollup';
 
 /** One line of the plan, list and timeline alike — they draw the same rows in
  * the same order, which is what lets the grid align them structurally rather
@@ -12,6 +12,12 @@ export interface GanttRowModel {
   isGroup: boolean;
   /** Direct children, for the sub-task count badge. */
   childCount: number;
+  /** True when this row is itself somebody's sub-task. A row that is one
+   * offers no "add sub-task" control: the screen creates one level of
+   * sub-tasks and no more. Not the same question as `depth`, which restarts
+   * at 0 under a focus — a focused parent's children are drawn at the top
+   * level and are still sub-tasks. */
+  isSubtask: boolean;
   /** The status the row is drawn at: its own, or a group's roll-up. */
   status: TaskStatus;
 }
@@ -46,6 +52,7 @@ export function visibleRows(items: TimelineItem[], options: RowFilter): GanttRow
       depth,
       isGroup: children.length > 0,
       childCount: children.length,
+      isSubtask: isSubtask(items, item.id),
       status: statusOf(items, item),
     };
 
