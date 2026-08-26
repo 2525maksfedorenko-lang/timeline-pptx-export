@@ -54,15 +54,14 @@ export function spanOf(items: TimelineItem[], item: TimelineItem, minDate: Date)
   return { start, len: end - start };
 }
 
-/** A group's status, in the handoff's order of precedence: one blocked child
- * blocks the group, all-done is done, anything under way is in progress, and
- * an untouched group is to do. Leaves report their own. */
+/** A group's status, in the handoff's order of precedence: all-done is done,
+ * anything under way is in progress, and an untouched group is to do. Leaves
+ * report their own. */
 export function statusOf(items: TimelineItem[], item: TimelineItem): TaskStatus {
   const children = childrenOf(items, item.id);
   if (children.length === 0) return getTaskStatus(item);
 
   const statuses = children.map((child) => statusOf(items, child));
-  if (statuses.includes('blocked')) return 'blocked';
   if (statuses.every((status) => status === 'done')) return 'done';
   if (statuses.includes('in_progress') || children.some((child) => (child.progress ?? 0) > 0)) {
     return 'in_progress';

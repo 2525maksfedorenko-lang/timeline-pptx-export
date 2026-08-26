@@ -4,7 +4,7 @@ import { useIsMobile } from '../utils/useIsMobile';
 import { useTimelineStore, type ExportOptions } from '../store/timelineStore';
 import {
   getTaskStatus,
-  SELECTABLE_TASK_STATUS_VALUES,
+  TASK_STATUS_VALUES,
   TASK_STATUS_LABELS,
   type SortMode,
   type TaskStatus,
@@ -35,11 +35,10 @@ const COMMENT_MODE_OPTIONS: { value: ExportOptions['commentMode']; label: string
   { value: 'none', label: 'No comments' },
 ];
 
-// The bulk setter offers what a person can choose, which no longer includes
-// blocked — see SELECTABLE_TASK_STATUS_VALUES. The per-row chips below use
-// statusOptionsFor instead, so a task that is already blocked still says so.
+// The bulk setter offers every status, which is the same list the per-row
+// chips below offer.
 const TASK_STATUS_OPTIONS: { value: TaskStatus; label: string }[] =
-  SELECTABLE_TASK_STATUS_VALUES.map((value) => ({ value, label: TASK_STATUS_LABELS[value] }));
+  TASK_STATUS_VALUES.map((value) => ({ value, label: TASK_STATUS_LABELS[value] }));
 
 const SORT_MODE_OPTIONS: { value: SortMode; label: string }[] = [
   { value: 'status', label: 'Status' },

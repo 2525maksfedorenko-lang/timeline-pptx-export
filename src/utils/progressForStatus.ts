@@ -7,9 +7,8 @@ import type { TaskStatus } from '../types/timeline';
  * picking either in the UI moves the figure to match rather than leaving a
  * task marked done at 30%. Both stay editable afterwards — the rule sets a
  * value, it doesn't own one, which is what lets someone mark a task done and
- * then pull it back to 80% because a tail is left. "in progress" and
- * "blocked" say nothing about how far along the work is, so they leave the
- * figure alone.
+ * then pull it back to 80% because a tail is left. "in progress" says nothing
+ * about how far along the work is, so it leaves the figure alone.
  *
  * There is deliberately no rule the other way: typing 100 does not mark a task
  * done. A status is a decision someone makes, and it should not follow from a

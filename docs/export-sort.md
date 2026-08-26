@@ -7,7 +7,7 @@ How tasks are ordered on the exported slides, and why it differs from the app.
 `STATUS_SORT_ORDER` in `src/utils/sortItemsForExport.ts`:
 
 ```
-done → in_progress → blocked → todo
+done → in_progress → todo
 ```
 
 Reordering the deck is a one-line edit to that array. Nothing in the slide

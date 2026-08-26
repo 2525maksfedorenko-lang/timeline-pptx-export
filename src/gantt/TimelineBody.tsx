@@ -37,8 +37,8 @@ interface TimelineBodyProps {
  * period lines at whatever the scale groups by, and soft row lines.
  *
  * Everything above the grid is stacked deliberately: weekend tint (0), the
- * pink after a blocked task's deadline (1), the today band (2), the links (4),
- * the bars (5) with their edge dots (6), and the drag pill over all of it. */
+ * today band (2), the links (4), the bars (5) with their edge dots (6), and
+ * the drag pill over all of it. */
 export function TimelineBody({
   rows,
   spans,
@@ -98,29 +98,6 @@ export function TimelineBody({
           }}
         />
       ))}
-
-      {/* Everything a blocked task overruns into: the days after its deadline,
-          fading out to the right of the row it belongs to. */}
-      {rows.map((row, index) => {
-        if (row.status !== 'blocked') return null;
-        const span = spans.get(row.item.id);
-        if (!span) return null;
-        const from = (span.start + span.len) * columnWidth;
-        return (
-          <div
-            key={`overrun-${row.item.id}`}
-            style={{
-              position: 'absolute',
-              left: from,
-              top: index * ROW_HEIGHT_PX,
-              width: Math.max(0, width - from),
-              height: ROW_HEIGHT_PX,
-              background: 'var(--gantt-out-of-range)',
-              zIndex: 1,
-            }}
-          />
-        );
-      })}
 
       <div
         style={{

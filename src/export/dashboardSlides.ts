@@ -1,5 +1,5 @@
 import type { TimelineItem } from '../types/timeline';
-import { getAtRiskTasks, getDaysOverdue, getDelayedTasks } from '../utils/dashboardMetrics';
+import { getDaysOverdue, getDelayedTasks } from '../utils/dashboardMetrics';
 import { formatShortDate } from './dateScale';
 import { dashboardDeepLink } from './qrCode';
 import {
@@ -82,7 +82,7 @@ function overflowNote(omittedRowCount: number, noun: string): string | null {
 
 interface TableSlideSpec {
   title: string;
-  view: 'delayed' | 'atrisk';
+  view: 'delayed';
   /** Singular noun for the overflow note ("delayed task" -> "+7 more delayed tasks"). */
   noun: string;
   emptyMessage: string;
@@ -110,30 +110,19 @@ function buildTableSlide(spec: TableSlideSpec): DashboardTableSlideModel {
   };
 }
 
-/** Builds the 2 dashboard table slides (at-risk tasks, then delayed tasks),
- * which sit directly after the overview slide(s) — see slideOrder.ts for the
- * full deck order. There's deliberately no status-breakdown slide here:
- * the summary slide already shows the same segments, and links to the
- * on-screen status view via its own QR code. Reuses the exact same
- * delayed/at-risk logic as the on-screen Dashboard
- * (src/components/Dashboard.tsx) via utils/dashboardMetrics.ts, and is
- * scoped to exportable items just like the rest of the export pipeline
- * (buildExportSlides). */
+/** Builds the dashboard table slide (delayed tasks), which sits directly
+ * after the overview slide(s) — see slideOrder.ts for the full deck order.
+ * There's deliberately no status-breakdown slide here: the summary slide
+ * already shows the same segments, and links to the on-screen status view via
+ * its own QR code. Reuses the exact same delayed logic as the on-screen
+ * Dashboard (src/components/Dashboard.tsx) via utils/dashboardMetrics.ts, and
+ * is scoped to exportable items just like the rest of the export pipeline
+ * (buildExportSlides).
+ *
+ * An "At risk tasks" slide used to lead this group. Its rows were the blocked
+ * tasks and nothing else, so it left with that status. */
 export function buildDashboardSlides(items: TimelineItem[], today: Date): DashboardSlideModel[] {
   const exportableItems = items.filter((item) => item.includeInExport !== false);
-
-  const atRiskSlide = buildTableSlide({
-    title: 'At risk tasks',
-    view: 'atrisk',
-    noun: 'at-risk task',
-    emptyMessage: 'No at-risk tasks.',
-    headers: ['Task', 'End date'],
-    rows: getAtRiskTasks(exportableItems).map((item) => [
-      item.label,
-      formatShortDate(new Date(item.end)),
-    ]),
-    dateColumnIndex: 1,
-  });
 
   const delayedSlide = buildTableSlide({
     title: 'Delayed tasks',
@@ -149,5 +138,5 @@ export function buildDashboardSlides(items: TimelineItem[], today: Date): Dashbo
     dateColumnIndex: 1,
   });
 
-  return [atRiskSlide, delayedSlide];
+  return [delayedSlide];
 }

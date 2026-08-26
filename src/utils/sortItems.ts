@@ -4,8 +4,7 @@ import { buildTaskHierarchy, type TaskNode } from './taskHierarchy';
 const STATUS_ORDER: Record<TaskStatus, number> = {
   todo: 0,
   in_progress: 1,
-  blocked: 2,
-  done: 3,
+  done: 2,
 };
 
 function byStart(a: TimelineItem, b: TimelineItem) {

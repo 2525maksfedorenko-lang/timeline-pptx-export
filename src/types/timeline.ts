@@ -1,4 +1,4 @@
-export type TaskStatus = 'todo' | 'in_progress' | 'done' | 'blocked';
+export type TaskStatus = 'todo' | 'in_progress' | 'done';
 
 export type SortMode = 'date' | 'status' | 'parent' | 'progress';
 
@@ -36,8 +36,6 @@ export const TASK_STATUS_SCALE: Record<
   //            --kanban-1-bg       --kanban-1-border  --kind-task        --kanban-1-fg
   done: { surface: '#DCFCE7', border: '#BBF7D0', accent: '#22C55E', solid: '#166534' },
   //     --status-done-bg     --kanban-3-border --status-active-dot --status-done-fg
-  blocked: { surface: '#FEE2E2', border: '#FECACA', accent: '#EF4444', solid: '#991B1B' },
-  //        --status-delayed-bg --kanban-4-border --destructive     --status-delayed-fg
 };
 
 const withoutHash = (hex: string) => hex.replace('#', '').toUpperCase();
@@ -49,7 +47,6 @@ export const TASK_STATUS_COLORS: Record<TaskStatus, string> = {
   todo: withoutHash(TASK_STATUS_SCALE.todo.solid),
   in_progress: withoutHash(TASK_STATUS_SCALE.in_progress.solid),
   done: withoutHash(TASK_STATUS_SCALE.done.solid),
-  blocked: withoutHash(TASK_STATUS_SCALE.blocked.solid),
 };
 
 /** The pale chip each status wears in the app's left column — the product's
@@ -70,11 +67,6 @@ export const TASK_STATUS_CHIP: Record<TaskStatus, { bg: string; fg: string; bord
     fg: TASK_STATUS_SCALE.done.solid,
     border: TASK_STATUS_SCALE.done.border,
   },
-  blocked: {
-    bg: TASK_STATUS_SCALE.blocked.surface,
-    fg: TASK_STATUS_SCALE.blocked.solid,
-    border: TASK_STATUS_SCALE.blocked.border,
-  },
 };
 
 // Status words are lowercase throughout the product ("on track", "delayed",
@@ -83,36 +75,16 @@ export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
   todo: 'to do',
   in_progress: 'in progress',
   done: 'done',
-  blocked: 'blocked',
 };
 
 /** Every status the model can hold, in the order they're offered — one list,
- * so a new status can't reach some dropdowns and miss others. */
+ * so a new status can't reach some dropdowns and miss others.
+ *
+ * All three are choosable. There used to be a second, shorter list here and a
+ * `statusOptionsFor` helper beside it, because `blocked` was a value the model
+ * carried but no control could set; with `blocked` gone the two lists were the
+ * same list, and a picker offers this one. */
 export const TASK_STATUS_VALUES = Object.keys(TASK_STATUS_LABELS) as TaskStatus[];
-
-/** The statuses a person can *choose*, which is no longer all of them.
- *
- * `blocked` is missing deliberately. It remains a value the model carries, the
- * importer produces and every colour table answers for — a task that arrives
- * blocked stays blocked, draws blocked, sorts as blocked and counts as at risk
- * — but nothing in the app sets it any more. That makes it a one-way door: a
- * blocked task can be moved to another status from the screen and cannot be
- * moved back. */
-export const SELECTABLE_TASK_STATUS_VALUES: TaskStatus[] = ['todo', 'in_progress', 'done'];
-
-/** What a picker sitting on `current` should offer: the choosable statuses,
- * plus `current` itself when it is not one of them.
- *
- * Without that second half a blocked task's control would be bound to a value
- * none of its options carry, which renders as an empty box — the task would
- * look statusless rather than blocked. It is shown, so the picker tells the
- * truth; it is not added to the list for anything else, so it cannot be
- * chosen. */
-export function statusOptionsFor(current: TaskStatus): TaskStatus[] {
-  return SELECTABLE_TASK_STATUS_VALUES.includes(current)
-    ? SELECTABLE_TASK_STATUS_VALUES
-    : [...SELECTABLE_TASK_STATUS_VALUES, current];
-}
 
 export function getTaskStatus(item: Pick<TimelineItem, 'status'>): TaskStatus {
   return item.status ?? DEFAULT_TASK_STATUS;

@@ -58,9 +58,6 @@ WCAG AA, normal text, threshold **4.5:1**. Ratios computed by
 | Gantt bar fill · percent inside | done | `#166534` | `#EBF0F5` | 6.22:1 | yes |
 | Status chip (app left column) | done | `#DCFCE7` | `#166534` | 6.49:1 | yes |
 | Status word on export slide | done | `#EBF0F5` | `#166534` | 6.22:1 | yes |
-| Gantt bar fill · percent inside | blocked | `#991B1B` | `#EBF0F5` | 7.25:1 | yes |
-| Status chip (app left column) | blocked | `#FEE2E2` | `#991B1B` | 6.80:1 | yes |
-| Status word on export slide | blocked | `#EBF0F5` | `#991B1B` | 7.25:1 | yes |
 | Percent beside bar · on track | — | `#E5E5E5` | `#0A0A0A` | 15.72:1 | yes |
 
 No pair is below the threshold.
@@ -73,7 +70,6 @@ step so it stays as light and legible-as-a-mark as the product's own dots:
 | to do | `#737373` |
 | in progress | `#3B82F6` |
 | done | `#22C55E` |
-| blocked | `#EF4444` |
 
 ## What the fix changed
 

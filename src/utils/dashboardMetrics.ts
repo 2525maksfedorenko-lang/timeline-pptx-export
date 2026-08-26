@@ -15,14 +15,14 @@ export interface StatusSegment {
   percent: number;
 }
 
-const STATUS_ORDER: TaskStatus[] = ['todo', 'in_progress', 'done', 'blocked'];
+const STATUS_ORDER: TaskStatus[] = ['todo', 'in_progress', 'done'];
 
 /** Status breakdown (count + percent per status present in `items`) — the
  * single source of truth for the donut/summary-chart data shown on both the
  * on-screen Dashboard and the exported summary/dashboard slides, so they
  * never drift from each other. */
 export function getStatusSegments(items: TimelineItem[]): StatusSegment[] {
-  const counts: Record<TaskStatus, number> = { todo: 0, in_progress: 0, done: 0, blocked: 0 };
+  const counts: Record<TaskStatus, number> = { todo: 0, in_progress: 0, done: 0 };
   items.forEach((item) => {
     counts[getTaskStatus(item)] += 1;
   });
@@ -49,10 +49,6 @@ export function getDelayedTasks(items: TimelineItem[], today: Date): TimelineIte
   return items.filter((item) => getTaskStatus(item) !== 'done' && new Date(item.end).getTime() < todayTime);
 }
 
-export function getAtRiskTasks(items: TimelineItem[]): TimelineItem[] {
-  return items.filter((item) => getTaskStatus(item) === 'blocked');
-}
-
 /** Whole days between an item's end date and `today` — always >= 1 for a
  * task returned by getDelayedTasks (0 would mean it ends today, i.e. not
  * yet overdue). */
@@ -67,12 +63,16 @@ export interface DashboardKpis {
   completed: number;
   completedPercent: number;
   delayed: number;
-  atRisk: number;
 }
 
-/** The 4 KPI numbers shown on the Dashboard's top cards, derived from the
- * same delayed/at-risk/status functions used everywhere else — so a KPI
- * card's count always matches the corresponding table's row count. */
+/** The 3 KPI numbers shown on the Dashboard's top cards, derived from the
+ * same delayed/status functions used everywhere else — so a KPI card's count
+ * always matches the corresponding table's row count.
+ *
+ * There used to be a fourth, "At risk", whose whole definition was "status is
+ * blocked". With that status gone the number could only ever be zero, so the
+ * card, its table and its slide went with it. "Delayed" is untouched — it is
+ * a fact about dates, not about a status. */
 export function getDashboardKpis(items: TimelineItem[], today: Date): DashboardKpis {
   const total = items.length;
   const completed = items.filter((item) => getTaskStatus(item) === 'done').length;
@@ -82,6 +82,5 @@ export function getDashboardKpis(items: TimelineItem[], today: Date): DashboardK
     completed,
     completedPercent: total > 0 ? Math.round((completed / total) * 100) : 0,
     delayed: getDelayedTasks(items, today).length,
-    atRisk: getAtRiskTasks(items).length,
   };
 }

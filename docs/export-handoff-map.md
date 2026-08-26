@@ -337,8 +337,10 @@ handoff's own pixels (`px(56)`, `px(480)`, `px(26)`) over one conversion —
    that colour, its own included, because the colour says *which branch* and a
    subtree in four colours says nothing. Nested bars are the same hue at the
    palette's tint (24–28%), a custom colour at 26%.
-3. **Blocked** — kept, in the product's red, as a fourth icon of the same
-   family and a fourth legend entry.
+3. **Blocked** — ~~kept, in the product's red, as a fourth icon of the same
+   family and a fourth legend entry.~~ **Revised: the status was removed from
+   the product outright** ("we don't have it and won't"), so the legend is the
+   handoff's own three. See "Phase 4" at the end of this document.
 4. **Status** — read from the stored field. The handoff's date rule
    (`end <= today` → done) is not applied anywhere.
 5. **Zoom** — derived from the widest window of the export, which is the window
@@ -359,11 +361,10 @@ handoff's own pixels (`px(56)`, `px(480)`, `px(26)`) over one conversion —
   slide against the old 12.
 - **Icons.** The handoff's own three paths, transcribed — a ring plus the
   check `M7.5 12.3 L10.6 15.4 L16.5 9.2`, the ring plus the filled play
-  triangle `M9.3 7.2 L17 12 L9.3 16.8 Z`, and the bare ring — with lucide's
-  `pause` inside the same ring as a fourth for blocked, which the handoff does
-  not draw. Drawn from primitives in both engines rather than as an image,
-  since jsPDF has no SVG: the triangle is `doc.triangle` in the PDF and
-  PowerPoint's own `triangle` shape given a quarter turn in the deck.
+  triangle `M9.3 7.2 L17 12 L9.3 16.8 Z`, and the bare ring. Three, exactly as
+  the handoff lists them. Drawn from primitives in both engines rather than as
+  an image, since jsPDF has no SVG: the triangle is `doc.triangle` in the PDF
+  and PowerPoint's own `triangle` shape given a quarter turn in the deck.
 
   *(Revised. This first shipped as lucide's `circle-check` / `clock` / `circle`
   — the plan screen's four, on the grounds that a deck should not rename the
@@ -396,3 +397,50 @@ handoff's own pixels (`px(56)`, `px(480)`, `px(26)`) over one conversion —
 - **The status chip is gone** from the overview, with the Status column it sat
   in. Status is the icon beside the name, as the handoff draws it; the word is
   still written out on every appendix row.
+
+---
+
+# Phase 4 — `blocked` was removed from the product
+
+Not a handoff decision: the status itself was dropped ("we don't have it and
+won't"), and `TaskStatus` is now `todo | in_progress | done`. That closes
+question 3 above by removing its subject, and it lands the deck on exactly the
+three-status world the handoff describes. Recorded here because the map's
+"Watchlist" promised nothing would come back by accident, and this is the
+reverse — something leaving.
+
+## What went with it
+
+`blocked` was not only a colour. Each of these existed *because* the status did,
+so each left with it rather than being kept as an option that can never fire:
+
+| Gone | Where it was | Why it could not stay |
+|---|---|---|
+| The fourth legend entry, its pause glyph, and the `bars` icon primitive | `slideLayout.ts`, both exporters | The primitive had one user, and the glyph had one status |
+| `COLORS.blocked` | `theme.ts` | Same hex as `COLORS.today`, kept apart because they meant different things; only one meaning is left |
+| The **At risk** KPI card, its table, and its whole dashboard slide | `Dashboard.tsx`, `dashboardSlides.ts`, `dashboardMetrics.ts` | `getAtRiskTasks` filtered to `status === 'blocked'` and nothing else — the count could only ever be zero |
+| `?dashboardView=atrisk` and its QR deep link | `App.tsx`, `qrCode.ts` | The section it scrolled to no longer exists |
+| The **At risk (blocked)** stat on the summary slide | `timelineExportModel.ts` | Same |
+| The pink overrun wash after a blocked task's deadline, and `--gantt-out-of-range` | `TimelineBody.tsx`, `tokens.css` | Drawn only for blocked rows |
+| The blocked name-pill and red edge dot | `TaskListRow.tsx`, `TaskBar.tsx`, `tokens.css` | Same |
+| `SELECTABLE_TASK_STATUS_VALUES` and `statusOptionsFor` | `types/timeline.ts` | They existed to hide one unselectable status from pickers; with three statuses both lists are `TASK_STATUS_VALUES` |
+
+**Delayed is untouched.** It is a fact about dates — not done, past its end —
+so it survives on the dashboard, in the deck and in the KPI row, which now has
+three cards instead of four.
+
+## Plans that already hold a blocked task
+
+Nothing new was written for this. A stored or imported plan carrying
+`status: "blocked"` goes through `normalizeItemStatuses` on the way in, which
+now recognises three spellings, drops the fourth and says so:
+
+```
+"blocked" is not a status ("Old blocked task") — imported as "to do".
+Expected one of: to do, in progress, done.
+```
+
+So the task loads, reads as **to do**, and the plan carries a repair notice
+naming it. That is the same path an unknown status from a spreadsheet has
+always taken; it is a one-way door, and re-selecting the old value is not
+possible because no control offers it.

@@ -32,8 +32,8 @@ export interface RowFilter {
 
 /** Does this item survive the toolbar's search and filter?
  *
- * The status compared is the *effective* one, so filtering to Blocked keeps a
- * group whose children include a blocked task. The search reads the task's own
+ * The status compared is the *effective* one, so filtering to Done keeps a
+ * group whose children are all done. The search reads the task's own
  * name and nothing else: it used to match an assignee's name too, which now
  * that no row shows one would answer with a set of rows carrying no visible
  * reason for being there. */

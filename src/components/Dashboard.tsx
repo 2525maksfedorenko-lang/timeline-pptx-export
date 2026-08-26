@@ -2,7 +2,6 @@ import { useEffect, useRef } from 'react';
 import { useTimelineStore } from '../store/timelineStore';
 import { withHash } from '../export/theme';
 import {
-  getAtRiskTasks,
   getDashboardKpis,
   getDaysOverdue,
   getDelayedTasks,
@@ -12,7 +11,7 @@ import {
 import { formatShortDate } from '../export/dateScale';
 import type { TimelineItem } from '../types/timeline';
 
-export type DashboardSection = 'status' | 'delayed' | 'atrisk';
+export type DashboardSection = 'status' | 'delayed';
 
 interface DashboardProps {
   /** Deep-linked section (from the ?dashboardView= URL param) to scroll to
@@ -142,33 +141,6 @@ function DelayedTable({ items, today }: { items: TimelineItem[]; today: Date }) 
   );
 }
 
-function AtRiskTable({ items }: { items: TimelineItem[] }) {
-  if (items.length === 0) {
-    return <p className="text-sm text-muted-foreground">No at-risk tasks.</p>;
-  }
-
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-left text-sm">
-        <thead>
-          <tr className="border-b border-border text-xs font-medium text-muted-foreground">
-            <th className="py-2 pr-3 font-medium">Task</th>
-            <th className="py-2 pr-3 font-medium">End date</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((item) => (
-            <tr key={item.id} className="border-b border-border last:border-0">
-              <td className="py-2 pr-3 font-medium text-foreground">{item.label}</td>
-              <td className="py-2 pr-3 font-mono text-xs tabular-nums text-muted-foreground">{formatShortDate(new Date(item.end))}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
 export function Dashboard({ highlightSection }: DashboardProps) {
   const items = useTimelineStore((state) => state.items);
   const today = new Date();
@@ -176,15 +148,13 @@ export function Dashboard({ highlightSection }: DashboardProps) {
   const kpis = getDashboardKpis(items, today);
   const segments = getStatusSegments(items);
   const delayedTasks = getDelayedTasks(items, today);
-  const atRiskTasks = getAtRiskTasks(items);
 
   const statusRef = useRef<HTMLDivElement>(null);
   const delayedRef = useRef<HTMLDivElement>(null);
-  const atRiskRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!highlightSection) return;
-    const target = { status: statusRef, delayed: delayedRef, atrisk: atRiskRef }[highlightSection];
+    const target = { status: statusRef, delayed: delayedRef }[highlightSection];
     target.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, [highlightSection]);
 
@@ -192,11 +162,10 @@ export function Dashboard({ highlightSection }: DashboardProps) {
     // List pages in the product centre on --content-max; the timeline doesn't,
     // because a plan needs every pixel of width it can get.
     <div className="mx-auto w-full max-w-6xl">
-      <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <KpiCard label="Total tasks" value={`${kpis.total}`} />
         <KpiCard label="Completed" value={`${kpis.completed} (${kpis.completedPercent}%)`}  />
         <KpiCard label="Delayed" value={`${kpis.delayed}`} accent={kpis.delayed > 0 ? 'hsl(var(--destructive))' : undefined} />
-        <KpiCard label="At risk" value={`${kpis.atRisk}`} accent={kpis.atRisk > 0 ? 'hsl(var(--destructive))' : undefined} />
       </div>
 
       <div
@@ -207,22 +176,12 @@ export function Dashboard({ highlightSection }: DashboardProps) {
         <StatusDonut segments={segments} />
       </div>
 
-      <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <div
-          ref={delayedRef}
-          className={`${CARD_CLASSES} transition-shadow ${highlightSection === 'delayed' ? HIGHLIGHT_CLASSES : ''}`}
-        >
-          <h3 className="mb-3 text-sm font-semibold tracking-tight text-foreground">Delayed tasks</h3>
-          <DelayedTable items={delayedTasks} today={today} />
-        </div>
-
-        <div
-          ref={atRiskRef}
-          className={`${CARD_CLASSES} transition-shadow ${highlightSection === 'atrisk' ? HIGHLIGHT_CLASSES : ''}`}
-        >
-          <h3 className="mb-3 text-sm font-semibold tracking-tight text-foreground">At risk tasks</h3>
-          <AtRiskTable items={atRiskTasks} />
-        </div>
+      <div
+        ref={delayedRef}
+        className={`${CARD_CLASSES} mb-6 transition-shadow ${highlightSection === 'delayed' ? HIGHLIGHT_CLASSES : ''}`}
+      >
+        <h3 className="mb-3 text-sm font-semibold tracking-tight text-foreground">Delayed tasks</h3>
+        <DelayedTable items={delayedTasks} today={today} />
       </div>
     </div>
   );
