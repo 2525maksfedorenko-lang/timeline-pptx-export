@@ -1,26 +1,14 @@
 import { TASK_STATUS_VALUES, type TaskStatus } from '../types/timeline';
 
-/** The three tones a status is drawn in on this screen: the bar's pale fill,
- * the label that sits on it, and the solid the progress overlay and the row's
- * status icon are painted with. Token names only — the values live in
- * `tokens.css`, transcribed from the handoff. */
-export interface StatusTone {
-  bg: string;
-  text: string;
-  fill: string;
-}
-
-const tone = (name: string): StatusTone => ({
-  bg: `var(--gantt-${name}-bg)`,
-  text: `var(--gantt-${name}-text)`,
-  fill: `var(--gantt-${name}-fill)`,
-});
-
-export const STATUS_TONE: Record<TaskStatus, StatusTone> = {
-  done: tone('done'),
-  in_progress: tone('active'),
-  todo: tone('todo'),
-};
+/* The bar's own colours are no longer here. A bar is drawn in its *branch's*
+ * colour now (src/utils/branchColors.ts, shared with the exporters), so the
+ * three status tones this file used to hand it — a pale fill, a matching dark
+ * label, a solid — had no reader left. What survives is what still says
+ * "status": the icon's stroke, and the wording.
+ *
+ * The --gantt-*-bg / -text / -fill tokens they read stay in tokens.css: they
+ * are the handoff's transcription of its own palette, and the icon colours
+ * below are two of them. */
 
 /** The status icon's stroke. Two of the three are the tone's solid; "to do"
  * is drawn as a bare outline circle a shade lighter than its own solid, so an

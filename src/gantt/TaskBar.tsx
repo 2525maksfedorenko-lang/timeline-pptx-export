@@ -1,7 +1,7 @@
 import { barHeight, barLeft, barOffsetY, barWidth, RESIZE_HANDLE_WIDTH_PX, ROW_HEIGHT_PX } from './geometry';
+import type { BarStyle } from './barColor';
 import type { Span } from './rollup';
 import type { GanttRowModel } from './rows';
-import { STATUS_TONE } from './tone';
 import type { DragState } from './drag';
 import { BAR_HIT_ATTRIBUTE } from './useScrollPanes';
 
@@ -14,6 +14,8 @@ interface TaskBarProps {
    * anywhere along it. */
   canvasWidth: number;
   isSelected: boolean;
+  /** The three CSS values of this task's branch colour — see barColor.ts. */
+  barStyle: BarStyle;
   /** Human date range for the bar's tooltip, e.g. "Aug 17 – Aug 24". */
   dateRange: string;
   statusLabel: string;
@@ -22,8 +24,15 @@ interface TaskBarProps {
   onContextMenu: (event: React.MouseEvent) => void;
 }
 
-/** One bar: a pale block in its status' tint, with its own name set on it in
- * the matching dark tone. A group's name is set in the heavier weight. */
+/** One bar, in its **branch's** colour: a root at full strength, everything
+ * nested under it in the same colour lightened. The name is set on the bar in
+ * whichever of the deck's two text colours reads on that fill, and a group's
+ * name is set in the heavier weight.
+ *
+ * The colour says which branch this task belongs to — the rule the exported
+ * deck has always drawn by, and now the only rule. It does *not* say what state
+ * the task is in: a done task and an untouched one in the same branch are the
+ * same colour, and the status icon in the list is what tells them apart. */
 export function TaskBar({
   row,
   span,
@@ -31,14 +40,14 @@ export function TaskBar({
   columnWidth,
   canvasWidth,
   isSelected,
+  barStyle,
   dateRange,
   statusLabel,
   onPointerDownBar,
   onSelect,
   onContextMenu,
 }: TaskBarProps) {
-  const { item, isGroup, status } = row;
-  const tone = STATUS_TONE[status];
+  const { item, isGroup } = row;
   const height = barHeight(ROW_HEIGHT_PX);
   const top = barOffsetY(ROW_HEIGHT_PX);
   const left = barLeft(span.start, columnWidth);
@@ -81,7 +90,7 @@ export function TaskBar({
           width,
           top,
           height,
-          background: tone.bg,
+          background: barStyle.fill,
           borderRadius: 5,
           boxSizing: 'border-box',
           overflow: 'hidden',
@@ -89,9 +98,9 @@ export function TaskBar({
           alignItems: 'center',
           cursor: 'grab',
           border: 'none',
-          // The only elevation on this screen: a ring in the status' own
+          // The only elevation on this screen: a ring in the branch's own
           // solid, at half alpha, around the selected bar.
-          boxShadow: isSelected ? `0 0 0 2px color-mix(in srgb, ${tone.fill} 50%, transparent)` : 'none',
+          boxShadow: isSelected ? `0 0 0 2px color-mix(in srgb, ${barStyle.ring} 50%, transparent)` : 'none',
         }}
       >
         <span
@@ -101,7 +110,7 @@ export function TaskBar({
             padding: '0 12px',
             fontSize: 14,
             fontWeight: isGroup ? 600 : 400,
-            color: tone.text,
+            color: barStyle.text,
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',

@@ -11,7 +11,7 @@ import { parseMarkdownBlocks, type MarkdownBlock } from '../utils/renderMarkdown
 import { getStatusSegments, type StatusSegment } from '../utils/dashboardMetrics';
 import { buildDepthMap } from '../utils/barNesting';
 import { buildTaskHierarchy, type TaskNode } from '../utils/taskHierarchy';
-import { phaseColor } from './theme';
+import { buildBranchColors, branchFillAlpha, FLAT_PLAN_COLOR, type BranchColor } from '../utils/branchColors';
 import {
   daysBetween,
   BASE_PX_PER_DAY,
@@ -132,7 +132,7 @@ export interface OverviewBarModel {
    * its children's, and which the handoff draws no icon for. */
   icon: TaskStatus | null;
   iconX: number;
-  /** The colour of the branch this task belongs to (see buildPhaseColors),
+  /** The colour of the branch this task belongs to (see buildBranchColors),
    * hex without '#'. */
   color: string;
   /** 1 for a top-level bar, the palette's tint for anything nested. */
@@ -396,37 +396,6 @@ function levelOfDate(date: Date, calendar: DateGrid): DateGridLevel | null {
   return found;
 }
 
-/** The colour of every task's bar, keyed by task id.
- *
- * Colour means branch, not status: a root takes the next colour of the phase
- * palette (or its own `color`, which is a choice someone made), and everything
- * under it inherits that colour whatever colour it carries itself — a subtree
- * drawn in four colours would say nothing about what belongs to what. Status
- * is the icon beside the name instead.
- *
- * Built once for the whole export, from the whole exportable set, so a task
- * keeps its colour whichever page of a 'full' export it lands on. */
-export function buildPhaseColors(items: TimelineItem[]): Map<string, PhaseColor> {
-  const { roots } = buildTaskHierarchy(items);
-  const colors = new Map<string, PhaseColor>();
-
-  roots.forEach((root, index) => {
-    const color = phaseColor(index, root.item.color?.trim() || undefined);
-    const paint = (node: TaskNode) => {
-      colors.set(node.item.id, color);
-      node.children.forEach(paint);
-    };
-    paint(root);
-  });
-
-  return colors;
-}
-
-export interface PhaseColor {
-  solid: string;
-  tintAlpha: number;
-}
-
 /** The items that overlap the given export timeframe window (any part of the
  * task's real date span inside the window counts). With no timeframe, every
  * item is "in range" — the window is implicitly the full date span of the
@@ -608,7 +577,7 @@ function buildOverviewSlide(
   title: string,
   omission: OverviewOmission,
   depthById: ReadonlyMap<string, number>,
-  colorByTaskId: ReadonlyMap<string, PhaseColor>,
+  colorByTaskId: ReadonlyMap<string, BranchColor>,
   parentIds: ReadonlySet<string>,
   today: Date,
 ): OverviewSlideModel {
@@ -697,7 +666,7 @@ function buildOverviewSlide(
       const depth = depthById.get(item.id) ?? 0;
       const isParent = parentIds.has(item.id);
       const barHeight = depth === 0 ? OVERVIEW_BAR_HEIGHT_IN : OVERVIEW_NESTED_BAR_HEIGHT_IN;
-      const color = colorByTaskId.get(item.id) ?? phaseColor(0, undefined);
+      const color = colorByTaskId.get(item.id) ?? FLAT_PLAN_COLOR;
 
       // A parent wears no icon, exactly as the handoff draws a phase: its
       // status is its children's, and the children state it themselves one row
@@ -717,7 +686,7 @@ function buildOverviewSlide(
         icon: isParent ? null : getTaskStatus(item),
         iconX,
         color: color.solid,
-        fillAlpha: depth === 0 ? 1 : color.tintAlpha,
+        fillAlpha: branchFillAlpha(depth, color),
         y,
         rowHeight,
         barX,
@@ -803,6 +772,7 @@ function buildOverviewSlides(
   exportMode: ExportMode,
   candidateItems: TimelineItem[],
   sectionedIds: ReadonlySet<string>,
+  colorByTaskId: ReadonlyMap<string, BranchColor>,
   today: Date,
 ): OverviewSlideModel[] {
   const isPaged = exportMode === 'full' && plan.inRange.length > plan.capacity;
@@ -826,10 +796,11 @@ function buildOverviewSlides(
   // missing — the page break between them — does not also reset a subtask to
   // full height, which would make nesting read as pagination.
   const depthById = buildDepthMap(drawnItems);
-  // Colour by branch, and "is this a parent", both resolved from the drawn set
-  // for the same reason depth is: a page break must not repaint a task or turn
-  // a phase into a leaf.
-  const colorByTaskId = buildPhaseColors(drawnItems);
+  // "Is this a parent" is resolved from the drawn set for the same reason depth
+  // is: a page break must not turn a phase into a leaf. Colour is *not* — it is
+  // handed in, built from the whole plan, so that excluding one root from the
+  // export cannot shift every other root's place in the palette and repaint the
+  // deck relative to the screen. See buildBranchColors.
   const parentIds = new Set(
     drawnItems.flatMap((item) => (item.parentId === undefined ? [] : [item.parentId])),
   );
@@ -1468,6 +1439,9 @@ export function buildExportSlides(
       exportMode,
       exportableItems,
       sectionedIds,
+      // From the whole plan, not from `exportableItems`: a task keeps its
+      // colour whether or not its neighbours are in the deck.
+      buildBranchColors(items),
       today,
     ),
     ...buildDetailSlides(detailCandidates),
