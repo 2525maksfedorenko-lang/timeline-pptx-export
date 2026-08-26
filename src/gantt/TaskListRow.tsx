@@ -72,7 +72,7 @@ export function TaskListRow({
   onAddSubtask,
   onContextMenu,
 }: TaskListRowProps) {
-  const { item, depth, isGroup, childCount, status } = row;
+  const { item, depth, isGroup, childCount, isSubtask, status } = row;
 
   const nameStyle: React.CSSProperties = isGroup
     ? {
@@ -259,35 +259,45 @@ export function TaskListRow({
         </button>
       )}
 
-      {/* Any row can take a sub-task — a task with one is simply a group from
-          then on — so the control is on every row rather than on the groups
-          that already have children. Out of the way until the pointer is on
-          the row: at rest the column is names, not controls. */}
-      <button
-        type="button"
-        className="gantt-row-add"
-        onClick={(event) => {
-          event.stopPropagation();
-          onAddSubtask();
-        }}
-        title="Add sub-task"
-        aria-label={`Add a sub-task under ${item.label}`}
-        style={{
-          width: 18,
-          height: 18,
-          flex: 'none',
-          border: 'none',
-          borderRadius: 4,
-          background: 'transparent',
-          padding: 0,
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <Plus size={14} strokeWidth={2.2} aria-hidden="true" />
-      </button>
+      {/* A top-level row can take a sub-task — a task with one is simply a
+          group from then on — and a sub-task cannot: the plan is built one
+          level deep, so the control is absent rather than present and
+          refusing. Out of the way until the pointer is on the row: at rest
+          the column is names, not controls.
+
+          The slot stays behind it, empty. The button is invisible at rest
+          already (see .gantt-row-add), so taking its 18px away as well would
+          widen a sub-task's name pill past its parent's and leave the column
+          with two right edges — for a control the eye never sees anyway. */}
+      {isSubtask ? (
+        <span aria-hidden="true" style={{ width: 18, height: 18, flex: 'none' }} />
+      ) : (
+        <button
+          type="button"
+          className="gantt-row-add"
+          onClick={(event) => {
+            event.stopPropagation();
+            onAddSubtask();
+          }}
+          title="Add sub-task"
+          aria-label={`Add a sub-task under ${item.label}`}
+          style={{
+            width: 18,
+            height: 18,
+            flex: 'none',
+            border: 'none',
+            borderRadius: 4,
+            background: 'transparent',
+            padding: 0,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Plus size={14} strokeWidth={2.2} aria-hidden="true" />
+        </button>
+      )}
     </div>
   );
 }

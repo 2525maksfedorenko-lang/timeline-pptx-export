@@ -30,7 +30,7 @@ import {
   planRange,
   weekendStarts,
 } from './scale';
-import { childrenOf } from './rollup';
+import { childrenOf, isSubtask } from './rollup';
 import { visibleRows } from './rows';
 import { descendantLeafIds, groupMoveDays, previewSpans, type DragState } from './drag';
 import { STATUS_CYCLE, STATUS_LABEL } from './tone';
@@ -357,6 +357,13 @@ export function GanttScreen() {
     updateItem(id, { status: next, progress: progressForStatus(next) ?? item.progress });
   };
 
+  /** Whether the list's own add row leads anywhere. It does everywhere except
+   * inside a focus on an item that is itself a sub-task — there a new task
+   * would become that sub-task's sub-task, which is the one thing this screen
+   * does not create. Only a plan that arrived already nested two levels deep
+   * can reach that view at all; the row says why rather than disappearing. */
+  const canAddTask = activeFocusId === null || !isSubtask(items, activeFocusId);
+
   const addTask = (name: string) => {
     const task = buildNewTask(
       {
@@ -386,6 +393,11 @@ export function GanttScreen() {
   const addSubtask = (parentId: string) => {
     const parent = items.find((item) => item.id === parentId);
     if (!parent) return null;
+    // One level deep and no further. The controls that reach this — the row's
+    // "+" and the menu's row — are already absent on a sub-task; the guard is
+    // here so the rule holds at the one place a sub-task is actually made,
+    // rather than in each control that offers to make one.
+    if (isSubtask(items, parentId)) return null;
 
     const span = spans.get(parentId);
     const task = buildNewTask(
@@ -442,8 +454,9 @@ export function GanttScreen() {
   };
 
   /** The rows a right-click offers, on the name and on the bar alike. Six at
-   * most, and two of them only where they mean anything: a task with no
-   * sub-tasks has no branch to fold away or to look at on its own.
+   * most, and three of them only where they mean anything: a task with no
+   * sub-tasks has no branch to fold away or to look at on its own, and a task
+   * that is itself a sub-task takes no sub-tasks of its own.
    *
    * Making a plan out of a branch is not among them: it is the sub-task count
    * badge's click, and the badge is the one thing on a row that already names
@@ -452,11 +465,15 @@ export function GanttScreen() {
     const isGroup = childrenOf(items, id).length > 0;
     const isIncluded = items.find((candidate) => candidate.id === id)?.includeInExport !== false;
     return [
-      {
-        label: 'Add sub-task',
-        icon: <Plus size={14} strokeWidth={2} aria-hidden="true" />,
-        onSelect: () => addSubtask(id),
-      },
+      ...(isSubtask(items, id)
+        ? []
+        : [
+            {
+              label: 'Add sub-task',
+              icon: <Plus size={14} strokeWidth={2} aria-hidden="true" />,
+              onSelect: () => addSubtask(id),
+            },
+          ]),
       {
         label: 'Rename',
         icon: <Pencil size={14} strokeWidth={2} aria-hidden="true" />,
@@ -681,14 +698,15 @@ export function GanttScreen() {
               collapsed={collapsed}
               selectedId={selectedId}
               minHeight={bodyHeight}
+              canAddTask={canAddTask}
               onSelect={select}
               onToggleCollapse={toggleCollapsed}
               onCycleStatus={cycleStatus}
               onRename={(id, name) => updateItem(id, { label: name })}
               onAddTask={addTask}
               onMakePlan={makePlanFromBranch}
-            onAddSubtask={addSubtask}
-            onContextMenu={openMenu}
+              onAddSubtask={addSubtask}
+              onContextMenu={openMenu}
             />
           </div>
 

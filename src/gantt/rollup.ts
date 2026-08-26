@@ -26,6 +26,23 @@ export function isGroup(items: TimelineItem[], id: string): boolean {
   return items.some((item) => item.parentId === id);
 }
 
+/** True when `id` is itself somebody's sub-task — its `parentId` names a task
+ * that is actually in this plan.
+ *
+ * Resolved parentage, not the bare field, and for the same reason
+ * buildTaskHierarchy resolves it: an item whose parent was deleted is drawn as
+ * a root and behaves as one, so it is not a sub-task here either.
+ *
+ * This is the whole of the "one level of sub-tasks" rule, which is about
+ * *creating* them: a row this returns true for offers no way to add a child.
+ * It says nothing about depth already in the plan — an imported file may nest
+ * as deep as it likes, and every level of it is drawn and exported as before. */
+export function isSubtask(items: TimelineItem[], id: string): boolean {
+  const item = items.find((candidate) => candidate.id === id);
+  if (item?.parentId === undefined) return false;
+  return items.some((candidate) => candidate.id === item.parentId);
+}
+
 export interface Span {
   /** Column index of the first day. */
   start: number;
