@@ -704,3 +704,31 @@ the time a layout effect could read `scrollLeft` the browser has already clamped
 it into the new canvas's range.
 
 The handoff describes none of those three: it has no wheel handler and no pan.
+
+## Where the plan screen corrects the prototype's grid
+
+The prototype rules the timeline grid at a fixed period — `columnWidth × 30` at
+the month scale, `× 7` at the week scale, both measured from day 0 — while its
+header groups by the calendar. Those are two different rulers, and the app
+inherited both.
+
+The bars were never on the fixed one: a bar's x is `dayIndexOf(iso) × cw`, so a
+task starting on 1 September has always opened exactly on the September cell's
+left edge. It was the *grid* that drifted out from under them — measured on the
+demo plan, 56 to 70px by the fifth month, and up to 217px on a canvas long
+enough to carry a year; at the week scale up to 91.2px, invisible only because
+the faint day-line layer is painted over the strong period rule and hides it.
+
+So the grid is now ruled from the header's own cells (`periodEdges` /
+`periodRuleLayer` in `src/gantt/scale.ts`) rather than from a period constant,
+and `PERIOD_DAYS` — which asserted that a month is 30 days — is gone. **Columns
+therefore vary in width: August is 31 columns wide and September 30.** The
+alternative, an even grid with bars snapped onto it, was rejected because it
+would make the dates wrong rather than the lines: `dayIndexOf`, `isoAtIndex`,
+the drag write-back, the today band and the weekend tint all count whole UTC
+days, and a plan screen whose bar sits three days from where its dates say is
+worse than one whose columns are uneven.
+
+`npm run check:scale` (`scripts/checkTimeScale.ts`) holds the invariant — header
+cell edge, painted rule and bar left edge are one x — across every canvas start
+date in a leap year and a common one.
