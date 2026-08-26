@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Plus } from 'lucide-react';
-import { ADD_ROW_HEIGHT_PX, LIST_WIDTH_PX } from './geometry';
+import { ADD_ROW_HEIGHT_PX } from './geometry';
 import type { GanttRowModel } from './rows';
 import { TaskListRow } from './TaskListRow';
 import { useGanttViewStore } from './viewStore';
@@ -30,9 +30,12 @@ interface TaskListProps {
   minHeight: number;
 }
 
-/** The 320px task column.
+/** The task column.
  *
- * Its pane is fixed to the left of the plan and never scrolls sideways; the
+ * It fills its pane rather than naming a width of its own — the width is the
+ * grid column's, which a drag on the seam can change (see `listWidth`).
+ *
+ * Its pane sits to the left of the plan and never scrolls sideways; the
  * shell writes its vertical offset from the body's as the rows scroll (see
  * useScrollPanes), which is what keeps a name level with its bar.
  *
@@ -86,7 +89,7 @@ export function TaskList({
   return (
     <div
       style={{
-        width: LIST_WIDTH_PX,
+        width: '100%',
         minHeight,
         background: 'var(--gantt-surface)',
         boxSizing: 'border-box',
