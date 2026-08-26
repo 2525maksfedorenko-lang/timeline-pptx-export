@@ -1,9 +1,8 @@
 import { useMemo } from 'react';
 
-import { ROW_HEIGHT_PX } from './geometry';
+import { ROW_HEIGHT_PX, type Span } from './geometry';
 import { periodRuleLayer, type HeaderCell, type TimeScale } from './scale';
 import { FALLBACK_BAR_STYLE, type BarStyle } from './barColor';
-import type { Span } from './rollup';
 import type { GanttRowModel } from './rows';
 import type { DragState } from './drag';
 import { TaskBar } from './TaskBar';

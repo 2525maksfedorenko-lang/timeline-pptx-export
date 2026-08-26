@@ -1,19 +1,20 @@
 import { getTaskStatus, type TaskStatus, type TimelineItem } from '../types/timeline';
-import { dayIndexOf } from './scale';
 
-/* What a "group" is on this screen, and what a group's own numbers are.
+/* What a "group" is on this screen, and what is still derived from its
+ * children.
  *
  * The handoff models groups explicitly (`kind: "task" | "group"`, with no
  * dates, status or progress of their own — all three "derived, never
  * stored"). This app has no `kind`: an item is a group exactly when some
- * other item names it as `parentId`. Everything below turns that into the
- * handoff's three roll-ups.
+ * other item names it as `parentId`.
  *
- * Consequence worth knowing: a parent item in this app *does* carry its own
- * start/end/status, and the export slides still read them. On screen those
- * are ignored in favour of the roll-up, which is the handoff's rule. A parent
- * whose stored dates disagree with its children's extent therefore draws one
- * span here and another on the slide.
+ * Of the handoff's three roll-ups only **status** survives here. A parent's
+ * dates are its own — it is a task that happens to have tasks under it, edited
+ * and dragged like any other, and drawn from the same stored pair the export
+ * slides read (see drag.ts's previewSpans, and the "phase" section of
+ * docs/design-system-map.md for why the roll-up went). Status is different: no
+ * control sets a parent's own status, so deriving it from the children states
+ * something rather than overriding something.
  */
 
 /** Direct children of `id`, in list order. */
@@ -41,34 +42,6 @@ export function isSubtask(items: TimelineItem[], id: string): boolean {
   const item = items.find((candidate) => candidate.id === id);
   if (item?.parentId === undefined) return false;
   return items.some((candidate) => candidate.id === item.parentId);
-}
-
-export interface Span {
-  /** Column index of the first day. */
-  start: number;
-  /** Days covered, at least 1. */
-  len: number;
-}
-
-/** A leaf's own span, in column indices. */
-function ownSpan(item: TimelineItem, minDate: Date): Span {
-  const start = dayIndexOf(item.start, minDate);
-  const end = dayIndexOf(item.end, minDate);
-  return { start, len: Math.max(1, end - start + 1) };
-}
-
-/** A row's span: its own dates for a leaf, and for a group the extent of its
- * children — recursively, so a group of groups spans its grandchildren too.
- * A group whose children have all been filtered out of view still spans them:
- * the roll-up is a fact about the plan, not about what is on screen. */
-export function spanOf(items: TimelineItem[], item: TimelineItem, minDate: Date): Span {
-  const children = childrenOf(items, item.id);
-  if (children.length === 0) return ownSpan(item, minDate);
-
-  const spans = children.map((child) => spanOf(items, child, minDate));
-  const start = Math.min(...spans.map((span) => span.start));
-  const end = Math.max(...spans.map((span) => span.start + span.len));
-  return { start, len: end - start };
 }
 
 /** A group's status, in the handoff's order of precedence: all-done is done,
