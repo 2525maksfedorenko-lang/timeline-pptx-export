@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { PanelRightOpen, Trash2, X } from 'lucide-react';
+import { Trash2, X } from 'lucide-react';
 import { buttonBaseClass, CHECKBOX_CLASS, INPUT_SHELL_CLASS } from '../components/systemUi';
 import { useTimelineStore } from '../store/timelineStore';
 import { getTaskStatus, TASK_STATUS_VALUES, type TaskStatus, type TimelineItem } from '../types/timeline';
 import { progressForStatus } from '../utils/progressForStatus';
 import { toHtml } from '../utils/renderMarkdown';
-import { PANEL_WIDE_WIDTH_PX, PANEL_WIDTH_PX } from './geometry';
+import { PANEL_WIDTH_PX } from './geometry';
 import { childrenOf, type Span } from './rollup';
 import { isoAtIndex } from './scale';
 import { STATUS_LABEL } from './tone';
@@ -108,8 +108,6 @@ export function EditTaskPanel({ item, minDate, spans }: EditTaskPanelProps) {
   const addComment = useTimelineStore((state) => state.addComment);
   const deleteTaskCascade = useTimelineStore((state) => state.deleteTaskCascade);
   const toggleIncludeInExportCascade = useTimelineStore((state) => state.toggleIncludeInExportCascade);
-  const panelWide = useGanttViewStore((state) => state.panelWide);
-  const togglePanelWide = useGanttViewStore((state) => state.togglePanelWide);
   const select = useGanttViewStore((state) => state.select);
 
   const [commentDraft, setCommentDraft] = useState('');
@@ -147,7 +145,7 @@ export function EditTaskPanel({ item, minDate, spans }: EditTaskPanelProps) {
     <div
       className="bg-card text-card-foreground"
       style={{
-        width: panelWide ? PANEL_WIDE_WIDTH_PX : PANEL_WIDTH_PX,
+        width: PANEL_WIDTH_PX,
         flex: 'none',
         borderLeft: '1px solid hsl(var(--border))',
         display: 'flex',
@@ -169,18 +167,10 @@ export function EditTaskPanel({ item, minDate, spans }: EditTaskPanelProps) {
         <span style={{ flex: 1, minWidth: 0, fontSize: 18, fontWeight: 500, letterSpacing: '-.01em' }}>
           Edit Task
         </span>
-        {/* The handoff's third header action — a "view as JSON" `<>` button —
-            is left out: its own README lists it as a stub whose behaviour is
-            undefined, and a button that does nothing is worse than no button. */}
-        <button
-          type="button"
-          onClick={togglePanelWide}
-          title={panelWide ? 'Collapse panel' : 'Expand panel'}
-          aria-label={panelWide ? 'Collapse panel' : 'Expand panel'}
-          className={buttonBaseClass('ghost', 'h-8 w-8 shrink-0 text-muted-foreground')}
-        >
-          <PanelRightOpen size={17} strokeWidth={1.7} />
-        </button>
+        {/* Close is the header's only action. The handoff's other two — a
+            widen toggle and a "view as JSON" `<>` button — are left out: the
+            panel reads at one width, and the README lists the second as a
+            stub whose behaviour is undefined. */}
         <button
           type="button"
           onClick={() => select(null)}

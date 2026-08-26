@@ -1,12 +1,4 @@
-import {
-  barHeight,
-  barLeft,
-  barOffsetY,
-  barWidth,
-  EDGE_DOT_SIZE_PX,
-  RESIZE_HANDLE_WIDTH_PX,
-  ROW_HEIGHT_PX,
-} from './geometry';
+import { barHeight, barLeft, barOffsetY, barWidth, RESIZE_HANDLE_WIDTH_PX, ROW_HEIGHT_PX } from './geometry';
 import type { Span } from './rollup';
 import type { GanttRowModel } from './rows';
 import { STATUS_TONE } from './tone';
@@ -31,11 +23,7 @@ interface TaskBarProps {
 }
 
 /** One bar: a pale block in its status' tint, with its own name set on it in
- * the matching dark tone. A group's name is set in the heavier weight.
- *
- * The dot on the right edge is drawn as a sibling of the bar, not a child: it
- * hangs half outside the rounded rectangle and would be clipped by the
- * `overflow: hidden` that keeps the label inside the radius. */
+ * the matching dark tone. A group's name is set in the heavier weight. */
 export function TaskBar({
   row,
   span,
@@ -142,24 +130,6 @@ export function TaskBar({
           </>
         )}
       </div>
-
-      {!isGroup && (
-        <span
-          aria-hidden="true"
-          style={{
-            position: 'absolute',
-            left: left + width - 4,
-            top: top - 4,
-            width: EDGE_DOT_SIZE_PX,
-            height: EDGE_DOT_SIZE_PX,
-            borderRadius: 999,
-            background: 'var(--gantt-edge-dot)',
-            border: '1.5px solid var(--gantt-edge-dot-ring)',
-            zIndex: 6,
-          }}
-        />
-      )}
-
     </div>
   );
 }

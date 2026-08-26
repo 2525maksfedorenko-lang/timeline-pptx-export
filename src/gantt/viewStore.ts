@@ -1,23 +1,16 @@
 import { create } from 'zustand';
-import type { StatusFilter } from './rows';
 import type { TimeScale } from './scale';
 
 /* What the plan screen remembers about how it is being looked at.
  *
  * Deliberately separate from `timelineStore`, and deliberately not persisted:
- * none of it is part of a plan. A search box, a collapsed group and a
+ * none of it is part of a plan. A collapsed group, a focused branch and a
  * selected row describe this session's view, and reopening the app should
- * show the whole plan again rather than someone's half-finished filter.
+ * show the whole plan again rather than where someone left off looking at it.
  */
 interface GanttViewStore {
   scale: TimeScale;
   setScale: (scale: TimeScale) => void;
-
-  search: string;
-  setSearch: (search: string) => void;
-
-  filter: StatusFilter;
-  setFilter: (filter: StatusFilter) => void;
 
   /** Group ids folded away. Absent means expanded. */
   collapsed: Record<string, boolean>;
@@ -48,10 +41,6 @@ interface GanttViewStore {
   focusId: string | null;
   setFocus: (id: string | null) => void;
 
-  /** The panel's expanded width.  */
-  panelWide: boolean;
-  togglePanelWide: () => void;
-
   /** Bumped by the toolbar's Today button. The scroll container lives in the
    * canvas and the button in the header, and they are no longer parent and
    * child — so the ask travels as a counter the canvas watches, rather than
@@ -63,12 +52,6 @@ interface GanttViewStore {
 export const useGanttViewStore = create<GanttViewStore>()((set) => ({
   scale: 'week',
   setScale: (scale) => set({ scale }),
-
-  search: '',
-  setSearch: (search) => set({ search }),
-
-  filter: 'all',
-  setFilter: (filter) => set({ filter }),
 
   collapsed: {},
   toggleCollapsed: (id) =>
@@ -91,9 +74,6 @@ export const useGanttViewStore = create<GanttViewStore>()((set) => ({
   // Entering a focus closes the Edit Task panel: the row it was open on is
   // usually the parent, which is the one row the focused view does not draw.
   setFocus: (focusId) => set({ focusId, selectedId: null }),
-
-  panelWide: false,
-  togglePanelWide: () => set((state) => ({ panelWide: !state.panelWide })),
 
   todayNonce: 0,
   requestToday: () => set((state) => ({ todayNonce: state.todayNonce + 1 })),

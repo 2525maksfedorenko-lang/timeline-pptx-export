@@ -65,8 +65,6 @@
   --gantt-today-edge: #fde047;
 
   /* Bar chrome */
-  --gantt-edge-dot: #60a5fa;
-  --gantt-edge-dot-ring: hsl(var(--card));
   --gantt-handle-hover: rgba(15, 23, 42, 0.16);
   --gantt-handle-hover-inset: rgba(15, 23, 42, 0.35);
   --gantt-drag-pill-bg: #334155;
