@@ -205,6 +205,30 @@ function drawStatusIcon(slide: PptxSlide, status: TaskStatus, x: number, y: numb
     });
   });
 
+  const triangle = geometry.triangle;
+  if (triangle) {
+    // PowerPoint's own triangle points up and turns about the centre of its
+    // box, so the handoff's right-pointing glyph is that box with its width
+    // and height swapped, given a quarter turn about the same centre. No
+    // outline: a 1pt default line on a glyph this small is half its width
+    // again, and the handoff's triangle is a fill.
+    const xs = triangle.map((point) => point[0]);
+    const ys = triangle.map((point) => point[1]);
+    const width = (Math.max(...xs) - Math.min(...xs)) * unit;
+    const height = (Math.max(...ys) - Math.min(...ys)) * unit;
+    const centerX = x + ((Math.min(...xs) + Math.max(...xs)) / 2) * unit;
+    const centerY = y + ((Math.min(...ys) + Math.max(...ys)) / 2) * unit;
+    slide.addShape('triangle', {
+      x: centerX - height / 2,
+      y: centerY - width / 2,
+      w: height,
+      h: width,
+      rotate: 90,
+      fill: { color },
+      line: { type: 'none' },
+    });
+  }
+
   geometry.bars?.forEach((bar) => {
     slide.addShape('rect', {
       x: x + bar.x * unit,

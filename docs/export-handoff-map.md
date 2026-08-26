@@ -357,13 +357,19 @@ handoff's own pixels (`px(56)`, `px(480)`, `px(26)`) over one conversion —
   so the ceiling comes from a floor on the row: `MIN_ROW_HEIGHT_IN` = 48px, the
   densest row the prototype draws (16 rows in ~761px). That gives 15 rows a
   slide against the old 12.
-- **Icons.** lucide, and the same four the plan screen already uses —
-  `circle-check`, `clock`, `circle`, `pause` — drawn from primitives in both
-  engines (a ring plus a polyline or two bars) rather than as an image, since
-  jsPDF has no SVG. **This differs from the handoff in one glyph**: its
-  "in progress" is a play triangle, and the app's is a clock. The app's own
-  handoff resolved that question first, and a deck exported from a screen
-  should not rename its vocabulary on the way out.
+- **Icons.** The handoff's own three paths, transcribed — a ring plus the
+  check `M7.5 12.3 L10.6 15.4 L16.5 9.2`, the ring plus the filled play
+  triangle `M9.3 7.2 L17 12 L9.3 16.8 Z`, and the bare ring — with lucide's
+  `pause` inside the same ring as a fourth for blocked, which the handoff does
+  not draw. Drawn from primitives in both engines rather than as an image,
+  since jsPDF has no SVG: the triangle is `doc.triangle` in the PDF and
+  PowerPoint's own `triangle` shape given a quarter turn in the deck.
+
+  *(Revised. This first shipped as lucide's `circle-check` / `clock` / `circle`
+  — the plan screen's four, on the grounds that a deck should not rename the
+  screen's vocabulary on the way out. Overruled: the README fixes the icons
+  along with everything else, so the slide draws the triangle. The plan screen
+  keeps its clock — that screen answers to its own handoff.)*
 - **Task column.** 480px, kept as pixels and converted like everything else, so
   it stays 25% of the slide whatever the page size does next.
 
