@@ -60,14 +60,18 @@ export const LEGEND_ICON_GAP_IN = px(10);
 /** Status icons are 24x24 wherever they appear — legend and task cell alike. */
 export const STATUS_ICON_SIZE_IN = px(24);
 
-/** The status glyphs, on lucide's own 24-unit grid.
+/** The status glyphs, on the handoff's own 24-unit grid.
  *
- * The handoff ships three inline SVGs and says to match them; the app already
- * answered the same question on its plan screen by taking the lucide icon each
- * path was transcribed from, so the deck takes the same four — a ringed check,
- * a clock, a bare ring, and two bars for blocked. Drawn from primitives rather
- * than from an image: PowerPoint would take an SVG, jsPDF would not, and the
- * handoff's own first export trap is icons that are not vectors.
+ * The handoff ships three inline SVGs and says to match them exactly, so the
+ * three are transcribed here from its paths rather than substituted with the
+ * lucide icon they were drawn from: a ringed check, a ringed play triangle,
+ * and a bare ring. The fourth — two bars for blocked — is lucide's `pause`
+ * inside the same ring, because the handoff's three-status world has no glyph
+ * for a status this product's data carries.
+ *
+ * Drawn from primitives rather than from an image: PowerPoint would take an
+ * SVG, jsPDF would not, and the handoff's own first export trap is icons that
+ * are not vectors.
  *
  * One geometry, two engines: each scales the grid to STATUS_ICON_SIZE_IN. */
 export const STATUS_ICON_GRID = 24;
@@ -77,16 +81,22 @@ export const STATUS_ICON_RING_RADIUS_UNITS = 10;
 export interface StatusIconGeometry {
   /** Points of a stroked polyline, in grid units. */
   polyline?: readonly (readonly [number, number])[];
+  /** A filled triangle, as its three corners in grid units, in path order. */
+  triangle?: readonly [
+    readonly [number, number],
+    readonly [number, number],
+    readonly [number, number],
+  ];
   /** Filled bars, in grid units. */
   bars?: readonly { x: number; y: number; w: number; h: number }[];
 }
 
 export const STATUS_ICON_GEOMETRY: Record<TaskStatus, StatusIconGeometry> = {
-  // lucide circle-check: "m9 12 2 2 4-4"
-  done: { polyline: [[9, 12], [11, 14], [15, 10]] },
-  // lucide clock: "M12 6v6l4 2"
-  in_progress: { polyline: [[12, 6], [12, 12], [16, 14]] },
-  // lucide circle: the ring alone
+  // The handoff's check: "M7.5 12.3 L10.6 15.4 L16.5 9.2"
+  done: { polyline: [[7.5, 12.3], [10.6, 15.4], [16.5, 9.2]] },
+  // The handoff's play triangle, filled: "M9.3 7.2 L17 12 L9.3 16.8 Z"
+  in_progress: { triangle: [[9.3, 7.2], [17, 12], [9.3, 16.8]] },
+  // The ring alone
   todo: {},
   // lucide pause, brought inside the ring the other three wear
   blocked: {

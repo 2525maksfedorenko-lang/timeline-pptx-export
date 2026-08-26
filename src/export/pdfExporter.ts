@@ -259,6 +259,21 @@ function drawStatusIcon(doc: jsPDF, status: TaskStatus, x: number, y: number, si
     doc.line(x + point[0] * unit, y + point[1] * unit, x + next[0] * unit, y + next[1] * unit);
   });
 
+  const triangle = geometry.triangle;
+  if (triangle) {
+    doc.setFillColor(color);
+    const [[ax, ay], [bx, by], [cx, cy]] = triangle;
+    doc.triangle(
+      x + ax * unit,
+      y + ay * unit,
+      x + bx * unit,
+      y + by * unit,
+      x + cx * unit,
+      y + cy * unit,
+      'F',
+    );
+  }
+
   if (geometry.bars) {
     doc.setFillColor(color);
     geometry.bars.forEach((bar) => {
