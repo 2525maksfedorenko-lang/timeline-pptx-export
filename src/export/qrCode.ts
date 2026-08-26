@@ -1,7 +1,31 @@
 import QRCode from 'qrcode';
 
-export const EXPORT_LINK_DISPLAY = 'timeline-pptx-export.vercel.app';
-export const EXPORT_LINK_URL = `https://${EXPORT_LINK_DISPLAY}`;
+/** The origin used when there is no page to read one from — the coverage check
+ * builds a whole deck in Node, and a QR still has to encode *something*.
+ *
+ * It is only ever seen headless. Every deck a person exports is exported from
+ * the running app, which answers with its own origin below. Change this line
+ * if a headless run should quote a particular public URL. */
+const HEADLESS_FALLBACK_ORIGIN = 'https://timeline-pptx-export.vercel.app';
+
+/** Where an exported deck's QR codes point: the origin the export is running
+ * in, not a host written down at build time.
+ *
+ * Read at call time rather than fixed as a constant because the deployment can
+ * move — it has, from Vercel to Netlify — and a deck carrying the old host is
+ * a dead link that nothing in the file admits to. Whatever origin serves the
+ * app is the origin its reader needs. */
+function exportOrigin(): string {
+  if (typeof window === 'undefined') return HEADLESS_FALLBACK_ORIGIN;
+  const { origin } = window.location;
+  return origin.startsWith('http') ? origin : HEADLESS_FALLBACK_ORIGIN;
+}
+
+/** The same origin as the caption printed under a QR code: no scheme, since
+ * the scheme is noise to someone reading a slide. */
+function exportOriginDisplay(): string {
+  return exportOrigin().replace(/^https?:\/\//, '');
+}
 
 /** Deep link into a specific on-screen Dashboard section (see App.tsx's
  * readDashboardViewParam). Lives here alongside the base export link so
@@ -9,7 +33,7 @@ export const EXPORT_LINK_URL = `https://${EXPORT_LINK_DISPLAY}`;
  * summary slide's status link — is built the same way, in one place. */
 export function dashboardDeepLink(view: 'status' | 'delayed'): { url: string; display: string } {
   const path = `/?dashboardView=${view}`;
-  return { url: `${EXPORT_LINK_URL}${path}`, display: `${EXPORT_LINK_DISPLAY}${path}` };
+  return { url: `${exportOrigin()}${path}`, display: `${exportOriginDisplay()}${path}` };
 }
 
 const cachedQrDataUrls = new Map<string, Promise<string>>();
@@ -42,7 +66,7 @@ export function getSummaryQrCodes(): Promise<QrCodeModel[]> {
   const statusLink = dashboardDeepLink('status');
 
   return Promise.all([
-    getQrCodeDataUrl(EXPORT_LINK_URL).then((dataUrl) => ({ dataUrl, display: EXPORT_LINK_DISPLAY })),
+    getQrCodeDataUrl(exportOrigin()).then((dataUrl) => ({ dataUrl, display: exportOriginDisplay() })),
     getQrCodeDataUrl(statusLink.url).then((dataUrl) => ({ dataUrl, display: 'View status details' })),
   ]);
 }
