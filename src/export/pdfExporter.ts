@@ -21,7 +21,7 @@ import {
 import { getQrCodeDataUrl, getSummaryQrCodes, type QrCodeModel } from './qrCode';
 import { buildSlideLinks, type SlideLinks } from './slideLinks';
 import { orderExportSlides } from './slideOrder';
-import { COLORS, FOOTER_TEXT, PDF_FONT_FACE, PDF_MONO_FONT_FACE, withHash } from './theme';
+import { COLORS, EXPORT_MARK_TEXT, PDF_FONT_FACE, PDF_MONO_FONT_FACE, withHash } from './theme';
 import { measureLetterSpacingWidthIn, measureTextWidthIn } from './textMetrics';
 import {
   BACK_LINK_FONT_SIZE_PT,
@@ -201,9 +201,16 @@ function drawTrackedText(
 }
 
 /** The frame every slide wears: a white page, the title at its top left, and
- * the footer line at the bottom — the export handoff's frame, shared by every
- * slide of the deck so a reader never meets two chromes in one file. */
-function drawChrome(doc: jsPDF, title: string, meta?: string) {
+ * the deck's mark at the right of the title's line — the export handoff's
+ * frame, shared by every slide of the deck so a reader never meets two
+ * chromes in one file.
+ *
+ * The footer is *not* drawn here. It carries one thing, the coverage note, and
+ * only the slides that have one draw it (drawOmittedNote).
+ *
+ * `markRight` is false on the appendix slides, where "Back to overview" owns
+ * that end of the title's line. One slot, one occupant. */
+function drawChrome(doc: jsPDF, title: string, markRight = true) {
   doc.setFillColor(withHash(COLORS.slideBg));
   doc.rect(0, 0, PAGE_WIDTH_IN, PAGE_HEIGHT_IN, 'F');
 
@@ -219,24 +226,18 @@ function drawChrome(doc: jsPDF, title: string, meta?: string) {
     { baseline: 'middle' },
   );
 
-  if (meta) {
+  if (markRight) {
     doc.setFont(PDF_FONT_FACE, 'normal');
     doc.setFontSize(META_FONT_SIZE_PT);
     doc.setTextColor(withHash(COLORS.mutedText));
-    drawText(doc, meta, CONTENT_X_IN + CONTENT_WIDTH_IN, FRAME_TOP_IN + TITLE_LINE_HEIGHT_IN / 2, {
-      align: 'right',
-      baseline: 'middle',
-    });
+    drawText(
+      doc,
+      EXPORT_MARK_TEXT,
+      CONTENT_X_IN + CONTENT_WIDTH_IN,
+      FRAME_TOP_IN + TITLE_LINE_HEIGHT_IN / 2,
+      { align: 'right', baseline: 'middle' },
+    );
   }
-
-  const footerY = PAGE_HEIGHT_IN - FRAME_BOTTOM_IN - FOOTER_HEIGHT_IN;
-  doc.setFont(PDF_FONT_FACE, 'normal');
-  doc.setFontSize(FOOTER_FONT_SIZE_PT);
-  doc.setTextColor(withHash(COLORS.mutedText));
-  drawText(doc, FOOTER_TEXT, CONTENT_X_IN + CONTENT_WIDTH_IN, footerY + FOOTER_HEIGHT_IN / 2, {
-    align: 'right',
-    baseline: 'middle',
-  });
 }
 
 /** One status glyph, drawn from primitives at `size` inches — the same
@@ -274,8 +275,9 @@ function drawStatusIcon(doc: jsPDF, status: TaskStatus, x: number, y: number, si
   }
 }
 
-/** The status legend and the zoom caption, on the line under the title. */
-function drawLegend(doc: jsPDF, zoomCaption: string) {
+/** The status legend, on the line under the title. The zoom caption that used
+ * to sit at the right of this row is gone with the per-slide window. */
+function drawLegend(doc: jsPDF) {
   let x = CONTENT_X_IN;
   const centerY = rowCenterY(CONTENT_TOP_IN, LEGEND_ROW_HEIGHT_IN);
 
@@ -295,11 +297,6 @@ function drawLegend(doc: jsPDF, zoomCaption: string) {
     doc.setTextColor(withHash(COLORS.mutedText));
     drawText(doc, item.label, labelX, centerY, { baseline: 'middle' });
     x = labelX + measureTextWidthIn(item.label, LEGEND_FONT_SIZE_PT) + LEGEND_ITEM_GAP_IN;
-  });
-
-  drawText(doc, zoomCaption, CONTENT_X_IN + CONTENT_WIDTH_IN, centerY, {
-    align: 'right',
-    baseline: 'middle',
   });
 }
 
@@ -329,9 +326,9 @@ function withAlpha(doc: jsPDF, alpha: number, draw: () => void) {
  * no z-index — draw order is paint order): the card and its rules, then the
  * bars, then the today rule, then every icon and every word. */
 function drawOverviewSlide(doc: jsPDF, model: OverviewSlideModel, links: SlideLinks) {
-  drawChrome(doc, model.title, model.meta);
+  drawChrome(doc, model.title);
   drawOmittedNote(doc, model.omittedNote);
-  drawLegend(doc, model.zoomCaption);
+  drawLegend(doc);
 
   doc.setFillColor(withHash(COLORS.cardBg));
   doc.setDrawColor(withHash(COLORS.border));
@@ -593,7 +590,7 @@ function drawCommentBlock(doc: jsPDF, block: CommentBlockRowModel) {
 }
 
 function drawDetailSlide(doc: jsPDF, model: DetailSlideModel, links: SlideLinks) {
-  drawChrome(doc, model.title);
+  drawChrome(doc, model.title, false);
   drawBackToOverviewLink(doc, links.overviewSlideNumber);
 
   model.sections.forEach((section) => {

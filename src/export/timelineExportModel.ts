@@ -56,7 +56,7 @@ import {
   PARENT_SECTION_GAP_IN,
   ROW_GAP_IN,
   ROW_LABEL_HEIGHT_IN,
-  ROWS_AREA_HEIGHT_IN,
+  OVERVIEW_ROW_HEIGHT_IN,
   ROWS_AREA_TOP_IN,
   SECTION_GAP_IN,
   STATUS_ICON_SIZE_IN,
@@ -117,8 +117,9 @@ export interface OverviewColumnModel {
 
 /** One row of the chart card: a task's name in the task column, its bar in the
  * timeline zone, and — unless it is a parent — the icon its status is read
- * from. The rows of a slide share the card's height equally (the handoff's
- * `flex:1`), so `rowHeight` is a fact about how many rows this slide carries. */
+ * from. Every row of every slide is OVERVIEW_ROW_HEIGHT_IN tall; `rowHeight`
+ * is carried so a renderer and the coverage audit read one number rather than
+ * each reaching for the constant. */
 export interface OverviewBarModel {
   id: string;
   label: string;
@@ -164,10 +165,12 @@ export interface OverviewGridLineModel {
 export interface OverviewSlideModel {
   kind: 'overview';
   title: string;
-  /** The line beside the title: how much time this slide covers, and when. */
-  meta: string;
-  /** The caption at the right of the legend row — "Zoom: weeks". */
-  zoomCaption: string;
+  // The line beside the title used to name this slide's own span ("5 months ·
+  // Aug 01 – Dec 31, 2028"), and the right of the legend row named the zoom
+  // ("Zoom: months"). Both are gone: the window is one window for the whole
+  // deck now, so a per-slide caption had nothing left to say that the axis
+  // does not, and the customer asked for the deck's mark in that slot. The
+  // mark is chrome — drawn by both engines, not carried here.
   columns: OverviewColumnModel[];
   /** The vertical rule between the task column and the timeline, and the
    * hairline under the column header. Both null on an empty slide. */
@@ -320,24 +323,6 @@ export function slideZoomFor(days: number): SlideZoom {
   if (days <= 550) return 'months';
   return 'quarters';
 }
-
-const ZOOM_CAPTION: Record<SlideZoom, string> = {
-  days: 'Zoom: days',
-  weeks: 'Zoom: weeks',
-  halfMonths: 'Zoom: half-months',
-  months: 'Zoom: months',
-  quarters: 'Zoom: quarters',
-};
-
-/** How the meta line names the span a slide covers — the handoff's
- * "1 month · Mar 2 – Apr 2, 2026" (gantt-export.html:17). */
-const ZOOM_SPAN_LABEL: Record<SlideZoom, (days: number) => string> = {
-  days: (days) => `${days} days`,
-  weeks: (days) => `${Math.round(days / 7)} weeks`,
-  halfMonths: (days) => `${Math.round(days / 30)} months`,
-  months: (days) => `${Math.round(days / 30)} months`,
-  quarters: (days) => `${Math.round((days / 365) * 10) / 10} years`,
-};
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 /** Monday-first initials, the single letter a 46px day column can hold. */
@@ -547,59 +532,66 @@ function snapWindowToZoom(window: OverviewWindow, zoom: SlideZoom): OverviewWind
   return { minDate, maxDate };
 }
 
-/** One axis per page, in page order; null for a page with nothing on it.
+/** The one axis every overview slide of the deck is drawn against.
  *
- * An explicit export timeframe is a window the reader chose, so every slide
- * keeps it unchanged — narrowing it per slide would quietly overrule the
- * setting. Only the automatic window is computed per slide. */
+ * **One window, repeated on every slide** — from the first day of the plan to
+ * the last, whatever any individual slide happens to carry. This reverses the
+ * earlier per-slide window (branch `fix/per-slide-timeframe`, and the section
+ * it wrote in docs/export-sort.md): there each slide took a window from its own
+ * tasks, so a bar's position on slide 3 meant nothing against a bar on slide 4.
+ *
+ * The customer asked for the shared window and accepted its cost, which is
+ * real and visible: a slide whose tasks all sit late in the plan draws them
+ * against an axis that starts at the plan's beginning, so the left half of
+ * that slide is empty track. That is the trade — a slide reads less densely,
+ * and any two slides of the deck can be laid side by side and compared. See
+ * Phase 5 in docs/export-handoff-map.md before "fixing" this back.
+ *
+ * An explicit export timeframe is the same shape of thing — one window for the
+ * deck — except that the reader chose it, so it is used exactly as given and
+ * not padded or snapped. */
 function buildOverviewAxes(
   pages: TimelineItem[][],
   timeframe: ExportTimeframe | null,
 ): (OverviewAxis | null)[] {
-  if (timeframe) {
-    // A window the reader chose is drawn exactly as chosen — not snapped to a
-    // column boundary, which would quietly widen the setting.
-    const minDate = new Date(timeframe.start);
-    const maxDate = new Date(timeframe.end);
+  const axisFor = (minDate: Date, maxDate: Date): OverviewAxis => {
     const tierDays = daysBetween(minDate, maxDate) + 1;
-    const scale = TIMELINE_WIDTH_IN / (tierDays * BASE_PX_PER_DAY);
-    const zoom = slideZoomFor(tierDays);
-    return pages.map((page) => (page.length > 0 ? { minDate, maxDate, scale, tierDays, zoom } : null));
+    return {
+      minDate,
+      maxDate,
+      // The window fills the timeline zone exactly. Every slide shares it, so
+      // every slide shares one inches-per-day and one set of columns.
+      scale: TIMELINE_WIDTH_IN / (tierDays * BASE_PX_PER_DAY),
+      tierDays,
+      zoom: slideZoomFor(tierDays),
+    };
+  };
+
+  // A window the reader chose is drawn exactly as chosen — not snapped to a
+  // column boundary, which would quietly widen the setting.
+  if (timeframe) {
+    const axis = axisFor(new Date(timeframe.start), new Date(timeframe.end));
+    return pages.map((page) => (page.length > 0 ? axis : null));
   }
 
-  const ranges = pages.map((page) => (page.length > 0 ? getDateRange(page) : null));
-  const widestRawDays = Math.max(1, ...ranges.map((range) => range?.totalDays ?? 1));
-  // One padding for the whole export, measured off the widest window, so the
-  // clear space either side is the same number of inches on every slide.
-  const padDays = Math.max(1, Math.round(widestRawDays * OVERVIEW_WINDOW_PAD_RATIO));
+  const drawnItems = pages.flat();
+  if (drawnItems.length === 0) return pages.map(() => null);
 
-  // The zoom is one decision for the whole export — every slide is ruled at
-  // the same density, so every slide is ruled at the same granularity — and it
-  // is taken from the widest window before snapping, since snapping can only
-  // move an edge by less than one column.
-  const zoom = slideZoomFor(widestRawDays + padDays * 2);
+  const range = getDateRange(drawnItems);
+  // Breathing room either side of the plan, as a fraction of the plan's own
+  // span — one window now, so there is no longer a "widest" to measure it off.
+  const padDays = Math.max(1, Math.round(range.totalDays * OVERVIEW_WINDOW_PAD_RATIO));
+  const padded = {
+    minDate: addDays(range.minDate, -padDays),
+    maxDate: addDays(range.maxDate, padDays),
+  };
+  // Snapping can only move an edge by less than one column, so the zoom is
+  // read off the padded span before the snap and the snap cannot invalidate it.
+  const zoom = slideZoomFor(range.totalDays + padDays * 2);
+  const window = snapWindowToZoom(padded, zoom);
 
-  const windows = ranges.map((range) =>
-    range === null
-      ? null
-      : snapWindowToZoom(
-          {
-            minDate: addDays(range.minDate, -padDays),
-            maxDate: addDays(range.maxDate, padDays),
-          },
-          zoom,
-        ),
-  );
-
-  // The widest window fills the timeline zone exactly; every other slide runs
-  // at that same inches-per-day and simply stops earlier.
-  const widestDays = Math.max(
-    1,
-    ...windows.map((window) => (window ? daysBetween(window.minDate, window.maxDate) + 1 : 1)),
-  );
-  const scale = TIMELINE_WIDTH_IN / (widestDays * BASE_PX_PER_DAY);
-
-  return windows.map((window) => (window ? { ...window, scale, tierDays: widestDays, zoom } : null));
+  const axis = axisFor(window.minDate, window.maxDate);
+  return pages.map((page) => (page.length > 0 ? axis : null));
 }
 
 /** Lays out one overview slide to the export handoff: a title with the window
@@ -629,20 +621,13 @@ function buildOverviewSlide(
   let headerRuleY: number | null = null;
   let dividerX: number | null = null;
   let todayX: number | null = null;
-  let meta = '';
-  let zoomCaption = '';
 
   if (axis && items.length > 0) {
-    const { minDate, maxDate, scale, tierDays, zoom } = axis;
-    const totalDays = daysBetween(minDate, maxDate) + 1;
-    // How much of the timeline zone this slide's window actually occupies. The
-    // widest slide of the export fills it; a narrower one stops short, and
-    // everything below clamps against *this* edge rather than the zone's.
-    const windowWidthIn = totalDays * BASE_PX_PER_DAY * scale;
+    const { minDate, scale, tierDays, zoom } = axis;
+    // The deck's one window, so this is the whole timeline zone on every
+    // slide. Kept as its own name because everything below clamps against it.
+    const windowWidthIn = tierDays * BASE_PX_PER_DAY * scale;
 
-    // Ruled across the whole zone, not across this slide's own window: the
-    // zone holds exactly `tierDays` days at the shared density, so a page
-    // whose tasks span less than the widest is still ruled edge to edge.
     const gridEnd = addDays(minDate, tierDays - 1);
     const calendar = buildDateGrid(minDate, gridEnd, tierDays);
     const starts = columnStarts(zoom, minDate, tierDays);
@@ -671,17 +656,20 @@ function buildOverviewSlide(
     headerRuleY = CARD_TOP_IN + COLUMN_HEADER_HEIGHT_IN;
     dividerX = TIMELINE_X_IN;
 
-    const todayOffset = daysBetween(minDate, today);
-    const todayIn = todayOffset * BASE_PX_PER_DAY * scale;
+    // Every slide shares one window, so the rule is on every slide or on
+    // none: today either falls inside the plan's own span, and each overview
+    // slide marks it at the same x, or it falls outside — a plan wholly in the
+    // future, or one that finished before today — and no slide of the deck
+    // draws it at all. There is no longer a middle case where the same day is
+    // on slide 2 and off slide 3.
+    const todayIn = daysBetween(minDate, today) * BASE_PX_PER_DAY * scale;
     todayX = todayIn >= 0 && todayIn <= windowWidthIn ? TIMELINE_X_IN + todayIn : null;
 
-    zoomCaption = ZOOM_CAPTION[zoom];
-    meta = `${ZOOM_SPAN_LABEL[zoom](totalDays)} · ${formatShortDate(minDate)} – ${formatShortDate(maxDate)}, ${maxDate.getUTCFullYear()}`;
-
-    // Rows share the card equally — the handoff's own `flex:1`. The count is
-    // never past MAX_OVERVIEW_BARS_PER_SLIDE (planOverview and the 'full' mode
-    // pager both cut to it), so a row is never thinner than MIN_ROW_HEIGHT_IN.
-    const rowHeight = ROWS_AREA_HEIGHT_IN / items.length;
+    // One pitch, fixed, on every slide — not the card's height shared out. A
+    // slide carrying fewer than MAX_OVERVIEW_BARS_PER_SLIDE rows therefore
+    // leaves the bottom of its card empty, which is the trade the customer
+    // accepted for two slides being comparable (see OVERVIEW_ROW_HEIGHT_IN).
+    const rowHeight = OVERVIEW_ROW_HEIGHT_IN;
     let y = ROWS_AREA_TOP_IN;
 
     items.forEach((item) => {
@@ -747,8 +735,6 @@ function buildOverviewSlide(
   return {
     kind: 'overview',
     title,
-    meta,
-    zoomCaption,
     columns,
     dividerX,
     headerRuleY,
@@ -848,9 +834,10 @@ function buildOverviewSlides(
     drawnItems.flatMap((item) => (item.parentId === undefined ? [] : [item.parentId])),
   );
 
-  // Paged first, so each page's own tasks are known before its window is: the
-  // window is a fact about the page, and the shared density a fact about the
-  // widest of them, so neither can be resolved one slide at a time.
+  // Paged by the same capacity the row height derives (see
+  // MAX_OVERVIEW_BARS_PER_SLIDE): a page holds as many rows as fit at the
+  // deck's one row pitch, and the last page holds whatever is left — which is
+  // the page the customer's example, half-filled slide 34, is.
   const pages: TimelineItem[][] = [];
   if (isPaged) {
     for (let i = 0; i < drawnItems.length; i += plan.capacity) {

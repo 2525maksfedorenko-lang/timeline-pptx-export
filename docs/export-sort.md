@@ -48,43 +48,47 @@ sort.
 
 ## What status order costs a long plan
 
-Sorting by status pulls tasks from both ends of the timeline onto the same
-slide, and that has a measurable price once a plan runs longer than a slide can
-show at a readable density.
+> **Superseded.** Everything below described a deck where each overview slide
+> took its date window from its own tasks. That is no longer how the deck
+> works: **every overview slide is drawn against one window, the whole plan's**
+> — see `buildOverviewAxes` and Phase 5 of docs/export-handoff-map.md. The
+> measurements are kept because they are the evidence behind a decision the
+> customer then reversed, and because they say something that is still true
+> about long plans. Read them as history, not as behaviour.
 
-Each overview slide is drawn against a window taken from its own tasks (see
-`buildOverviewAxes` in `timelineExportModel.ts`), at a density shared by every
-slide so equal durations stay equal across the deck. Under `status` those
-per-slide windows barely narrow, because a slide's twelve roots are spread over
-the whole plan. Measured on a 2.8-year plan — 249 tasks, 50 roots, 1036 days,
-five overview slides:
+Sorting by status pulls tasks from both ends of the timeline onto the same
+slide, and that had a measurable price when a slide's window came from its own
+tasks. Measured then on a 2.8-year plan — 249 tasks, 50 roots, 1036 days, five
+overview slides:
 
 | sortMode | per-slide windows | share of the plan | a 46-day bar |
 | --- | --- | --- | --- |
 | `date` | 256, 292, 262, 240, 86 days | 8–28% | 0.828in |
 | `status` | 982, 756, 980, 771, 67 days | **73–95%** | 0.246in |
 
-So under `status` four of the five slides span nearly the entire plan, the
-widest window sets the density for all of them, and the same task is drawn
-**3.4× shorter** than it would be in date order. The slides are correct and
-comparable; they are simply compressed, and the compression is inherent to the
-ordering rather than to the layout.
+The reading at the time: under `status` four of the five slides already spanned
+nearly the entire plan, the widest window set the density for all of them, and
+the same task was drawn 3.4× shorter than in date order. What per-slide windows
+bought `status` order was that bars started at the left edge rather than
+somewhere in the middle, and that each slide's captions named its own months.
 
-What per-slide windows still buy `status` order is real but narrower: bars
-start at the left edge instead of somewhere in the middle, and each slide's
-axis captions name its own months rather than the whole plan's. What they
-cannot buy is resolution.
+**What the shared window changes.** The axis no longer depends on the sort at
+all: every slide spans the whole plan whatever order the tasks arrive in, so
+the `date` column of that table is now the `status` column — a 46-day bar is
+0.246in either way. Sort order still decides *which* tasks share a slide and in
+what sequence; it no longer decides how wide anything is drawn.
 
-**Practical reading:** for a plan much longer than a year, `date` order
-produces readable slides and `status` order does not. The tail slide is the
-clearest case — two tasks spanning 67 days, drawn at a density set by a
-1042-day window, occupy 0.47in of the 5.56in timeline zone.
+**Practical reading, restated:** a plan much longer than a year is compressed
+on every overview slide, in every sort mode. That is the price of one axis, and
+it was accepted knowingly. If a deck needs resolution rather than
+comparability, the lever is the export timeframe — a narrower window the reader
+chooses — not the sort mode.
 
-The alternative — paginating the overview by date band and sorting by status
-*within* each band — would give every slide a tight window and keep the status
-reading order on the slide. It changes pagination rather than the axis, and it
+The alternative once considered — paginating the overview by date band and
+sorting by status *within* each band — would have given every slide a tight
+window. It is doubly moot now: it changes pagination rather than the axis, it
 would break the deck-level `done`-block-first reading this document describes,
-so it is deliberately not done here.
+and the deck has since chosen one axis on purpose.
 
 ## A `done` parent with an open child
 
