@@ -63,40 +63,15 @@ export const COLORS = {
   iconTodo: '9A9A9A',
 } as const;
 
-/** The four phase colours of the export handoff, in its own order, each with
- * the alpha its nested bars are tinted at.
+/* The bar palette used to live here. It now lives in
+ * `src/utils/branchColors.ts`, because it stopped being an export-only palette:
+ * the plan screen draws its bars from the same values, so that a task is the
+ * same colour on screen as on the slide. This file keeps the colours that are
+ * genuinely the deck's own — its chrome, its grid, its footer.
  *
- * The handoff names four phases (Discovery / Design / Build / Validation) and
- * gives each a solid and a tint. Our model has no phases — it has a tree — so
- * the four are used as a cycle: a root takes the next colour in this list, and
- * everything under it inherits that colour, because what the colour says is
- * "this is the same branch", not "this is the same status". A root that
- * carries a colour of its own (TimelineItem.color) keeps it; the cycle only
- * fills in for roots that don't.
- *
- * Hex without '#', matching the rest of this file. */
-export const PHASE_PALETTE = [
-  { solid: '0F9488', tintAlpha: 0.28 },
-  { solid: '7C3AED', tintAlpha: 0.24 },
-  { solid: '2F7FED', tintAlpha: 0.24 },
-  { solid: 'E08706', tintAlpha: 0.26 },
-] as const;
-
-/** The tint a bar gets when its colour did not come from the palette — a task
- * carrying its own `color`. The middle of the handoff's own 0.24–0.28 range,
- * since it gives no rule for a colour it never named. */
-export const CUSTOM_COLOR_TINT_ALPHA = 0.26;
-
-/** The colour a root's whole branch is drawn in: its own if it has one, else
- * the next entry of the palette, cycled. `rootIndex` is the root's position in
- * the plan's own order, so the same plan always produces the same colours. */
-export function phaseColor(rootIndex: number, ownColor: string | undefined): { solid: string; tintAlpha: number } {
-  if (ownColor) {
-    return { solid: ownColor.replace('#', '').toUpperCase(), tintAlpha: CUSTOM_COLOR_TINT_ALPHA };
-  }
-  const entry = PHASE_PALETTE[rootIndex % PHASE_PALETTE.length];
-  return { solid: entry.solid, tintAlpha: entry.tintAlpha };
-}
+ * `COLORS.kind*` below are not that palette. They are the design system's
+ * work-item kind colours, which a task may carry as its own `TimelineItem.color`
+ * — and a task's own colour still wins over the branch palette, in both media. */
 
 export function withHash(hex: string) {
   return `#${hex}`;

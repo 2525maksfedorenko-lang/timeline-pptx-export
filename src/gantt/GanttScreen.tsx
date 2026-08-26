@@ -4,6 +4,9 @@ import { buttonBaseClass } from '../components/systemUi';
 import { ContextMenu, type ContextMenuAction } from '../components/ContextMenu';
 import { useTimelineStore } from '../store/timelineStore';
 import { buildNewTask } from '../utils/newTask';
+import { buildBranchColors } from '../utils/branchColors';
+import { buildDepthMap } from '../utils/barNesting';
+import { buildBarStyles } from './barColor';
 import { progressForStatus } from '../utils/progressForStatus';
 import { useScrollPanes } from './useScrollPanes';
 import { shiftIsoDate } from '../export/dateScale';
@@ -182,6 +185,16 @@ export function GanttScreen() {
   const weekends = useMemo(
     () => weekendStarts(minDate, renderedDays, scale),
     [minDate, renderedDays, scale],
+  );
+
+  // Colour is branch, not status — the rule the exported deck draws by, shared
+  // with it through buildBranchColors so the two can't drift. Both maps are
+  // built from the whole plan: depth so a focused view doesn't repaint a
+  // sub-tree it promoted, colour so excluding a task from the export doesn't
+  // shift the palette under its neighbours.
+  const barStyleById = useMemo(
+    () => buildBarStyles(buildBranchColors(items), buildDepthMap(items)),
+    [items],
   );
 
   const dateRangeById = useMemo(
@@ -701,6 +714,7 @@ export function GanttScreen() {
               spans={spans}
               scale={scale}
               cells={headerCells}
+              barStyleById={barStyleById}
               columnWidth={columnWidth}
               width={canvasWidth}
               height={bodyHeight}

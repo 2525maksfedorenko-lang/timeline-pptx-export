@@ -732,3 +732,50 @@ worse than one whose columns are uneven.
 `npm run check:scale` (`scripts/checkTimeScale.ts`) holds the invariant — header
 cell edge, painted rule and bar left edge are one x — across every canvas start
 date in a leap year and a common one.
+
+## Where colour stopped meaning two things
+
+The plan screen and the exported deck used to disagree about what a bar's
+colour was *for*. The deck coloured by **branch**: a root takes a colour from
+the four-entry phase palette and its whole subtree inherits it, so the colour
+answers "what does this belong to", and status is the icon beside the name. The
+screen coloured by **status** out of `src/gantt/tone.ts`: green done, blue in
+progress, grey not started. The same plan was two different pictures, and
+neither one said what the other did.
+
+The screen now follows the deck. The palette moved out of `src/export/theme.ts`
+— which is documented above as the exporters' own palette, and this is no longer
+only theirs — into `src/utils/branchColors.ts`, which both sides import.
+`src/gantt/barColor.ts` is the screen's adapter: the exporters hand pptxgenjs
+and jsPDF a solid plus an alpha and let them composite over the white card,
+while a translucent bar on screen would let the grid's period rules show
+through it, so the same two numbers are flattened against the canvas instead.
+
+**The consequence is deliberate and is the reason this is written down: a done
+task and an untouched task in the same branch are now the same colour.** Status
+is carried by the row's status icon alone, exactly as on a slide. The bar's own
+label colour is picked by measured contrast rather than by depth, because the
+palette's amber is nearly as light as its own tint and "roots get light text"
+would be unreadable on it.
+
+Two decisions the parity forced, neither of which the screen could reach on its
+own:
+
+- **Colour is resolved from the whole plan, not from the exportable subset.**
+  The palette cycles over roots, so excluding one root from the export used to
+  shift every later root one place along it — the same task teal on screen and
+  violet on the slide. `buildBranchColors` takes the whole plan and both sides
+  look colours up by id.
+- **A plan with no sub-tasks at all is drawn in one colour, the palette's
+  blue.** Cycling four colours over a flat list distinguishes nothing: task 5
+  would be teal and task 6 violet for no reason a reader could name. "No
+  sub-tasks" is judged on resolved parentage, so a plan whose `parentId`s all
+  dangle is flat. A task carrying its own `TimelineItem.color` still keeps it,
+  in a flat plan exactly as in a nested one.
+
+What did *not* change is the deck's rule that an orphan is drawn as a root: a
+task whose parent the timeframe filtered out is full strength on the slide and
+tinted on screen, because on that slide it really has no parent. The hue — the
+part that means "branch" — matches either way. `npm run check:colors`
+(`scripts/checkColorParity.ts`) asserts the hue always and the tint wherever the
+deck draws the parent.

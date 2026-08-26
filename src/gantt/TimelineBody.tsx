@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 
 import { ROW_HEIGHT_PX } from './geometry';
 import { periodRuleLayer, type HeaderCell, type TimeScale } from './scale';
+import { FALLBACK_BAR_STYLE, type BarStyle } from './barColor';
 import type { Span } from './rollup';
 import type { GanttRowModel } from './rows';
 import type { DragState } from './drag';
@@ -14,6 +15,8 @@ interface TimelineBodyProps {
   /** The header's cells — the grid's period lines are ruled at their edges,
    * so the two can't drift apart. */
   cells: HeaderCell[];
+  /** Each task's branch colour, resolved to CSS. */
+  barStyleById: Map<string, BarStyle>;
   columnWidth: number;
   width: number;
   height: number;
@@ -49,6 +52,7 @@ export function TimelineBody({
   spans,
   scale,
   cells,
+  barStyleById,
   columnWidth,
   width,
   height,
@@ -134,6 +138,7 @@ export function TimelineBody({
             columnWidth={columnWidth}
             canvasWidth={width}
             isSelected={selectedId === row.item.id}
+            barStyle={barStyleById.get(row.item.id) ?? FALLBACK_BAR_STYLE}
             dateRange={dateRangeById.get(row.item.id) ?? ''}
             statusLabel={statusLabelById.get(row.item.id) ?? ''}
             onPointerDownBar={(event, mode) => onPointerDownBar(row.item.id, event, mode)}

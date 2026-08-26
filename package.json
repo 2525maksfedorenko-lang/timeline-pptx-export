@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "check:export": "jiti scripts/checkExportCoverage.ts",
     "check:design": "jiti scripts/checkDesignSystem.ts",
-    "check:scale": "jiti scripts/checkTimeScale.ts"
+    "check:scale": "jiti scripts/checkTimeScale.ts",
+    "check:colors": "jiti scripts/checkColorParity.ts"
   },
   "dependencies": {
     "idb": "^8.0.3",
