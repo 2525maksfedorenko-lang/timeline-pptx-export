@@ -462,10 +462,22 @@ that task's appendix section), and pptxgenjs stamps `u="sng"` on any run
 carrying a hyperlink. Only tasks with an appendix section get a link, and those
 are the parents — so every parent name, and nothing else, came out underlined.
 
-Fixed by setting `underline: { style: 'none' }` on that run. The link still
-works; only PowerPoint's default styling is overridden. **PDF was never
-affected** — jsPDF's `link()` draws no decoration — so this is a PPTX-only
-change and the two engines now agree.
+Fixed by **taking the hyperlink off the text run entirely**. The name is now
+plain text, and the jump lives on an invisible shape over the same box — a
+`rect` with a fully transparent fill and no outline, whose link lands in
+`<p:cNvPr>` where it can decorate nothing.
+
+The first attempt was `underline: { style: 'none' }` on the run. That does
+suppress it in PowerPoint, and it is not what shipped, because it leaves the
+run *a hyperlink*: a viewer is entitled to style one however it likes, so the
+underline stayed one renderer away from coming back. Moving the link is the
+version that cannot regress.
+
+Two details worth keeping: the fill must be transparent rather than absent — a
+shape with `fill: none` takes a click only on its outline, and this one has no
+outline — and this is exactly what the PDF has always done (`linkToPage` over
+the label's rectangle), so the two engines now attach a link the same way.
+**PDF was never affected** either way; jsPDF's `link()` draws no decoration.
 
 The "Back to overview" link on appendix slides keeps its underline. It is a
 navigation affordance rather than a task name, and the customer's note was

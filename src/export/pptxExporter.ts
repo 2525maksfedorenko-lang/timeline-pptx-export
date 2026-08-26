@@ -491,6 +491,13 @@ function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel, links: S
       );
     }
 
+    // The name is plain text and carries no hyperlink of its own. It used to,
+    // and that is what underlined every parent: pptxgenjs stamps `u="sng"` on
+    // any run holding an `<a:hlinkClick>`, and only parents have an appendix
+    // section to jump to. Writing `u="none"` on the run does suppress it in
+    // PowerPoint, but it leaves the run *a hyperlink*, and a viewer is free to
+    // style one however it likes — so the underline was still one renderer
+    // away from coming back.
     slide.addText(bar.label, {
       x: bar.labelX,
       y: bar.y,
@@ -503,15 +510,26 @@ function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel, links: S
       valign: 'middle',
       margin: 0,
       wrap: false,
-      // A parent's name is the deck's one clickable task label, and pptxgenjs
-      // stamps `u="sng"` on any run carrying a hyperlink — which is what put
-      // an underline under every parent and nothing else. The weight already
-      // says "parent"; the underline said "link" in a deck where the only
-      // other underline is the back link. Turned off explicitly, since the
-      // default is PowerPoint's, not ours.
-      underline: { style: 'none' },
-      ...barJump(bar),
     });
+
+    // The jump moves to an invisible shape over the same box, where it lands
+    // in `<p:cNvPr>` and can decorate nothing. This is also what the PDF has
+    // always done — `linkToPage` over the label's rectangle — so the two
+    // engines now attach a link the same way.
+    //
+    // A fully transparent *fill*, not `fill: none`: a shape with no fill takes
+    // a click only on its outline, and this one has no outline.
+    if (links.detailSlideNumberByTaskId.has(bar.id)) {
+      slide.addShape('rect', {
+        x: bar.labelX,
+        y: bar.y,
+        w: bar.labelWidth,
+        h: bar.rowHeight,
+        fill: { color: COLORS.cardBg, transparency: 100 },
+        line: { type: 'none' },
+        ...barJump(bar),
+      });
+    }
   });
 }
 
