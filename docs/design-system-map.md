@@ -779,3 +779,59 @@ tinted on screen, because on that slide it really has no parent. The hue — the
 part that means "branch" — matches either way. `npm run check:colors`
 (`scripts/checkColorParity.ts`) asserts the hue always and the tint wherever the
 deck draws the parent.
+
+## Where a phase stopped being the sum of its tasks
+
+The handoff models a group as having no dates of its own — `kind: "group"`, with
+dates, status and progress all "derived, never stored" — and the screen was
+built that way: `deriveGroupSpans` laid out the leaves and then overwrote every
+group's span with its children's extent, the panel's date fields were disabled
+under a "Rolled up from sub-tasks" note, and a group bar carried no resize
+handles, only a whole-block move that dragged its descendants with it.
+
+This app's model never matched that shape. A parent here is an ordinary
+`TimelineItem` that happens to have items pointing at it, it carries its own
+`start`/`end`, and **the export slides have always drawn from that stored pair**
+(`getItemBar` in `src/export/timelineExportModel.ts`). So the same phase could
+be two different bars, and the split opened on an ordinary edit rather than on
+malformed data: dragging a *child* moved the parent's bar on screen and left its
+stored dates alone, so the deck kept drawing the old span.
+
+Per the project owner the roll-up goes and the stored pair wins:
+
+- **Every item's span is its own two dates**, parent or not (`previewSpans` in
+  `src/gantt/drag.ts` — the deepest-first derivation and `groupMoveDays` /
+  `descendantLeafIds` with it). The screen and the deck now read the same pair
+  by construction.
+- **A phase resizes like any task** — the handoff hid those two handles because
+  a group had no duration of its own, and it now has one.
+- **A phase drag moves the phase alone.** Its sub-tasks keep their dates, which
+  is the point: the two are edited independently in both directions.
+
+**The consequence is deliberate and is why this is written down: nothing keeps a
+phase covering its own work any more.** A phase can end before its last task,
+and the plan simply draws it that way rather than the screen quietly stretching
+it. The alternative on the table — keep the roll-up and let a manual edit pin a
+parent's dates — was rejected as a new stored mode in the plan file, invisible
+unless drawn, that every reader and the exporters would have to ask about.
+
+Status is untouched and still rolls up (`statusOf` in `src/gantt/rollup.ts`): no
+control sets a parent's own status, so deriving it states something rather than
+overriding something.
+
+## Where sub-tasks stop nesting
+
+The handoff has exactly two kinds, `task` and `group`, and so exactly one level
+of nesting; this app's `parentId` allows any depth, and the screen used to offer
+"+" on every row. Per the project owner **creating** now stops at one level: a
+row that is itself somebody's sub-task shows no "+", no "Add sub-task" in its
+menu, and `addSubtask` refuses one (`isSubtask` in `src/gantt/rollup.ts` is the
+whole rule). The list's add row goes quiet in the one view that could still
+reach past it — a focus on an item that is itself a sub-task.
+
+**Depth already in a plan is untouched.** Nothing caps it anywhere: a file that
+nests five levels imports whole, draws every level with the indent ladder above,
+and exports every task (`check:export --plan` on a 5-level fixture: 93 of 93 in
+the deck). A deep row simply has no "+" — the 18px slot stays behind it, since
+the button is invisible at rest and taking its width away too would leave the
+task column with two right edges.

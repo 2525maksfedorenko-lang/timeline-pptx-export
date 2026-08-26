@@ -9,7 +9,6 @@ import { buildDepthMap } from '../utils/barNesting';
 import { buildBarStyles } from './barColor';
 import { progressForStatus } from '../utils/progressForStatus';
 import { useScrollPanes } from './useScrollPanes';
-import { shiftIsoDate } from '../export/dateScale';
 import type { TaskStatus } from '../types/timeline';
 import {
   clampListWidth,
@@ -32,7 +31,7 @@ import {
 } from './scale';
 import { childrenOf, isSubtask } from './rollup';
 import { visibleRows } from './rows';
-import { descendantLeafIds, groupMoveDays, previewSpans, type DragState } from './drag';
+import { previewSpans, type DragState } from './drag';
 import { STATUS_CYCLE, STATUS_LABEL } from './tone';
 import { TimelineHeader } from './TimelineHeader';
 import { TaskList } from './TaskList';
@@ -256,44 +255,14 @@ export function GanttScreen() {
     panes.scrollToDay(opensOn, columnWidth, TODAY_SCROLL_LEAD_PX, 'auto');
   }, [panes, opensOn, columnWidth, activePlanId]);
 
-/** Writes a finished drag onto the plan. */
+  /** Writes a finished drag onto the plan.
+   *
+   * One path for every bar. A phase has its own two dates like any other task,
+   * so it is moved and resized like any other task — and it moves alone: its
+   * sub-tasks keep the dates they had, which is what makes the two editable
+   * independently. */
   const commitDrag = useCallback(
     (finished: DragState) => {
-      const dragged = items.find((item) => item.id === finished.id);
-      if (!dragged) return;
-
-      const isGroup = items.some((item) => item.parentId === finished.id);
-      if (isGroup) {
-        // A group has no dates to move, only its children's — so the whole
-        // block shifts by one offset. The group's own stored dates shift with
-        // it: nothing on this screen draws them, but the export slides read
-        // them, and leaving them behind would split the two views of the
-        // same phase.
-        if (finished.mode !== 'move') return;
-        const days = groupMoveDays(items, minDate, renderedDays, finished);
-        if (days === 0) return;
-
-        [finished.id, ...descendantLeafIds(items, finished.id)].forEach((id) => {
-          const target = items.find((item) => item.id === id);
-          if (!target) return;
-          const start = spans.get(id);
-          if (id === finished.id || !start) {
-            // Groups (including nested ones) keep no span of their own here,
-            // so they move by day arithmetic on their stored dates.
-            updateItem(id, {
-              start: shiftIsoDate(target.start, days),
-              end: shiftIsoDate(target.end, days),
-            });
-            return;
-          }
-          updateItem(id, {
-            start: isoAtIndex(minDate, start.start),
-            end: isoAtIndex(minDate, start.start + start.len - 1),
-          });
-        });
-        return;
-      }
-
       const span = spans.get(finished.id);
       if (!span) return;
       const startIso = isoAtIndex(minDate, span.start);
@@ -303,7 +272,7 @@ export function GanttScreen() {
       else if (finished.mode === 'start') updateItem(finished.id, { start: startIso });
       else updateItem(finished.id, { end: endIso });
     },
-    [items, minDate, renderedDays, spans, updateItem],
+    [minDate, spans, updateItem],
   );
 
   const commitRef = useRef(commitDrag);
@@ -388,8 +357,11 @@ export function GanttScreen() {
    * happens — the old menu collected a name, two dates and a status in a
    * popup before creating anything, and this screen has an inline name field
    * on every row already, so the task is created first and named in place.
-   * The span comes from the drawn spans rather than the parent's stored
-   * dates, so a group's sub-task starts out matching the bar on screen. */
+   * The span comes from the drawn spans rather than the parent's stored pair
+   * so that a sub-task created mid-drag starts where the bar is being dropped;
+   * with the date roll-up gone the two are otherwise the same dates. The
+   * sub-task is free to leave that span the moment it is dragged — nothing
+   * pulls the parent after it. */
   const addSubtask = (parentId: string) => {
     const parent = items.find((item) => item.id === parentId);
     if (!parent) return null;

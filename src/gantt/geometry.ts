@@ -71,6 +71,19 @@ export function barWidth(spanDays: number, columnWidth: number): number {
 /** The grab strips at each end of a bar. */
 export const RESIZE_HANDLE_WIDTH_PX = 11;
 
+/** A bar's horizontal extent, in day columns from the canvas's origin — the
+ * unit every bar on this screen is placed and dragged in, before barLeft and
+ * barWidth turn it into pixels.
+ *
+ * One item, one span, whether or not anything nests under it: a span is read
+ * from an item's own two dates and from nothing else. */
+export interface Span {
+  /** Column index of the first day. */
+  start: number;
+  /** Days covered, at least 1. */
+  len: number;
+}
+
 /** The Edit Task panel's width. */
 export const PANEL_WIDTH_PX = 348;
 

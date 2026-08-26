@@ -1,6 +1,13 @@
-import { barHeight, barLeft, barOffsetY, barWidth, RESIZE_HANDLE_WIDTH_PX, ROW_HEIGHT_PX } from './geometry';
+import {
+  barHeight,
+  barLeft,
+  barOffsetY,
+  barWidth,
+  RESIZE_HANDLE_WIDTH_PX,
+  ROW_HEIGHT_PX,
+  type Span,
+} from './geometry';
 import type { BarStyle } from './barColor';
-import type { Span } from './rollup';
 import type { GanttRowModel } from './rows';
 import type { DragState } from './drag';
 import { BAR_HIT_ATTRIBUTE } from './useScrollPanes';
@@ -120,24 +127,22 @@ export function TaskBar({
           {item.label}
         </span>
 
-        {/* A group has no duration of its own to resize — its span is its
-            children's — so it gets no handles, only the whole-block move. */}
-        {!isGroup && (
-          <>
-            <div
-              onPointerDown={(event) => onPointerDownBar(event, 'start')}
-              title="Drag to change the start date"
-              className="gantt-handle gantt-handle-left"
-              style={handleStyle('left')}
-            />
-            <div
-              onPointerDown={(event) => onPointerDownBar(event, 'end')}
-              title="Drag to change the deadline"
-              className="gantt-handle gantt-handle-right"
-              style={handleStyle('right')}
-            />
-          </>
-        )}
+        {/* A phase has a duration of its own, so it resizes like anything
+            else: the handoff hid these on a group because a group's span was
+            its children's, and it no longer is. Dragging a phase moves the
+            phase — its sub-tasks stay where they are. */}
+        <div
+          onPointerDown={(event) => onPointerDownBar(event, 'start')}
+          title="Drag to change the start date"
+          className="gantt-handle gantt-handle-left"
+          style={handleStyle('left')}
+        />
+        <div
+          onPointerDown={(event) => onPointerDownBar(event, 'end')}
+          title="Drag to change the deadline"
+          className="gantt-handle gantt-handle-right"
+          style={handleStyle('right')}
+        />
       </div>
     </div>
   );

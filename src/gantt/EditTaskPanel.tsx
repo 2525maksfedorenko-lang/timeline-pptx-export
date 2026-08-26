@@ -5,8 +5,8 @@ import { useTimelineStore } from '../store/timelineStore';
 import { getTaskStatus, TASK_STATUS_VALUES, type TaskStatus, type TimelineItem } from '../types/timeline';
 import { progressForStatus } from '../utils/progressForStatus';
 import { toHtml } from '../utils/renderMarkdown';
-import { PANEL_WIDTH_PX } from './geometry';
-import { childrenOf, type Span } from './rollup';
+import { PANEL_WIDTH_PX, type Span } from './geometry';
+import { childrenOf } from './rollup';
 import { isoAtIndex } from './scale';
 import { STATUS_LABEL } from './tone';
 import { useGanttViewStore } from './viewStore';
@@ -202,9 +202,10 @@ export function EditTaskPanel({ item, minDate, spans }: EditTaskPanelProps) {
                 const next = event.target.value as TaskStatus;
                 updateItem(item.id, { status: next, progress: progressForStatus(next) ?? item.progress });
               }}
-              // A group's own status is stored and exported, but the plan
-              // draws its children's roll-up — so the control stays usable
-              // and says which of the two it is changing.
+              // Status is the one thing still rolled up: a group's own is
+              // stored and exported, while the plan draws its children's — so
+              // the control stays usable and says which of the two it sets.
+              // Its dates, unlike its status, are simply its own.
               title={isGroup ? 'Sub-tasks decide the status shown on the plan' : undefined}
               className={PANEL_FIELD_CLASS}
             >
@@ -224,15 +225,16 @@ export function EditTaskPanel({ item, minDate, spans }: EditTaskPanelProps) {
             <input
               id={`panel-${item.id}-start`}
               type="date"
+              // The drawn span, so a date being dragged on the chart reads
+              // here as it is dropped; off a drag it is the item's own pair.
               value={span ? isoAtIndex(minDate, span.start) : item.start}
-              disabled={isGroup}
               onChange={(event) => {
                 if (!event.target.value) return;
                 // Moving the start keeps the deadline where it is, so the
                 // task's length is what changes.
                 updateItem(item.id, { start: event.target.value });
               }}
-              style={{ ...DATE_FIELD_STYLE, opacity: isGroup ? 0.5 : 1 }}
+              style={DATE_FIELD_STYLE}
             />
           </Field>
           <Field label="Deadline" htmlFor={`panel-${item.id}-end`}>
@@ -240,12 +242,11 @@ export function EditTaskPanel({ item, minDate, spans }: EditTaskPanelProps) {
               id={`panel-${item.id}-end`}
               type="date"
               value={span ? isoAtIndex(minDate, span.start + span.len - 1) : item.end}
-              disabled={isGroup}
               onChange={(event) => {
                 if (!event.target.value) return;
                 updateItem(item.id, { end: event.target.value });
               }}
-              style={{ ...DATE_FIELD_STYLE, opacity: isGroup ? 0.5 : 1 }}
+              style={DATE_FIELD_STYLE}
             />
           </Field>
 
@@ -270,14 +271,6 @@ export function EditTaskPanel({ item, minDate, spans }: EditTaskPanelProps) {
               Include in export
             </label>
           </div>
-
-          {/* Why a group's dates are not editable here. A leaf needs no such
-              line: its fields say what they are by being usable. */}
-          {isGroup && (
-            <span className="text-muted-foreground" style={{ fontSize: 12 }}>
-              Rolled up from sub-tasks
-            </span>
-          )}
 
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
             <button
