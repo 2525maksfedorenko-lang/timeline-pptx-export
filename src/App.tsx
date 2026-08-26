@@ -28,10 +28,10 @@ interface PendingOverflowExport {
   capacity: number
 }
 
-const DASHBOARD_VIEW_SECTIONS: DashboardSection[] = ['status', 'delayed', 'atrisk']
+const DASHBOARD_VIEW_SECTIONS: DashboardSection[] = ['status', 'delayed']
 
 /** Reads the initial tab + highlighted dashboard section from
- * ?dashboardView=delayed|atrisk|status once at startup, so a shared link
+ * ?dashboardView=delayed|status once at startup, so a shared link
  * opens straight on the right view instead of the default Timeline tab. */
 function readDashboardViewParam(): DashboardSection | null {
   const value = new URLSearchParams(window.location.search).get('dashboardView')

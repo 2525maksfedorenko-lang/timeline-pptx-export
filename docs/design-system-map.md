@@ -273,6 +273,11 @@ hex and matching:
 hex without `#` (`TASK_STATUS_COLORS`, `src/types/timeline.ts:40`). Phase 2 can
 name them without changing a single rendered colour.
 
+*(Later: the `blocked` status was removed from the product, so its four rows no
+longer correspond to anything in `TASK_STATUS_SCALE` — twelve of these sixteen
+are live. The table is left whole as the record of the audit that produced it;
+see "Phase 4" in docs/export-handoff-map.md.)*
+
 ### 3.2 Divergences — ours to fix
 
 | What | Where | System says |

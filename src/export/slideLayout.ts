@@ -65,9 +65,7 @@ export const STATUS_ICON_SIZE_IN = px(24);
  * The handoff ships three inline SVGs and says to match them exactly, so the
  * three are transcribed here from its paths rather than substituted with the
  * lucide icon they were drawn from: a ringed check, a ringed play triangle,
- * and a bare ring. The fourth — two bars for blocked — is lucide's `pause`
- * inside the same ring, because the handoff's three-status world has no glyph
- * for a status this product's data carries.
+ * and a bare ring.
  *
  * Drawn from primitives rather than from an image: PowerPoint would take an
  * SVG, jsPDF would not, and the handoff's own first export trap is icons that
@@ -87,8 +85,6 @@ export interface StatusIconGeometry {
     readonly [number, number],
     readonly [number, number],
   ];
-  /** Filled bars, in grid units. */
-  bars?: readonly { x: number; y: number; w: number; h: number }[];
 }
 
 export const STATUS_ICON_GEOMETRY: Record<TaskStatus, StatusIconGeometry> = {
@@ -98,27 +94,15 @@ export const STATUS_ICON_GEOMETRY: Record<TaskStatus, StatusIconGeometry> = {
   in_progress: { triangle: [[9.3, 7.2], [17, 12], [9.3, 16.8]] },
   // The ring alone
   todo: {},
-  // lucide pause, brought inside the ring the other three wear
-  blocked: {
-    bars: [
-      { x: 8.6, y: 8, w: 2.2, h: 8 },
-      { x: 13.2, y: 8, w: 2.2, h: 8 },
-    ],
-  },
 };
 
-/** The legend's four entries, in the order a task moves through them.
- *
- * The handoff lists three; the fourth is blocked, which this product's data
- * carries and its plans show in red, and a deck that dropped the signal to fit
- * a three-status legend would be hiding the one status a reader most needs to
- * see. The words are the handoff's own (Title Case, unlike the lowercase
+/** The legend's three entries, in the order a task moves through them — the
+ * handoff's own list, and its own words (Title Case, unlike the lowercase
  * TASK_STATUS_LABELS the appendix uses). */
 export const LEGEND_ITEMS: { status: TaskStatus; label: string }[] = [
   { status: 'done', label: 'Done' },
   { status: 'in_progress', label: 'In progress' },
   { status: 'todo', label: 'To do' },
-  { status: 'blocked', label: 'Blocked' },
 ];
 
 // The chart card (`:27`): a white surface with a hairline border and a 14px
@@ -291,7 +275,7 @@ export function letterSpacingPt(fontSizePt: number, em: number): number {
 // margin rather than as a rounding accident.
 export const STATUS_RIGHT_PADDING_IN = 0.12;
 
-// Top of the dashboard tables' slides (Delayed / At risk). A slide's content
+// Top of the dashboard tables' slides (Delayed). A slide's content
 // normally starts at CONTENT_TOP_IN, which is right for text — but these
 // slides open with a filled table header, and a solid band wants a little
 // more air under the title than a line of text does. Kept as its own constant

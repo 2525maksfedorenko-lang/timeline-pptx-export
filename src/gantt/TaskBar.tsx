@@ -153,7 +153,7 @@ export function TaskBar({
             width: EDGE_DOT_SIZE_PX,
             height: EDGE_DOT_SIZE_PX,
             borderRadius: 999,
-            background: `var(${status === 'blocked' ? '--gantt-edge-dot-blocked' : '--gantt-edge-dot'})`,
+            background: 'var(--gantt-edge-dot)',
             border: '1.5px solid var(--gantt-edge-dot-ring)',
             zIndex: 6,
           }}

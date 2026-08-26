@@ -54,10 +54,9 @@ export const COLORS = {
   // disappear: --foreground. --muted-foreground was measured first and only
   // reaches 3.7:1 on the track, so it is deliberately not used here.
   textOnSurface: '0A0A0A',
-  // --destructive. The "today" rule, and the blocked status icon: the two
-  // marks on a slide that mean "look here".
+  // --destructive. The "today" rule — the one mark on a slide that means
+  // "look here".
   today: 'EF4444',
-  blocked: 'EF4444',
   // --muted-foreground at the handoff's 0.7 opacity, resolved over the white
   // card (0.7 x 0x73 + 0.3 x 0xFF). Both engines would need a per-stroke alpha
   // otherwise, and only one of them has one.

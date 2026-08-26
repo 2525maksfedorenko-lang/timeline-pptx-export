@@ -1,9 +1,9 @@
 import { ChevronDown } from 'lucide-react';
 import { COLORS, withHash } from '../export/theme';
 import {
-  statusOptionsFor,
   TASK_STATUS_CHIP,
   TASK_STATUS_LABELS,
+  TASK_STATUS_VALUES,
   type TaskStatus,
 } from '../types/timeline';
 
@@ -42,7 +42,7 @@ export function StatusSelect({ status, onChange, label }: StatusSelectProps) {
         style={{ backgroundColor: chip.bg, color: chip.fg, borderColor: chip.border }}
         aria-label={label ? `Status: ${label}` : `Status: ${TASK_STATUS_LABELS[status]}`}
       >
-        {statusOptionsFor(status).map((value) => (
+        {TASK_STATUS_VALUES.map((value) => (
           // Options are painted by the OS menu, which inherits the select's
           // own colors — a tinted dropdown would leave the rest looking
           // mislabelled, so each option resets them.

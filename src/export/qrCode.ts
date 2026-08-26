@@ -7,7 +7,7 @@ export const EXPORT_LINK_URL = `https://${EXPORT_LINK_DISPLAY}`;
  * readDashboardViewParam). Lives here alongside the base export link so
  * every exported QR target — the dashboard slides' per-table links and the
  * summary slide's status link — is built the same way, in one place. */
-export function dashboardDeepLink(view: 'status' | 'delayed' | 'atrisk'): { url: string; display: string } {
+export function dashboardDeepLink(view: 'status' | 'delayed'): { url: string; display: string } {
   const path = `/?dashboardView=${view}`;
   return { url: `${EXPORT_LINK_URL}${path}`, display: `${EXPORT_LINK_DISPLAY}${path}` };
 }

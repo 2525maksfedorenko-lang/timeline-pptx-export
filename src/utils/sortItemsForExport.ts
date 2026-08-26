@@ -8,7 +8,7 @@ import { buildTaskHierarchy, type TaskNode } from './taskHierarchy';
  * Deliberately not the on-screen order (see sortItems.ts, which runs
  * todo-first): a deck is read as a report of what is finished, so it leads with
  * `done`, while the app is a working view that leads with what is still open. */
-export const STATUS_SORT_ORDER: TaskStatus[] = ['done', 'in_progress', 'blocked', 'todo'];
+export const STATUS_SORT_ORDER: TaskStatus[] = ['done', 'in_progress', 'todo'];
 
 const statusRank = (item: TimelineItem): number => {
   const rank = STATUS_SORT_ORDER.indexOf(getTaskStatus(item));

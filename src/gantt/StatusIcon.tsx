@@ -1,4 +1,4 @@
-import { Circle, CircleCheck, Clock, Pause } from 'lucide-react';
+import { Circle, CircleCheck, Clock } from 'lucide-react';
 import type { TaskStatus } from '../types/timeline';
 import { STATUS_ICON_COLOR } from './tone';
 
@@ -7,13 +7,12 @@ import { STATUS_ICON_COLOR } from './tone';
  * The handoff draws these as inline paths and then says, in as many words, to
  * use `lucide-react` instead of copying them — so each one here is the lucide
  * icon whose path the prototype had transcribed: a ringed check for done, a
- * clock face for in progress, a bare circle for not started, and two upright
- * bars for blocked. 19px at stroke 1.9, its own numbers. */
+ * clock face for in progress, and a bare circle for not started. 19px at
+ * stroke 1.9, its own numbers. */
 const ICON: Record<TaskStatus, typeof Circle> = {
   done: CircleCheck,
   in_progress: Clock,
   todo: Circle,
-  blocked: Pause,
 };
 
 export function StatusIcon({ status }: { status: TaskStatus }) {

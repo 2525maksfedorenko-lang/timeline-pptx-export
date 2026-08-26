@@ -102,7 +102,6 @@ const STATUS_ICON_COLORS: Record<TaskStatus, string> = {
   done: COLORS.textOnSurface,
   in_progress: COLORS.textOnSurface,
   todo: COLORS.iconTodo,
-  blocked: COLORS.blocked,
 };
 
 const PT_TO_IN = 1 / 72;
@@ -272,13 +271,6 @@ function drawStatusIcon(doc: jsPDF, status: TaskStatus, x: number, y: number, si
       y + cy * unit,
       'F',
     );
-  }
-
-  if (geometry.bars) {
-    doc.setFillColor(color);
-    geometry.bars.forEach((bar) => {
-      doc.rect(x + bar.x * unit, y + bar.y * unit, bar.w * unit, bar.h * unit, 'F');
-    });
   }
 }
 

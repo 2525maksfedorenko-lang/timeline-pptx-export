@@ -73,7 +73,6 @@ export function TaskListRow({
   onContextMenu,
 }: TaskListRowProps) {
   const { item, depth, isGroup, childCount, status } = row;
-  const blocked = status === 'blocked';
 
   const nameStyle: React.CSSProperties = isGroup
     ? {
@@ -93,11 +92,11 @@ export function TaskListRow({
         textOverflow: 'ellipsis',
         whiteSpace: 'nowrap',
         fontSize: 14,
-        // An untouched task is set in the muted grey; anything under way,
-        // done or blocked takes the primary text colour.
+        // An untouched task is set in the muted grey; anything under way or
+        // done takes the primary text colour.
         color: status === 'todo' ? 'var(--gantt-text-muted)' : 'var(--gantt-text)',
-        border: `1px solid var(${blocked ? '--gantt-pill-border-blocked' : '--gantt-pill-border'})`,
-        background: `var(${blocked ? '--gantt-pill-bg-blocked' : '--gantt-pill-bg'})`,
+        border: '1px solid var(--gantt-pill-border)',
+        background: 'var(--gantt-pill-bg)',
         borderRadius: 6,
         padding: '6px 10px',
         boxSizing: 'border-box',

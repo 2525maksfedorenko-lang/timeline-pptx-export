@@ -73,7 +73,7 @@ export interface GridCoverage {
   levels: string;
 }
 
-/** What one dashboard-table slide (Delayed / At risk) drew, and what it cut.
+/** What one dashboard-table slide (Delayed) drew, and what it cut.
  * Reported per slide for the same reason the grid is: the two numbers are only
  * worth anything read side by side. */
 export interface DashboardTableCoverage {

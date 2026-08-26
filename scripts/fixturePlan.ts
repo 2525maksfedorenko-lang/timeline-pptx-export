@@ -55,7 +55,7 @@ function shapeSize(shape: Shape): number {
 }
 
 const TOTAL_ITEMS = 103;
-const STATUSES: TaskStatus[] = ['todo', 'in_progress', 'done', 'blocked'];
+const STATUSES: TaskStatus[] = ['todo', 'in_progress', 'done'];
 const AREAS = ['Platform', 'Billing', 'Onboarding', 'Reporting', 'Search', 'Mobile', 'Data', 'Identity'];
 const ACTIONS = ['migration', 'rollout', 'audit', 'redesign', 'hardening', 'integration', 'cleanup', 'pilot'];
 const DETAILS = ['phase 1', 'EU region', 'legacy path', 'dry run', 'GA', 'internal beta', 'follow-up'];

@@ -51,7 +51,7 @@ export const DEV_SEED_ITEMS: TimelineItem[] = [
     progress: 0,
     status: 'todo',
     group: 'Phase 2',
-    color: TASK_STATUS_SCALE.blocked.accent,
+    color: TASK_STATUS_SCALE.todo.accent,
     dependencies: ['3'],
   },
   {
@@ -60,7 +60,7 @@ export const DEV_SEED_ITEMS: TimelineItem[] = [
     start: '2026-08-08',
     end: '2026-08-14',
     progress: 50,
-    status: 'blocked',
+    status: 'in_progress',
     group: 'Phase 2',
     color: withHash(COLORS.kindPhase),
     parentId: '3',

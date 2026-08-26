@@ -1,7 +1,7 @@
 import { buttonBaseClass, INPUT_SHELL_CLASS } from '../components/systemUi';
 import { PlanMenu } from '../components/PlanMenu';
 import { useTimelineStore } from '../store/timelineStore';
-import { SELECTABLE_TASK_STATUS_VALUES } from '../types/timeline';
+import { TASK_STATUS_VALUES } from '../types/timeline';
 import { TIME_SCALE_LABELS, TIME_SCALES } from './scale';
 import { STATUS_LABEL } from './tone';
 import type { StatusFilter } from './rows';
@@ -23,15 +23,10 @@ interface GanttToolbarProps {
 
 /** Which statuses get a filter chip, in the handoff's order. "All" first,
  * then the states worth singling out; "Not started" has no chip, because the
- * plan is mostly that and the chip would select nearly everything.
- *
- * Built from the choosable statuses, so there is no Blocked chip: a status
- * nothing in the app can set is not something to filter a plan down to. A
- * blocked task imported into the plan is still reachable — under All, where it
- * draws in its own colour like everything else. */
+ * plan is mostly that and the chip would select nearly everything. */
 const FILTER_CHIPS: { value: StatusFilter; label: string }[] = [
   { value: 'all', label: 'All' },
-  ...SELECTABLE_TASK_STATUS_VALUES.filter((status) => status !== 'todo').map((status) => ({
+  ...TASK_STATUS_VALUES.filter((status) => status !== 'todo').map((status) => ({
     value: status as StatusFilter,
     label: STATUS_LABEL[status],
   })),

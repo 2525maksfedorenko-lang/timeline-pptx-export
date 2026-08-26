@@ -1,6 +1,6 @@
-import { SELECTABLE_TASK_STATUS_VALUES, type TaskStatus } from '../types/timeline';
+import { TASK_STATUS_VALUES, type TaskStatus } from '../types/timeline';
 
-/** The four tones a status is drawn in on this screen: the bar's pale fill,
+/** The three tones a status is drawn in on this screen: the bar's pale fill,
  * the label that sits on it, and the solid the progress overlay and the row's
  * status icon are painted with. Token names only — the values live in
  * `tokens.css`, transcribed from the handoff. */
@@ -20,17 +20,15 @@ export const STATUS_TONE: Record<TaskStatus, StatusTone> = {
   done: tone('done'),
   in_progress: tone('active'),
   todo: tone('todo'),
-  blocked: tone('blocked'),
 };
 
-/** The status icon's stroke. Three of the four are the tone's solid; "to do"
+/** The status icon's stroke. Two of the three are the tone's solid; "to do"
  * is drawn as a bare outline circle a shade lighter than its own solid, so an
  * untouched row reads as empty rather than as grey-but-present. */
 export const STATUS_ICON_COLOR: Record<TaskStatus, string> = {
   done: 'var(--gantt-done-fill)',
   in_progress: 'var(--gantt-active-fill)',
   todo: 'var(--gantt-icon-todo)',
-  blocked: 'var(--gantt-blocked-fill)',
 };
 
 /** How this screen names a status. Title Case and spelled out — the
@@ -41,11 +39,9 @@ export const STATUS_LABEL: Record<TaskStatus, string> = {
   todo: 'Not started',
   in_progress: 'In progress',
   done: 'Done',
-  blocked: 'Blocked',
 };
 
 /** Clicking a row's status icon walks this ring — which is exactly the set a
  * picker offers, in the order a task moves through it, so the two can never
- * disagree about what can be set. A row that arrives blocked leaves the ring
- * at its first click and cannot re-enter it. */
-export const STATUS_CYCLE: TaskStatus[] = [...SELECTABLE_TASK_STATUS_VALUES];
+ * disagree about what can be set. */
+export const STATUS_CYCLE: TaskStatus[] = [...TASK_STATUS_VALUES];

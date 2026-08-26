@@ -96,13 +96,11 @@ import {
 import { measureTextWidthIn } from './textMetrics';
 
 /** What each status icon is stroked in: the two states a reader acts on take
- * --foreground, "to do" the muted grey the handoff sets it in, and blocked the
- * product's red (see COLORS.blocked). */
+ * --foreground, and "to do" the muted grey the handoff sets it in. */
 const STATUS_ICON_COLORS: Record<TaskStatus, string> = {
   done: COLORS.textOnSurface,
   in_progress: COLORS.textOnSurface,
   todo: COLORS.iconTodo,
-  blocked: COLORS.blocked,
 };
 
 // Comment blocks are indented slightly from the section's left edge, same as
@@ -228,17 +226,6 @@ function drawStatusIcon(slide: PptxSlide, status: TaskStatus, x: number, y: numb
       line: { type: 'none' },
     });
   }
-
-  geometry.bars?.forEach((bar) => {
-    slide.addShape('rect', {
-      x: x + bar.x * unit,
-      y: y + bar.y * unit,
-      w: bar.w * unit,
-      h: bar.h * unit,
-      fill: { color },
-      line: { color },
-    });
-  });
 }
 
 /** The status legend and the zoom caption, on the line under the title. */

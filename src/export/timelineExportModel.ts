@@ -292,7 +292,6 @@ function buildSummarySlide(items: TimelineItem[]): SummarySlideModel {
   const segments = getStatusSegments(items);
   const total = items.length;
   const done = segments.find((segment) => segment.status === 'done');
-  const blocked = segments.find((segment) => segment.status === 'blocked');
 
   return {
     kind: 'summary',
@@ -301,7 +300,6 @@ function buildSummarySlide(items: TimelineItem[]): SummarySlideModel {
     stats: [
       { label: 'Total tasks', value: `${total}` },
       { label: 'Completed', value: `${done?.count ?? 0} (${done?.percent ?? 0}%)` },
-      { label: 'At risk (blocked)', value: `${blocked?.count ?? 0}` },
     ],
   };
 }

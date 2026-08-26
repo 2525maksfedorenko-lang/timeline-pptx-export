@@ -7,7 +7,7 @@ export type OrderedSlideModel = ExportSlideModel | DashboardSlideModel;
 /** The deck's slide order, in one place, so the PPTX and PDF exporters can
  * never drift apart:
  *   1. overview slide(s) — one in compact mode, N in full
- *   2. the dashboard tables (at risk, then delayed)
+ *   2. the dashboard tables (delayed)
  *   3. the summary slide
  *   4. the detail slides (subtasks & comments) — an appendix at the very
  *      back, so the deck reaches its conclusion before its supporting detail
