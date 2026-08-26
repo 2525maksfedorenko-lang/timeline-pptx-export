@@ -5,10 +5,11 @@ import { Dashboard, type DashboardSection } from './components/Dashboard'
 import { SettingsFlyout } from './components/SettingsFlyout'
 import { ExportOverflowModal } from './components/ExportOverflowModal'
 import { ImportModal } from './components/ImportModal'
-import { ExportMenu, type ExportFormat } from './components/ExportMenu'
+import { ExportMenu, type DeckFormat, type ExportFormat } from './components/ExportMenu'
 import { PlanNotice } from './components/PlanNotice'
 import { exportTimelineToPptx } from './export/pptxExporter'
 import { exportTimelineToPdf } from './export/pdfExporter'
+import { downloadPlanCsv } from './export/planCsv'
 import { getExportOverviewItems, planOverview, type ExportMode } from './export/timelineExportModel'
 import { buildExportFilename } from './export/dateScale'
 import { sortItemsForExport } from './utils/sortItemsForExport'
@@ -20,7 +21,7 @@ type Tab = 'timeline' | 'dashboard'
 /** The export the user asked for, held while the overflow modal asks how to
  * handle the tasks that don't fit on one overview slide. */
 interface PendingOverflowExport {
-  format: ExportFormat
+  format: DeckFormat
   totalTasks: number
   capacity: number
 }
@@ -59,7 +60,7 @@ function App() {
     void loadPlans()
   }, [loadPlans])
 
-  const runExport = (format: ExportFormat, exportMode: ExportMode) => {
+  const runExport = (format: DeckFormat, exportMode: ExportMode) => {
     const fileName = buildExportFilename(exportOptions.exportTimeframe, format)
     const exportTimeline = format === 'pptx' ? exportTimelineToPptx : exportTimelineToPdf
     void exportTimeline(items, exportOptions, comments, fileName, exportMode)
@@ -73,6 +74,14 @@ function App() {
   // Counted over every exportable task, not just the roots: the overview draws
   // subtasks as bars too, so the roots alone would under-count what has to fit.
   const handleExport = (format: ExportFormat) => {
+    // A table has no slides, so none of the paging question below is one it
+    // can be asked: every exportable task is a row, however many there are.
+    // The filename is built by the same rule as the other two.
+    if (format === 'csv') {
+      downloadPlanCsv(items, buildExportFilename(exportOptions.exportTimeframe, 'csv'))
+      return
+    }
+
     const overviewItems = getExportOverviewItems(sortItemsForExport(items, exportOptions.sortMode))
     const plan = planOverview(overviewItems, exportOptions.exportTimeframe)
 

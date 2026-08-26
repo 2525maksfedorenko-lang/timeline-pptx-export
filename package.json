@@ -11,7 +11,8 @@
     "check:export": "jiti scripts/checkExportCoverage.ts",
     "check:design": "jiti scripts/checkDesignSystem.ts",
     "check:scale": "jiti scripts/checkTimeScale.ts",
-    "check:colors": "jiti scripts/checkColorParity.ts"
+    "check:colors": "jiti scripts/checkColorParity.ts",
+    "check:csv": "jiti scripts/checkCsvRoundTrip.ts"
   },
   "dependencies": {
     "idb": "^8.0.3",

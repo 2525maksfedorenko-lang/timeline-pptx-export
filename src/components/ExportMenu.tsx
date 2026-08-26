@@ -1,8 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, FileText, Presentation } from 'lucide-react';
+import { ChevronDown, FileText, Presentation, Sheet } from 'lucide-react';
 import { buttonBaseClass, MENU_ITEM_CLASS, MENU_SURFACE_CLASS } from './systemUi';
 
-export type ExportFormat = 'pptx' | 'pdf';
+/** The two formats that make a deck. Kept apart from `ExportFormat` because
+ * the overview's slide capacity — and the question the overflow modal asks
+ * about it — is a question only these two can be asked. */
+export type DeckFormat = 'pptx' | 'pdf';
+
+export type ExportFormat = DeckFormat | 'csv';
 
 interface ExportMenuProps {
   onExport: (format: ExportFormat) => void;
@@ -76,6 +81,19 @@ export function ExportMenu({ onExport }: ExportMenuProps) {
           >
             <FileText size={14} strokeWidth={2} aria-hidden="true" />
             PDF (.pdf)
+          </button>
+          {/* Last, and not because it matters least: the two above are the
+              plan as a document to send, and this one is the plan as data to
+              open in a spreadsheet — or to bring back in through Import,
+              which reads exactly the columns it writes. */}
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => choose('csv')}
+            className={MENU_ITEM_CLASS}
+          >
+            <Sheet size={14} strokeWidth={2} aria-hidden="true" />
+            Spreadsheet (.csv)
           </button>
         </div>
       )}
