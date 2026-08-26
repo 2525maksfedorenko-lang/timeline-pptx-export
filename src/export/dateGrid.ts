@@ -1,38 +1,24 @@
 import { daysBetween, getWeekMarkers, MS_PER_DAY } from './dateScale';
-import { COLORS } from './theme';
 
-/** The densities of vertical date line drawn behind the timeline bars — on
- * screen (GanttChart) and on the exported overview slides alike. Which of
- * them are actually drawn depends on how much time is on screen at once; see
- * getVisibleGridLevels. */
-export type DateGridLevel = 'day' | 'week' | 'month' | 'year';
+/** The densities of vertical date line the overview slide can be ruled at.
+ * Which of them a slide actually uses is decided by its zoom level; see
+ * getVisibleGridLevels and slideZoomFor.
+ *
+ * The screen is not one of the surfaces here any more — src/gantt draws its
+ * own grid from its own scale — so these serve the export alone. */
+export type DateGridLevel = 'day' | 'week' | 'halfMonth' | 'month' | 'year';
 
-export interface DateGridLevelStyle {
-  /** Hex without a leading '#', matching theme.ts's COLORS convention. */
-  color: string;
-  /** Stroke width in the exported slides (points). */
-  widthPt: number;
-  /** Stroke width on screen (CSS px). */
-  widthPx: number;
-}
-
-/** One style table for every renderer, so a level's weight and color are
- * defined once instead of once per exporter. The ramp is monotonic in both
- * dimensions — day is the thinnest and palest, month the thickest and
- * darkest — which is what makes the three densities read as a hierarchy
- * rather than as three arbitrary line styles. */
-export const DATE_GRID_STYLES: Record<DateGridLevel, DateGridLevelStyle> = {
-  day: { color: COLORS.dayGridLine, widthPt: 0.25, widthPx: 0.5 },
-  week: { color: COLORS.weekGridLine, widthPt: 0.5, widthPx: 1 },
-  month: { color: COLORS.gridLine, widthPt: 1, widthPx: 1.75 },
-  year: { color: COLORS.yearGridLine, widthPt: 1.75, widthPx: 3 },
-};
-
-/** Back-to-front draw order: the palest, densest level first, so a month
- * line is never overpainted by the day line sharing its position (every
- * month boundary is also a day boundary, and every Monday is both, and every
- * 1 January is all four). */
-export const DATE_GRID_LEVELS: DateGridLevel[] = ['day', 'week', 'month', 'year'];
+/** Weakest to strongest, which is both the draw order and the ownership order:
+ * a position claimed by several levels belongs to the last of them (see
+ * resolveGridStrokes). Every Monday is also a day, every 1st is also a
+ * half-month mark, and every 1 January is all five.
+ *
+ * The levels carry no weight or colour of their own. A slide's grid is the
+ * column boundaries of its zoom, drawn as one uniform hairline in `--border`
+ * (see docs/export-handoff-map.md); what a level still decides is which dates
+ * *qualify* as a boundary, which is what the coverage audit holds a drawn line
+ * to. */
+export const DATE_GRID_LEVELS: DateGridLevel[] = ['day', 'week', 'halfMonth', 'month', 'year'];
 
 // How much time can be on screen at once before a level stops being worth
 // drawing. Both thresholds are in days of *visible* range — the span the
@@ -43,39 +29,28 @@ export const DATE_GRID_LEVELS: DateGridLevel[] = ['day', 'week', 'month', 'year'
 export const MAX_VISIBLE_DAYS_FOR_DAY_LINES = 90;
 export const MAX_VISIBLE_DAYS_FOR_WEEK_LINES = 365;
 
-/** Which levels are worth drawing for a range of `visibleDays`: everything
- * down to daily on a quarter or less, weeks and months up to a year, and
- * months against year boundaries beyond that. Each tier keeps two or three
- * levels, so the grid always reads as a hierarchy rather than as one
- * undifferentiated comb. */
+/** Which levels a range of `visibleDays` can be ruled at: everything down to
+ * daily on a quarter or less, weeks through months up to a year, and months
+ * against year boundaries beyond that.
+ *
+ * The half-month level exists for the zoom of the same name — a six-month
+ * window is too long for a legible week column and too short for a month one
+ * (see slideZoomFor) — so it appears exactly where that zoom can be chosen. */
 export function getVisibleGridLevels(visibleDays: number): DateGridLevel[] {
   if (visibleDays > MAX_VISIBLE_DAYS_FOR_WEEK_LINES) return ['month', 'year'];
-  if (visibleDays > MAX_VISIBLE_DAYS_FOR_DAY_LINES) return ['week', 'month'];
+  if (visibleDays > MAX_VISIBLE_DAYS_FOR_DAY_LINES) return ['week', 'halfMonth', 'month'];
   return ['day', 'week', 'month'];
 }
 
-/** Clear ground kept between two drawn strokes, as a multiple of the heaviest
- * stroke's own width.
+/** Clear ground kept between two drawn strokes.
  *
- * Two strokes separated by less than the width of one of them do not read as
- * two lines — they read as a single thick, slightly dirty one, which is what a
- * month line and the Monday three days after it look like once a year is
- * compressed into five inches (one day is then ~1.1pt). Requiring a full
- * stroke-width of clear ground either side is the smallest rule that keeps two
- * lines legible *as* two, and it is expressed against the heaviest stroke
- * because that is the one whose neighbour disappears first.
- *
- * At the year level's 1.75pt / 3px that is 3.5pt (~0.049in) on a slide and 6px
- * on screen. Within a level the marks are always further apart than this — a
- * week is 7.7pt even across a full year — so the rule only ever fires between
- * two different levels, which is exactly the collision it exists for. */
-export const DATE_GRID_MIN_GAP_RATIO = 2;
-
-const heaviest = DATE_GRID_LEVELS.reduce((widest, level) =>
-  DATE_GRID_STYLES[level].widthPt > DATE_GRID_STYLES[widest].widthPt ? level : widest,
-);
-export const DATE_GRID_MIN_GAP_PT = DATE_GRID_STYLES[heaviest].widthPt * DATE_GRID_MIN_GAP_RATIO;
-export const DATE_GRID_MIN_GAP_PX = DATE_GRID_STYLES[heaviest].widthPx * DATE_GRID_MIN_GAP_RATIO;
+ * Two strokes closer than this do not read as two lines — they read as one
+ * thick, slightly dirty one, which is what a month line and the Monday three
+ * days after it look like once a year is compressed into nine inches. The
+ * value is the one the levels used to derive between them when each carried
+ * its own weight: twice the heaviest stroke, 1.75pt, so nothing about which
+ * positions survive a collision has changed. */
+export const DATE_GRID_MIN_GAP_PT = 3.5;
 
 export interface DateGridMark {
   /** Whole days from the range start. Callers scale this into px (screen) or
@@ -126,7 +101,7 @@ export interface DateGridStroke {
  * strongest level qualifying for it draws, the weaker ones do not draw there
  * at all. The same rule then extends by a tolerance — a weaker stroke closer
  * than `minGap` to a stronger one is the same collision a fraction of a point
- * apart (see DATE_GRID_MIN_GAP_RATIO), and is resolved the same way.
+ * apart (see DATE_GRID_MIN_GAP_PT), and is resolved the same way.
  *
  * Shared by the slides and the on-screen chart, each passing the gap in its
  * own unit, so neither can drift into drawing a different grid. */
@@ -180,6 +155,12 @@ export function buildDateGrid(minDate: Date, maxDate: Date, visibleDays?: number
   // month-level date caption.
   const month = day.filter((mark, index) => index === 0 || mark.date.getUTCDate() === 1);
 
+  // The 1st and the 16th: the two boundaries the half-month zoom rules. The
+  // 1st belongs to the month level as well and loses the position to it (see
+  // resolveGridStrokes), which leaves this level owning the 16ths — exactly
+  // the marks no other level has.
+  const halfMonth = day.filter((mark) => mark.date.getUTCDate() === 1 || mark.date.getUTCDate() === 16);
+
   // Only true 1 Januarys — unlike the month level, this one takes no
   // range-start anchor: a year line at the very edge of the axis would sit
   // on top of the month line already there and mark nothing.
@@ -188,6 +169,7 @@ export function buildDateGrid(minDate: Date, maxDate: Date, visibleDays?: number
   return {
     day: levels.has('day') ? day : [],
     week: levels.has('week') ? week : [],
+    halfMonth: levels.has('halfMonth') ? halfMonth : [],
     month: levels.has('month') ? month : [],
     year: levels.has('year') ? year : [],
   };

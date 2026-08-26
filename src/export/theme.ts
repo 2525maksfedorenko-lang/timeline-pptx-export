@@ -7,14 +7,18 @@
 // name is given — keep the two in step (see design-system/tokens/).
 
 export const COLORS = {
-  // --primary: the one navy the whole brand rests on.
+  // --primary: the one navy the whole brand rests on. Off the slide's chrome
+  // since the export handoff (the frame is white now, its text --foreground);
+  // what still uses it is the deck's own furniture — the summary slide's
+  // headings and the dashboard tables' header row.
   navy: '1E2A38',
-  // --base-background: the product's pale blue-grey app chrome, so a slide
-  // reads as a Coordinator surface rather than plain white.
-  slideBg: 'EBF0F5',
-  // --primary-foreground: the pale blue-grey that sits *on* navy. Same value as
-  // slideBg upstream, which is safe here because it is only ever drawn on the
-  // navy header band or on a coloured bar fill, never on the slide background.
+  // --background / --card: the slide, and the chart card on it. The handoff
+  // draws both white and separates them with --border rather than with a
+  // tint, so a bar's colour is the only colour on the slide.
+  slideBg: 'FFFFFF',
+  cardBg: 'FFFFFF',
+  // --primary-foreground: the pale blue-grey that sits *on* navy — a table's
+  // header row, a status segment's fill.
   lightText: 'EBF0F5',
   // Text links are the product's one deliberate exception to "navy plus
   // neutrals": Tailwind blue-500, not --primary. See the Link note in
@@ -50,25 +54,50 @@ export const COLORS = {
   // disappear: --foreground. --muted-foreground was measured first and only
   // reaches 3.7:1 on the track, so it is deliberately not used here.
   textOnSurface: '0A0A0A',
-  // Vertical date grid lines behind the timeline bars, in four densities, each
-  // paired with a stroke width in dateGrid.ts. No design-system counterpart —
-  // the product's Gantt isn't part of the system — so these are derived: the
-  // original khaki-tinted set retuned onto neutral greys, since aicoo has no
-  // warm greys anywhere. The spread is kept wide enough that the levels stay
-  // distinguishable after antialiasing at sub-pixel widths, and every one of
-  // them stays a clear step darker than slideBg or it would vanish.
-  //
-  // Monthly is the darkest of the three regular levels and daily the palest,
-  // so the levels read as a hierarchy at a glance.
-  gridLine: 'CFCFCF',
-  weekGridLine: 'D6D6D6',
-  // Year boundaries, only drawn on ranges long enough that months are the
-  // *fine* level (see getVisibleGridLevels). A clear step darker than the
-  // monthly line, since on a multi-year range it's the one mark that says
-  // where one year ends and the next begins.
-  yearGridLine: 'B0B0B0',
-  dayGridLine: 'E0E0E0',
+  // --destructive. The "today" rule, and the blocked status icon: the two
+  // marks on a slide that mean "look here".
+  today: 'EF4444',
+  blocked: 'EF4444',
+  // --muted-foreground at the handoff's 0.7 opacity, resolved over the white
+  // card (0.7 x 0x73 + 0.3 x 0xFF). Both engines would need a per-stroke alpha
+  // otherwise, and only one of them has one.
+  iconTodo: '9A9A9A',
 } as const;
+
+/** The four phase colours of the export handoff, in its own order, each with
+ * the alpha its nested bars are tinted at.
+ *
+ * The handoff names four phases (Discovery / Design / Build / Validation) and
+ * gives each a solid and a tint. Our model has no phases — it has a tree — so
+ * the four are used as a cycle: a root takes the next colour in this list, and
+ * everything under it inherits that colour, because what the colour says is
+ * "this is the same branch", not "this is the same status". A root that
+ * carries a colour of its own (TimelineItem.color) keeps it; the cycle only
+ * fills in for roots that don't.
+ *
+ * Hex without '#', matching the rest of this file. */
+export const PHASE_PALETTE = [
+  { solid: '0F9488', tintAlpha: 0.28 },
+  { solid: '7C3AED', tintAlpha: 0.24 },
+  { solid: '2F7FED', tintAlpha: 0.24 },
+  { solid: 'E08706', tintAlpha: 0.26 },
+] as const;
+
+/** The tint a bar gets when its colour did not come from the palette — a task
+ * carrying its own `color`. The middle of the handoff's own 0.24–0.28 range,
+ * since it gives no rule for a colour it never named. */
+export const CUSTOM_COLOR_TINT_ALPHA = 0.26;
+
+/** The colour a root's whole branch is drawn in: its own if it has one, else
+ * the next entry of the palette, cycled. `rootIndex` is the root's position in
+ * the plan's own order, so the same plan always produces the same colours. */
+export function phaseColor(rootIndex: number, ownColor: string | undefined): { solid: string; tintAlpha: number } {
+  if (ownColor) {
+    return { solid: ownColor.replace('#', '').toUpperCase(), tintAlpha: CUSTOM_COLOR_TINT_ALPHA };
+  }
+  const entry = PHASE_PALETTE[rootIndex % PHASE_PALETTE.length];
+  return { solid: entry.solid, tintAlpha: entry.tintAlpha };
+}
 
 export function withHash(hex: string) {
   return `#${hex}`;

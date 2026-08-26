@@ -1,6 +1,6 @@
 import pptxgen from 'pptxgenjs';
 import type { ExportOptions } from '../store/timelineStore';
-import type { TaskComment, TimelineItem } from '../types/timeline';
+import type { TaskComment, TaskStatus, TimelineItem } from '../types/timeline';
 import { sortItemsForExport } from '../utils/sortItemsForExport';
 import {
   buildExportSlides,
@@ -26,12 +26,22 @@ import {
   BACK_LINK_TEXT,
   BACK_LINK_WIDTH_IN,
   BACK_LINK_Y_IN,
-  BAR_HEIGHT_IN,
-  BAR_LABEL_FONT_SIZE_PT,
   BAR_RADIUS_IN,
-  BAR_STATUS_FONT_SIZE_PT,
-  AXIS_MONTH_FONT_SIZE_PT,
-  AXIS_WEEK_FONT_SIZE_PT,
+  CARD_BORDER_WIDTH_PT,
+  CARD_BOTTOM_IN,
+  CARD_HEIGHT_IN,
+  CARD_RADIUS_IN,
+  CARD_TOP_IN,
+  CARD_WIDTH_IN,
+  CARD_X_IN,
+  CHEVRON_HEIGHT_IN,
+  CHEVRON_WIDTH_IN,
+  COLUMN_HEADER_FONT_SIZE_PT,
+  COLUMN_HEADER_HEIGHT_IN,
+  COLUMN_HEADER_LINE_IN,
+  COLUMN_HEADER_SUB_LINE_Y_IN,
+  COLUMN_HEADER_TOP_LINE_Y_IN,
+  COLUMN_HEADER_TRACKING_EM,
   COMMENT_BODY_FONT_SIZE_PT,
   COMMENT_META_ROW_HEIGHT_IN,
   COMMENT_TABLE_FONT_SIZE_PT,
@@ -44,29 +54,56 @@ import {
   DASHBOARD_TABLE_QR_SIZE_IN,
   DASHBOARD_TABLE_TOP_IN,
   DASHBOARD_TABLE_WIDTH_IN,
+  DATE_LETTER_SPACING_EM,
+  FOOTER_FONT_SIZE_PT,
   FOOTER_HEIGHT_IN,
-  GROUP_HEADER_HEIGHT_IN,
-  HEADER_HEIGHT_IN,
-  TITLE_FONT_SIZE_PT,
+  FRAME_BOTTOM_IN,
+  FRAME_TOP_IN,
+  LEGEND_FONT_SIZE_PT,
+  LEGEND_ICON_GAP_IN,
+  LEGEND_ITEM_GAP_IN,
+  LEGEND_ITEMS,
+  LEGEND_ROW_HEIGHT_IN,
+  letterSpacingPt,
   LIST_ROW_HEIGHT_IN,
+  META_FONT_SIZE_PT,
   PAGE_HEIGHT_IN,
   PAGE_WIDTH_IN,
   ROW_LABEL_HEIGHT_IN,
+  ROW_RULE_ALPHA,
+  ROW_RULE_WIDTH_PT,
+  ROWS_AREA_TOP_IN,
+  STATUS_ICON_GEOMETRY,
+  STATUS_ICON_GRID,
+  STATUS_ICON_RING_RADIUS_UNITS,
+  STATUS_ICON_SIZE_IN,
+  STATUS_ICON_STROKE_UNITS,
+  STATUS_LETTER_SPACING_EM,
+  STATUS_RIGHT_PADDING_IN,
   SUBTASK_DATE_FONT_SIZE_PT,
   SUBTASK_STATUS_FONT_SIZE_PT,
   SUBTASK_TEXT_FONT_SIZE_PT,
   SUMMARY_LEGEND_STATUS_FONT_SIZE_PT,
-  STATUS_LETTER_SPACING_EM,
-  STATUS_RIGHT_PADDING_IN,
-  COLUMN_HEADER_FONT_SIZE_PT,
-  COLUMN_DIVIDER_WIDTH_PT,
-  STATUS_CHIP_RADIUS_IN,
-  STATUS_CHIP_TEXT_INSET_IN,
-  STATUS_CHIP_BORDER_WIDTH_PT,
-  DATE_LETTER_SPACING_EM,
-  letterSpacingPt,
+  TASK_CELL_PAD_IN,
+  TASK_COL_WIDTH_IN,
+  TASK_NAME_FONT_SIZE_PT,
+  TITLE_FONT_SIZE_PT,
+  TITLE_LINE_HEIGHT_IN,
+  TITLE_TRACKING_EM,
+  TODAY_LINE_ALPHA,
+  TODAY_LINE_WIDTH_PT,
 } from './slideLayout';
-import { DATE_GRID_STYLES } from './dateGrid';
+import { measureTextWidthIn } from './textMetrics';
+
+/** What each status icon is stroked in: the two states a reader acts on take
+ * --foreground, "to do" the muted grey the handoff sets it in, and blocked the
+ * product's red (see COLORS.blocked). */
+const STATUS_ICON_COLORS: Record<TaskStatus, string> = {
+  done: COLORS.textOnSurface,
+  in_progress: COLORS.textOnSurface,
+  todo: COLORS.iconTodo,
+  blocked: COLORS.blocked,
+};
 
 // Comment blocks are indented slightly from the section's left edge, same as
 // the subtask rows above them.
@@ -74,58 +111,153 @@ const COMMENT_BODY_X_IN = CONTENT_X_IN + 0.2;
 const COMMENT_BODY_WIDTH_IN = CONTENT_WIDTH_IN - 0.2;
 const COMMENT_HEADING_FONT_SIZE: Record<1 | 2 | 3, number> = { 1: 16, 2: 14, 3: 12 };
 
-const CHEVRON_WIDTH_IN = 0.14;
 
 type PptxSlide = ReturnType<pptxgen['addSlide']>;
 
-function drawChrome(slide: PptxSlide, title: string) {
+/** The frame every slide wears: a white page, the title at its top left, and
+ * the footer line at the bottom. No header band any more — the export handoff
+ * puts the title on the slide itself (docs/export-handoff-map.md). */
+function drawChrome(slide: PptxSlide, title: string, meta?: string) {
   slide.background = { color: COLORS.slideBg };
 
-  slide.addShape('rect', {
-    x: 0,
-    y: 0,
-    w: PAGE_WIDTH_IN,
-    h: HEADER_HEIGHT_IN,
-    fill: { color: COLORS.navy },
-    line: { color: COLORS.navy },
-  });
   slide.addText(title, {
     x: CONTENT_X_IN,
-    y: 0,
+    y: FRAME_TOP_IN,
     w: CONTENT_WIDTH_IN,
-    h: HEADER_HEIGHT_IN,
+    h: TITLE_LINE_HEIGHT_IN,
     fontSize: TITLE_FONT_SIZE_PT,
+    charSpacing: letterSpacingPt(TITLE_FONT_SIZE_PT, TITLE_TRACKING_EM),
     bold: true,
-    color: COLORS.lightText,
+    color: COLORS.textOnSurface,
     fontFace: PPTX_FONT_FACE,
     valign: 'middle',
-    // Explicit zero insets rather than PowerPoint's defaults (0.05in top and
-    // bottom, 0.1in each side): the vertical pair ate into the clear space the
-    // band is sized to give the title, and the horizontal one pushed the text
-    // 0.1in right of CONTENT_X_IN — where the PDF exporter draws it, and where
-    // every other left edge on the slide sits.
+    align: 'left',
     margin: 0,
+    // The handoff's second export trap: a shrink-to-fit box re-wraps on a
+    // machine with wider metrics and lands on the row below.
+    wrap: false,
   });
 
-  const footerY = PAGE_HEIGHT_IN - FOOTER_HEIGHT_IN;
-  slide.addShape('rect', {
-    x: 0,
-    y: footerY,
-    w: PAGE_WIDTH_IN,
-    h: FOOTER_HEIGHT_IN,
-    fill: { color: COLORS.border },
-    line: { color: COLORS.border },
-  });
+  if (meta) {
+    slide.addText(meta, {
+      x: CONTENT_X_IN,
+      y: FRAME_TOP_IN,
+      w: CONTENT_WIDTH_IN,
+      h: TITLE_LINE_HEIGHT_IN,
+      fontSize: META_FONT_SIZE_PT,
+      color: COLORS.mutedText,
+      fontFace: PPTX_FONT_FACE,
+      valign: 'middle',
+      align: 'right',
+      margin: 0,
+      wrap: false,
+    });
+  }
+
+  const footerY = PAGE_HEIGHT_IN - FRAME_BOTTOM_IN - FOOTER_HEIGHT_IN;
   slide.addText(FOOTER_TEXT, {
     x: CONTENT_X_IN,
     y: footerY,
     w: CONTENT_WIDTH_IN,
     h: FOOTER_HEIGHT_IN,
-    fontSize: 8,
-    color: COLORS.footerText,
+    fontSize: FOOTER_FONT_SIZE_PT,
+    color: COLORS.mutedText,
     fontFace: PPTX_FONT_FACE,
     valign: 'middle',
     align: 'right',
+    margin: 0,
+  });
+}
+
+/** One status glyph, drawn from primitives at `size` inches (see
+ * STATUS_ICON_GEOMETRY for why it is not an image). */
+function drawStatusIcon(slide: PptxSlide, status: TaskStatus, x: number, y: number, size: number) {
+  const unit = size / STATUS_ICON_GRID;
+  const color = STATUS_ICON_COLORS[status];
+  const strokePt = STATUS_ICON_STROKE_UNITS * unit * 72;
+  const radius = STATUS_ICON_RING_RADIUS_UNITS * unit;
+
+  slide.addShape('ellipse', {
+    x: x + size / 2 - radius,
+    y: y + size / 2 - radius,
+    w: radius * 2,
+    h: radius * 2,
+    fill: { color: COLORS.cardBg },
+    line: { color, width: strokePt },
+  });
+
+  const geometry = STATUS_ICON_GEOMETRY[status];
+
+  geometry.polyline?.forEach((point, index) => {
+    const next = geometry.polyline?.[index + 1];
+    if (!next) return;
+    const [x1, y1] = point;
+    const [x2, y2] = next;
+    slide.addShape('line', {
+      x: x + Math.min(x1, x2) * unit,
+      y: y + Math.min(y1, y2) * unit,
+      w: Math.abs(x2 - x1) * unit,
+      h: Math.abs(y2 - y1) * unit,
+      // A pptx line runs top-left to bottom-right; a segment that climbs is
+      // the same box flipped.
+      flipV: y2 < y1,
+      line: { color, width: strokePt },
+    });
+  });
+
+  geometry.bars?.forEach((bar) => {
+    slide.addShape('rect', {
+      x: x + bar.x * unit,
+      y: y + bar.y * unit,
+      w: bar.w * unit,
+      h: bar.h * unit,
+      fill: { color },
+      line: { color },
+    });
+  });
+}
+
+/** The status legend and the zoom caption, on the line under the title. */
+function drawLegend(slide: PptxSlide, zoomCaption: string) {
+  let x = CONTENT_X_IN;
+
+  LEGEND_ITEMS.forEach((item) => {
+    drawStatusIcon(
+      slide,
+      item.status,
+      x,
+      CONTENT_TOP_IN + (LEGEND_ROW_HEIGHT_IN - STATUS_ICON_SIZE_IN) / 2,
+      STATUS_ICON_SIZE_IN,
+    );
+    const labelX = x + STATUS_ICON_SIZE_IN + LEGEND_ICON_GAP_IN;
+    const labelWidth = measureTextWidthIn(item.label, LEGEND_FONT_SIZE_PT);
+    slide.addText(item.label, {
+      x: labelX,
+      y: CONTENT_TOP_IN,
+      w: labelWidth,
+      h: LEGEND_ROW_HEIGHT_IN,
+      fontSize: LEGEND_FONT_SIZE_PT,
+      color: COLORS.mutedText,
+      fontFace: PPTX_FONT_FACE,
+      valign: 'middle',
+      margin: 0,
+      wrap: false,
+    });
+    x = labelX + labelWidth + LEGEND_ITEM_GAP_IN;
+  });
+
+  slide.addText(zoomCaption, {
+    x: CONTENT_X_IN,
+    y: CONTENT_TOP_IN,
+    w: CONTENT_WIDTH_IN,
+    h: LEGEND_ROW_HEIGHT_IN,
+    fontSize: LEGEND_FONT_SIZE_PT,
+    color: COLORS.mutedText,
+    fontFace: PPTX_FONT_FACE,
+    valign: 'middle',
+    align: 'right',
+    margin: 0,
+    wrap: false,
   });
 }
 
@@ -134,19 +266,18 @@ function drawChrome(slide: PptxSlide, title: string) {
 function drawOmittedNote(slide: PptxSlide, note: string | null) {
   if (!note) return;
 
-  const footerY = PAGE_HEIGHT_IN - FOOTER_HEIGHT_IN;
-
   slide.addText(note, {
     x: CONTENT_X_IN,
-    y: footerY,
-    w: CONTENT_WIDTH_IN - 1.8,
+    y: PAGE_HEIGHT_IN - FRAME_BOTTOM_IN - FOOTER_HEIGHT_IN,
+    w: CONTENT_WIDTH_IN - 2.4,
     h: FOOTER_HEIGHT_IN,
-    fontSize: 8,
+    fontSize: FOOTER_FONT_SIZE_PT,
     bold: true,
     color: COLORS.warning,
     fontFace: PPTX_FONT_FACE,
     valign: 'middle',
     align: 'left',
+    margin: 0,
   });
 }
 
@@ -161,13 +292,12 @@ function slideJump(slideNumber: number | null | undefined, tooltip: string) {
 
 /** The "← Back to overview" affordance shared by every appendix slide — one
  * per slide, not one per parent section, since the whole slide returns to the
- * same place. Drawn as a plain teal caption rather than a button/chrome
- * shape: it's a breadcrumb, and the deck's other links are unadorned too. */
+ * same place. */
 function drawBackToOverviewLink(slide: PptxSlide, overviewSlideNumber: number | null) {
   if (!overviewSlideNumber) return;
 
   slide.addText(BACK_LINK_TEXT, {
-    x: CONTENT_X_IN,
+    x: CONTENT_X_IN + CONTENT_WIDTH_IN - BACK_LINK_WIDTH_IN,
     y: BACK_LINK_Y_IN,
     w: BACK_LINK_WIDTH_IN,
     h: BACK_LINK_HEIGHT_IN,
@@ -176,222 +306,211 @@ function drawBackToOverviewLink(slide: PptxSlide, overviewSlideNumber: number | 
     color: COLORS.link,
     fontFace: PPTX_FONT_FACE,
     valign: 'middle',
+    align: 'right',
     margin: 0,
     wrap: false,
     ...slideJump(overviewSlideNumber, 'Back to the timeline overview'),
   });
 }
 
-/** Painted strictly back to front, because pptxgenjs has no z-index — shape
- * order *is* z-order:
- *   1. the three date-grid densities (palest first)
+/** The overview slide of the export handoff, painted back to front (pptxgenjs
+ * has no z-index — shape order *is* z-order):
+ *   1. the card, then its column header and the rules of its grid
  *   2. the bars, over the grid
- *   3. every piece of text, over both, so nothing can cut through a label or
- *      a status
- * Splitting the bars into a shapes pass and a text pass is what buys step 3;
- * drawing each bar's shapes and text together would put the first bars' text
- * under the later bars again. */
+ *   3. the "today" rule, over the bars
+ *   4. every piece of text and every icon, over all of it
+ */
 function drawOverviewSlide(slide: PptxSlide, model: OverviewSlideModel, links: SlideLinks) {
-  // A bar is clickable exactly when its task has an appendix slide to open.
-  // The link goes on the track, the fill *and* the label because those are
-  // three separate objects making up one visual row: the fill sits over the
-  // track (so linking only the track would leave the colored part dead), and
-  // a track clipped to MIN_TRACK_WIDTH_IN is a 0.15in sliver that nobody can
-  // reasonably hit — the label beside it is the readable handle for the task.
   const barJump = (bar: OverviewSlideModel['bars'][number]) =>
     slideJump(links.detailSlideNumberByTaskId.get(bar.id), 'Open subtasks & comments');
 
-  drawChrome(slide, model.title);
+  drawChrome(slide, model.title, model.meta);
   drawOmittedNote(slide, model.omittedNote);
+  drawLegend(slide, model.zoomCaption);
 
-  const axisLineY = model.dateAxisY + GROUP_HEADER_HEIGHT_IN;
+  // The card: one white surface with a hairline border, holding everything
+  // below it.
+  slide.addShape('roundRect', {
+    x: CARD_X_IN,
+    y: CARD_TOP_IN,
+    w: CARD_WIDTH_IN,
+    h: CARD_HEIGHT_IN,
+    rectRadius: CARD_RADIUS_IN,
+    fill: { color: COLORS.cardBg },
+    line: { color: COLORS.border, width: CARD_BORDER_WIDTH_PT },
+  });
 
-  // "Status" and "Task", on the axis row so they share one line with the month
-  // captions, at the same size (COLUMN_HEADER_FONT_SIZE_PT) in the same muted
-  // colour — sans rather than the dates' mono, since they are words.
-  model.columnHeaders.forEach((header) => {
-    slide.addText(header.text, {
-      x: header.x,
-      y: model.dateAxisY,
-      w: header.width,
-      h: GROUP_HEADER_HEIGHT_IN,
+  slide.addText('TASK', {
+    x: CARD_X_IN + TASK_CELL_PAD_IN,
+    y: CARD_TOP_IN,
+    w: TASK_COL_WIDTH_IN,
+    h: COLUMN_HEADER_HEIGHT_IN,
+    fontSize: COLUMN_HEADER_FONT_SIZE_PT,
+    charSpacing: letterSpacingPt(COLUMN_HEADER_FONT_SIZE_PT, COLUMN_HEADER_TRACKING_EM),
+    color: COLORS.mutedText,
+    fontFace: PPTX_FONT_FACE,
+    valign: 'bottom',
+    margin: 0,
+    wrap: false,
+  });
+
+  model.columns.forEach((column) => {
+    slide.addText(column.top, {
+      x: column.x,
+      y: CARD_TOP_IN + COLUMN_HEADER_TOP_LINE_Y_IN,
+      w: column.width,
+      h: COLUMN_HEADER_LINE_IN,
       fontSize: COLUMN_HEADER_FONT_SIZE_PT,
       bold: true,
-      color: COLORS.footerText,
+      color: COLORS.textOnSurface,
       fontFace: PPTX_FONT_FACE,
+      align: 'center',
+      valign: 'middle',
+      margin: 0,
+      wrap: false,
+    });
+    slide.addText(column.sub, {
+      x: column.x,
+      y: CARD_TOP_IN + COLUMN_HEADER_SUB_LINE_Y_IN,
+      w: column.width,
+      h: COLUMN_HEADER_LINE_IN,
+      fontSize: COLUMN_HEADER_FONT_SIZE_PT,
+      color: COLORS.mutedText,
+      fontFace: PPTX_FONT_FACE,
+      align: 'center',
       valign: 'middle',
       margin: 0,
       wrap: false,
     });
   });
 
-  // The vertical rule between the columns and the timeline, matching the
-  // border the on-screen chart draws in the same place.
+  if (model.headerRuleY !== null) {
+    slide.addShape('line', {
+      x: CARD_X_IN,
+      y: model.headerRuleY,
+      w: CARD_WIDTH_IN,
+      h: 0,
+      line: { color: COLORS.border, width: CARD_BORDER_WIDTH_PT },
+    });
+  }
+
+  // The column rules, and the divider that separates the task column from the
+  // zone — one hairline each, the whole height of the card, exactly as the
+  // handoff's per-cell borders read once they are stacked.
+  const columnRuleTop = CARD_TOP_IN;
+  const columnRuleHeight = CARD_BOTTOM_IN - columnRuleTop;
   if (model.dividerX !== null) {
     slide.addShape('line', {
       x: model.dividerX,
-      y: model.dividerTop,
+      y: columnRuleTop,
       w: 0,
-      h: model.dividerBottom - model.dividerTop,
-      line: { color: COLORS.border, width: COLUMN_DIVIDER_WIDTH_PT },
+      h: columnRuleHeight,
+      line: { color: COLORS.border, width: CARD_BORDER_WIDTH_PT },
     });
   }
-
-  // The hairline under the whole header row — both columns and the axis, not
-  // just the timeline zone.
-  if (model.headerRuleY !== null) {
+  model.gridLines.forEach((gridLine) => {
     slide.addShape('line', {
-      x: CONTENT_X_IN,
-      y: model.headerRuleY,
-      w: CONTENT_WIDTH_IN,
+      x: gridLine.x,
+      y: columnRuleTop,
+      w: 0,
+      h: columnRuleHeight,
+      line: { color: COLORS.border, width: CARD_BORDER_WIDTH_PT },
+    });
+  });
+
+  // A hairline under every row but the last, at 0.6 of the border's strength.
+  model.bars.slice(0, -1).forEach((bar) => {
+    slide.addShape('line', {
+      x: CARD_X_IN,
+      y: bar.y + bar.rowHeight,
+      w: CARD_WIDTH_IN,
       h: 0,
-      line: { color: COLORS.border, width: 0.75 },
+      line: {
+        color: COLORS.border,
+        width: ROW_RULE_WIDTH_PT,
+        transparency: Math.round((1 - ROW_RULE_ALPHA) * 100),
+      },
     });
-  }
-
-  if (model.gridLines.length > 0) {
-
-    // Day/week/month lines, all full height through the bar area and all
-    // drawn from the one shared style table — only the weight and color
-    // differ per level. Model order is palest-first, so a month line always
-    // ends up over the day line at the same x.
-    model.gridLines.forEach((gridLine) => {
-      const style = DATE_GRID_STYLES[gridLine.level];
-      slide.addShape('line', {
-        x: gridLine.x,
-        y: axisLineY,
-        w: 0,
-        h: CONTENT_BOTTOM_IN - axisLineY,
-        line: { color: style.color, width: style.widthPt },
-      });
-    });
-  }
+  });
 
   model.bars.forEach((bar) => {
-    // barJump() is called per object rather than shared between the two
-    // shapes: pptxgenjs stamps its own `_rId` onto whatever hyperlink object
-    // it's handed, so reusing one would leave both shapes rendering the
-    // second one's relationship.
-    // One solid rectangle per task, spanning the days it runs.
     slide.addShape('roundRect', {
       x: bar.barX,
       y: bar.barY,
       w: bar.barWidth,
       h: bar.barHeight,
       rectRadius: BAR_RADIUS_IN,
-      fill: { color: bar.color },
-      line: { color: bar.color },
+      fill: { color: bar.color, transparency: Math.round((1 - bar.fillAlpha) * 100) },
+      line: { color: bar.color, transparency: Math.round((1 - bar.fillAlpha) * 100) },
       ...barJump(bar),
     });
+
+    // Chevrons mark a bar the export timeframe clipped: "starts earlier" on
+    // the left, "continues further" on the right. Triangles, not characters.
+    const chevronY = bar.barY + (bar.barHeight - CHEVRON_HEIGHT_IN) / 2;
+    if (bar.chevronLeft) {
+      slide.addShape('triangle', {
+        x: bar.barX,
+        y: chevronY,
+        w: CHEVRON_WIDTH_IN,
+        h: CHEVRON_HEIGHT_IN,
+        rotate: 270,
+        fill: { color: COLORS.textOnSurface },
+        line: { color: COLORS.textOnSurface },
+      });
+    }
+    if (bar.chevronRight) {
+      slide.addShape('triangle', {
+        x: bar.barX + bar.barWidth - CHEVRON_WIDTH_IN,
+        y: chevronY,
+        w: CHEVRON_WIDTH_IN,
+        h: CHEVRON_HEIGHT_IN,
+        rotate: 90,
+        fill: { color: COLORS.textOnSurface },
+        line: { color: COLORS.textOnSurface },
+      });
+    }
   });
 
-  // Month captions at the axis's normal size, week captions a notch smaller
-  // (the model has already thinned any that would collide). Monospace, like
-  // every other date: sizes stay as they were because these are already the
-  // smallest text on the slide and shrinking them further would cost more
-  // legibility than the extra tier is worth — the face change alone is what
-  // marks them as dates. Still comfortably inside AXIS_LABEL_MIN_PITCH_IN
-  // (0.5in) at the widest: "Aug 01" is 6 glyphs * 0.6em * 8pt = 0.4in.
-  model.axisLabels.forEach((label) => {
-    const fontSize = label.level === 'month' ? AXIS_MONTH_FONT_SIZE_PT : AXIS_WEEK_FONT_SIZE_PT;
-    slide.addText(label.text, {
-      x: label.x,
-      y: model.dateAxisY,
-      w: 1,
-      h: GROUP_HEADER_HEIGHT_IN,
-      fontSize,
-      charSpacing: letterSpacingPt(fontSize, DATE_LETTER_SPACING_EM),
-      color: COLORS.footerText,
-      fontFace: PPTX_MONO_FONT_FACE,
-      valign: 'middle',
+  if (model.todayX !== null) {
+    slide.addShape('line', {
+      x: model.todayX,
+      y: ROWS_AREA_TOP_IN,
+      w: 0,
+      h: CARD_BOTTOM_IN - ROWS_AREA_TOP_IN,
+      line: {
+        color: COLORS.today,
+        width: TODAY_LINE_WIDTH_PT,
+        transparency: Math.round((1 - TODAY_LINE_ALPHA) * 100),
+      },
     });
-  });
+  }
 
   model.bars.forEach((bar) => {
-    // The name sits in the Task column, at the same x on every row — it no
-    // longer tracks the bar at all. The model has already truncated it to the
-    // column's width, so `wrap: false` keeps it on the one line that width was
-    // measured against instead of PowerPoint wrapping a measurement-
-    // approximation edge case onto a second line.
+    if (bar.icon !== null) {
+      drawStatusIcon(
+        slide,
+        bar.icon,
+        bar.iconX,
+        bar.y + (bar.rowHeight - STATUS_ICON_SIZE_IN) / 2,
+        STATUS_ICON_SIZE_IN,
+      );
+    }
+
     slide.addText(bar.label, {
       x: bar.labelX,
       y: bar.y,
       w: bar.labelWidth,
-      h: BAR_HEIGHT_IN,
-      fontSize: BAR_LABEL_FONT_SIZE_PT,
-      bold: true,
-      color: COLORS.navy,
+      h: bar.rowHeight,
+      fontSize: TASK_NAME_FONT_SIZE_PT,
+      bold: bar.labelBold,
+      color: COLORS.textOnSurface,
       fontFace: PPTX_FONT_FACE,
       valign: 'middle',
-      // Like every other piece of text on this slide, and unlike this one
-      // until now: without it pptxgenjs's default 0.05in inset started the
-      // name that far right of the labelX the model resolved, so the PPTX
-      // column did not line up with the PDF's, with its own "Task" heading, or
-      // with the tag pills measured from that same x.
       margin: 0,
       wrap: false,
       ...barJump(bar),
     });
-
-    // The status chip in the Status column: the app's own chip — pale surface,
-    // hairline border, dark text, lowercase — and no dropdown chevron, which
-    // would promise an interaction a slide can't honour.
-    slide.addShape('roundRect', {
-      x: bar.statusChipX,
-      y: bar.statusChipY,
-      w: bar.statusChipWidth,
-      h: bar.statusChipHeight,
-      rectRadius: STATUS_CHIP_RADIUS_IN,
-      fill: { color: bar.statusChipBg },
-      line: { color: bar.statusChipBorder, width: STATUS_CHIP_BORDER_WIDTH_PT },
-    });
-    slide.addText(bar.statusText, {
-      x: bar.statusChipX + STATUS_CHIP_TEXT_INSET_IN,
-      y: bar.y,
-      w: bar.statusChipWidth - STATUS_CHIP_TEXT_INSET_IN * 2,
-      h: BAR_HEIGHT_IN,
-      margin: 0,
-      fontSize: BAR_STATUS_FONT_SIZE_PT,
-      charSpacing: letterSpacingPt(BAR_STATUS_FONT_SIZE_PT, STATUS_LETTER_SPACING_EM),
-      bold: true,
-      color: bar.statusColor,
-      fontFace: PPTX_FONT_FACE,
-      align: 'left',
-      valign: 'middle',
-      wrap: false,
-    });
-
-    // Chevrons mark a bar clipped by the export timeframe window: "starts
-    // earlier" on the left, "continues further" on the right.
-    if (bar.chevronLeft) {
-      slide.addText('◀', {
-        x: bar.barX,
-        y: bar.y,
-        w: CHEVRON_WIDTH_IN,
-        h: BAR_HEIGHT_IN,
-        fontSize: 9,
-        bold: true,
-        color: COLORS.navy,
-        fontFace: PPTX_FONT_FACE,
-        align: 'left',
-        valign: 'middle',
-      });
-    }
-
-    if (bar.chevronRight) {
-      slide.addText('▶', {
-        x: bar.barX + bar.barWidth - CHEVRON_WIDTH_IN,
-        y: bar.y,
-        w: CHEVRON_WIDTH_IN,
-        h: BAR_HEIGHT_IN,
-        fontSize: 9,
-        bold: true,
-        color: COLORS.navy,
-        fontFace: PPTX_FONT_FACE,
-        align: 'right',
-        valign: 'middle',
-      });
-    }
   });
 }
 
@@ -802,14 +921,18 @@ export async function exportTimelineToPptx(
   exportMode: ExportMode = 'compact',
 ): Promise<void> {
   const sortedItems = sortItemsForExport(items, exportOptions.sortMode);
+  // One clock reading for the whole deck: the overview's today rule and the
+  // dashboard's overdue counts have to agree about what day it is.
+  const now = new Date();
   const slides = buildExportSlides(
     sortedItems,
     comments,
     exportOptions.commentMode,
     exportOptions.exportTimeframe,
     exportMode,
+    now,
   );
-  const dashboardSlides = buildDashboardSlides(sortedItems, new Date());
+  const dashboardSlides = buildDashboardSlides(sortedItems, now);
   const summaryQrCodes = await getSummaryQrCodes();
   // Keyed by the slide model itself rather than by position, so the deck
   // order (see slideOrder.ts) can change without silently pairing a slide
@@ -823,7 +946,10 @@ export async function exportTimelineToPptx(
   );
 
   const pptx = new pptxgen();
-  pptx.layout = 'LAYOUT_16x9';
+  // PowerPoint's own 16:9 page, which is what the export handoff's 1920x1080
+  // is at 144 pixels to the inch (see PX_PER_IN in slideLayout).
+  pptx.defineLayout({ name: 'HANDOFF_16x9', width: PAGE_WIDTH_IN, height: PAGE_HEIGHT_IN });
+  pptx.layout = 'HANDOFF_16x9';
 
   // Resolved from the ordered deck up front, so a bar drawn on slide 1 can
   // link forward to an appendix slide that hasn't been added yet.

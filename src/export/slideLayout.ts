@@ -1,166 +1,261 @@
-import { labelIndent } from '../utils/barNesting';
-import { TASK_STATUS_LABELS, TASK_STATUS_VALUES } from '../types/timeline';
+import { labelIndent, MAX_LABEL_INDENT_STEPS } from '../utils/barNesting';
+import type { TaskStatus } from '../types/timeline';
 import { estimateWrappedLines, measureLetterSpacingWidthIn, measureTextWidthIn } from './textMetrics';
 
-// Shared page geometry (inches) for both the PPTX (LAYOUT_16x9) and PDF
-// exporters, so a "slide" looks identical in either format.
+// Shared page geometry (inches) for both the PPTX and PDF exporters, so a
+// "slide" looks identical in either format. Every value the export handoff
+// fixes is here, written in its own pixels; see docs/export-handoff-map.md
+// for what it fixes and where each number comes from.
 
 // Colour is deliberately *not* here. This module is the slide's geometry and
 // type scale; the palette has one home per concern and duplicating any of it
 // here would create a second one:
 //
 //   status colours   src/types/timeline.ts  — TASK_STATUS_SCALE
-//   everything else  src/export/theme.ts    — COLORS
+//   phase + neutrals src/export/theme.ts    — COLORS, PHASE_PALETTE
 //
-// Both exporters already read one computed model (timelineExportModel.ts), which
-// resolves bar fills through resolveBarColor and text colours through
-// readableTextOn, so pptxExporter and pdfExporter cannot drift apart: neither
-// picks a colour of its own, they only render `bar.statusColor` and
-// `row.statusColor`.
+// Both exporters already read one computed model (timelineExportModel.ts),
+// which resolves every fill, so pptxExporter and pdfExporter cannot drift
+// apart: neither picks a colour of its own.
 
-export const PAGE_WIDTH_IN = 10;
-export const PAGE_HEIGHT_IN = 5.625;
+/** The handoff draws a 1920x1080 slide; PowerPoint's own 16:9 page is
+ * 13.333 x 7.5in, which is the same shape at 144 pixels to the inch. Every
+ * measurement below is written as the handoff's own pixel value and converted
+ * once, here — so a value can be read straight off docs/export-handoff-map.md
+ * and found in this file unchanged. */
+export const PX_PER_IN = 144;
+const px = (value: number) => value / PX_PER_IN;
+/** The handoff's px, as points: 144px = 1in = 72pt. */
+const pxPt = (value: number) => value / 2;
 
-// The slide title, and the band it sits in. The band's height used to be a
-// bare proportion of the page with no relation to the type inside it, and the
-// 24pt was written out again in each exporter — so nothing connected the two,
-// and a title that outgrew its band had nowhere to go but over the edge. Both
-// exporters centre the title in this band, so half of any overflow lands above
-// the top of the slide, which is exactly what "the top half of the letters is
-// missing" looks like.
-//
-// So the band is derived from the title instead: one line of it at a
-// line-height a renderer can be trusted to stay inside (1.2 covers Arial's
-// ~1.15 with room to spare), plus clear space above and below so the letters
-// never touch the band's edges. The proportion stays as a floor, and at 24pt
-// it is the one that wins — 0.84in against the 0.52in the type needs — so this
-// changes no geometry today. What it changes is what happens if someone raises
-// the title's size: the band grows with it instead of clipping it.
-export const TITLE_FONT_SIZE_PT = 24;
-const TITLE_LINE_HEIGHT_RATIO = 1.2;
-const TITLE_BAND_PADDING_IN = 0.06;
-const TITLE_BAND_MIN_HEIGHT_IN =
-  (TITLE_FONT_SIZE_PT * TITLE_LINE_HEIGHT_RATIO) / 72 + TITLE_BAND_PADDING_IN * 2;
-export const HEADER_HEIGHT_IN = Math.max(PAGE_HEIGHT_IN * 0.15, TITLE_BAND_MIN_HEIGHT_IN);
-export const FOOTER_HEIGHT_IN = PAGE_HEIGHT_IN * 0.04;
+export const PAGE_WIDTH_IN = px(1920);
+export const PAGE_HEIGHT_IN = px(1080);
 
-// The page's two side margins, which are deliberately *not* the same number.
-//
-// The right one is the classic half-inch slide margin. The left one is the
-// typographic minimum, because everything that reads left-to-right on these
-// slides starts against it — the title, the Status column, and the task names
-// the deck exists to be read for. A half inch there was half an inch taken off
-// the one column that was running out of room.
-//
-// A quarter inch is the floor rather than a taste: it is three times the clear
-// space kept *inside* a column (COLUMN_TEXT_INSET_IN, 0.08in), and an outer
-// margin has to stay visibly wider than the padding inside the content or the
-// slide's edge starts reading as tighter than its columns' edges. It is also
-// the allowance a printer typically cannot print inside, so a PDF of one of
-// these slides still comes off a desk printer whole.
-//
-// Both are here rather than one MARGIN_X_IN because the asymmetry is the
-// point: every slide in the deck takes CONTENT_X_IN from here, so the whole
-// deck's left edge moves together and a reader flicking through does not see
-// the grid shift (see TASK_COL_WIDTH_IN for what happens to the width this
-// frees, and why the timeline does not move).
-export const MARGIN_LEFT_IN = 0.25;
-export const MARGIN_RIGHT_IN = 0.5;
-export const CONTENT_X_IN = MARGIN_LEFT_IN;
-export const CONTENT_WIDTH_IN = PAGE_WIDTH_IN - MARGIN_LEFT_IN - MARGIN_RIGHT_IN;
-export const CONTENT_TOP_IN = HEADER_HEIGHT_IN + 0.3;
-export const CONTENT_BOTTOM_IN = PAGE_HEIGHT_IN - FOOTER_HEIGHT_IN - 0.15;
-// Vertical space actually available for slide content, used to compute how
-// many rows/sections fit per slide instead of guessing a fixed count.
-// = 5.25 - 1.14375 = 4.10625in
+// --- The frame every slide shares -------------------------------------------
+// `padding: 56px 72px 48px` (gantt-export.html:13), on a white slide with
+// --foreground text. There is no header band any more: the title is text on
+// the slide, and the deck's other slides take the same frame so a reader does
+// not meet two different chromes in one file.
+
+export const FRAME_X_IN = px(72);
+export const FRAME_TOP_IN = px(56);
+export const FRAME_BOTTOM_IN = px(48);
+
+/** Title: 44px / 600 / -0.02em, one line, never wrapped (`:16`). */
+export const TITLE_FONT_SIZE_PT = pxPt(44);
+export const TITLE_TRACKING_EM = -0.02;
+const TITLE_LINE_RATIO = 1.15;
+export const TITLE_LINE_HEIGHT_IN = px(44 * TITLE_LINE_RATIO);
+/** The line to the right of the title — the window this slide covers (`:17`). */
+export const META_FONT_SIZE_PT = pxPt(26);
+
+// The legend: three status icons and their words, with the zoom caption pushed
+// to the right (`:20-24`). 24px text, 24px icons, 30px between items, 10px
+// between an icon and its word.
+export const LEGEND_MARGIN_TOP_IN = px(26);
+export const LEGEND_FONT_SIZE_PT = pxPt(24);
+export const LEGEND_ROW_HEIGHT_IN = px(28);
+export const LEGEND_ITEM_GAP_IN = px(30);
+export const LEGEND_ICON_GAP_IN = px(10);
+/** Status icons are 24x24 wherever they appear — legend and task cell alike. */
+export const STATUS_ICON_SIZE_IN = px(24);
+
+/** The status glyphs, on lucide's own 24-unit grid.
+ *
+ * The handoff ships three inline SVGs and says to match them; the app already
+ * answered the same question on its plan screen by taking the lucide icon each
+ * path was transcribed from, so the deck takes the same four — a ringed check,
+ * a clock, a bare ring, and two bars for blocked. Drawn from primitives rather
+ * than from an image: PowerPoint would take an SVG, jsPDF would not, and the
+ * handoff's own first export trap is icons that are not vectors.
+ *
+ * One geometry, two engines: each scales the grid to STATUS_ICON_SIZE_IN. */
+export const STATUS_ICON_GRID = 24;
+export const STATUS_ICON_STROKE_UNITS = 2;
+export const STATUS_ICON_RING_RADIUS_UNITS = 10;
+
+export interface StatusIconGeometry {
+  /** Points of a stroked polyline, in grid units. */
+  polyline?: readonly (readonly [number, number])[];
+  /** Filled bars, in grid units. */
+  bars?: readonly { x: number; y: number; w: number; h: number }[];
+}
+
+export const STATUS_ICON_GEOMETRY: Record<TaskStatus, StatusIconGeometry> = {
+  // lucide circle-check: "m9 12 2 2 4-4"
+  done: { polyline: [[9, 12], [11, 14], [15, 10]] },
+  // lucide clock: "M12 6v6l4 2"
+  in_progress: { polyline: [[12, 6], [12, 12], [16, 14]] },
+  // lucide circle: the ring alone
+  todo: {},
+  // lucide pause, brought inside the ring the other three wear
+  blocked: {
+    bars: [
+      { x: 8.6, y: 8, w: 2.2, h: 8 },
+      { x: 13.2, y: 8, w: 2.2, h: 8 },
+    ],
+  },
+};
+
+/** The legend's four entries, in the order a task moves through them.
+ *
+ * The handoff lists three; the fourth is blocked, which this product's data
+ * carries and its plans show in red, and a deck that dropped the signal to fit
+ * a three-status legend would be hiding the one status a reader most needs to
+ * see. The words are the handoff's own (Title Case, unlike the lowercase
+ * TASK_STATUS_LABELS the appendix uses). */
+export const LEGEND_ITEMS: { status: TaskStatus; label: string }[] = [
+  { status: 'done', label: 'Done' },
+  { status: 'in_progress', label: 'In progress' },
+  { status: 'todo', label: 'To do' },
+  { status: 'blocked', label: 'Blocked' },
+];
+
+// The chart card (`:27`): a white surface with a hairline border and a 14px
+// radius, holding the column header and every row.
+export const CARD_MARGIN_TOP_IN = px(16);
+export const CARD_RADIUS_IN = px(14);
+export const CARD_BORDER_WIDTH_PT = 0.75;
+
+/** The footer line — the file's provenance on the right, and the coverage
+ * note ("+N tasks not shown") on the left. Not in the handoff, which has no
+ * footer at all; kept because the note is the deck's own promise that nothing
+ * was dropped silently, and sized at the handoff's 24px floor for that reason. */
+export const FOOTER_HEIGHT_IN = px(28);
+export const FOOTER_FONT_SIZE_PT = pxPt(24);
+
+export const CONTENT_X_IN = FRAME_X_IN;
+export const CONTENT_WIDTH_IN = PAGE_WIDTH_IN - FRAME_X_IN * 2;
+/** Where a slide's content starts under its title. The overview puts its
+ * legend here; every other slide starts its own content at the same line, so
+ * the deck keeps one rhythm. */
+export const CONTENT_TOP_IN = FRAME_TOP_IN + TITLE_LINE_HEIGHT_IN + LEGEND_MARGIN_TOP_IN;
+export const CONTENT_BOTTOM_IN = PAGE_HEIGHT_IN - FRAME_BOTTOM_IN - FOOTER_HEIGHT_IN;
 export const CONTENT_HEIGHT_IN = CONTENT_BOTTOM_IN - CONTENT_TOP_IN;
+
+export const CARD_X_IN = CONTENT_X_IN;
+export const CARD_WIDTH_IN = CONTENT_WIDTH_IN;
+export const CARD_TOP_IN = CONTENT_TOP_IN + LEGEND_ROW_HEIGHT_IN + CARD_MARGIN_TOP_IN;
+export const CARD_BOTTOM_IN = CONTENT_BOTTOM_IN;
+export const CARD_HEIGHT_IN = CARD_BOTTOM_IN - CARD_TOP_IN;
+
+// --- The card's own grid ----------------------------------------------------
+// `grid-template-columns: 480px repeat(N, 1fr)` (`:29`): a fixed task column
+// and N equal time columns. Equal, deliberately — the handoff positions bars
+// as a percentage of the window and never in column indices, so a month column
+// is as wide as the month beside it whatever their day counts (README, step 1).
+
+export const TASK_COL_WIDTH_IN = px(480);
+export const TIMELINE_X_IN = CARD_X_IN + TASK_COL_WIDTH_IN;
+export const TIMELINE_WIDTH_IN = CARD_WIDTH_IN - TASK_COL_WIDTH_IN;
+
+// The column header row (`:30-31`): "TASK" set small and tracked out over the
+// task column, then two centred lines per time column.
+const COLUMN_HEADER_PAD_TOP_IN = px(12);
+const COLUMN_HEADER_PAD_BOTTOM_IN = px(14);
+export const COLUMN_HEADER_LINE_GAP_IN = px(2);
+export const COLUMN_HEADER_FONT_SIZE_PT = pxPt(24);
+export const COLUMN_HEADER_LINE_IN = px(28);
+export const COLUMN_HEADER_HEIGHT_IN =
+  COLUMN_HEADER_PAD_TOP_IN + COLUMN_HEADER_LINE_IN * 2 + COLUMN_HEADER_LINE_GAP_IN + COLUMN_HEADER_PAD_BOTTOM_IN;
+export const COLUMN_HEADER_TOP_LINE_Y_IN = COLUMN_HEADER_PAD_TOP_IN;
+export const COLUMN_HEADER_SUB_LINE_Y_IN =
+  COLUMN_HEADER_PAD_TOP_IN + COLUMN_HEADER_LINE_IN + COLUMN_HEADER_LINE_GAP_IN;
+/** "TASK" — 0.08em of tracking, uppercase, muted (`:30`). */
+export const COLUMN_HEADER_TRACKING_EM = 0.08;
+
+// The rows area: everything under the column header, inside the card.
+export const ROWS_AREA_TOP_IN = CARD_TOP_IN + COLUMN_HEADER_HEIGHT_IN;
+export const ROWS_AREA_HEIGHT_IN = CARD_BOTTOM_IN - ROWS_AREA_TOP_IN;
+
+// A row is `flex:1` in the handoff — the rows share the area equally, so their
+// pitch is a result of how many there are rather than a constant. What has to
+// be a constant is the floor: the smallest row that still holds a 26px name
+// with air around it, which is what decides how many rows a slide can take
+// before the overflow rules (Compact/Full) have to split it.
+//
+// 48px is the densest row the prototype draws (16 rows in ~761px).
+export const MIN_ROW_HEIGHT_IN = px(48);
+export const MAX_OVERVIEW_BARS_PER_SLIDE = Math.floor(ROWS_AREA_HEIGHT_IN / MIN_ROW_HEIGHT_IN);
+
+/** The hairline under a row (`:67`) — `--border` at 0.6 alpha, against the
+ * full-strength border the card and the column rules use. */
+export const ROW_RULE_ALPHA = 0.6;
+export const ROW_RULE_WIDTH_PT = 0.75;
+
+// The task cell (`:100`, `:140`): a phase starts 24px in, a nested task 52px,
+// and each further level adds the same 28px step — the handoff draws two
+// levels and gives one step between them, so deeper trees continue it, capped
+// where the screen's own ladder caps (MAX_LABEL_INDENT_STEPS).
+export const TASK_CELL_PAD_IN = px(24);
+export const TASK_CELL_INDENT_STEP_IN = px(28);
+export const TASK_ICON_GAP_IN = px(14);
+export const TASK_NAME_FONT_SIZE_PT = pxPt(26);
+
+/** A task cell's left inset at `depth`, in inches. */
+export function taskCellIndent(depth: number): number {
+  const steps = Math.min(Math.max(depth, 0), MAX_LABEL_INDENT_STEPS);
+  return TASK_CELL_PAD_IN + TASK_CELL_INDENT_STEP_IN * steps;
+}
+
+// Bars (`:104`, `:146`): a phase is 26px of solid colour, anything nested is
+// 20px of the same hue at the palette's tint. 8px radius on both, and a floor
+// of 8px so a same-day task is still a mark rather than nothing.
+export const OVERVIEW_BAR_HEIGHT_IN = px(26);
+export const OVERVIEW_NESTED_BAR_HEIGHT_IN = px(20);
+export const BAR_RADIUS_IN = px(8);
+export const MIN_BAR_WIDTH_IN = px(8);
+
+/** The "today" rule (`:66`): 2px of --destructive at 80%, the full height of
+ * the rows area. */
+export const TODAY_LINE_WIDTH_PT = 1.5;
+export const TODAY_LINE_ALPHA = 0.8;
+
+// A chevron marks a bar the export timeframe clipped. Drawn as a triangle
+// rather than as a character: the handoff's first export trap is glyph icons,
+// which macOS substitutes with colour emoji.
+export const CHEVRON_WIDTH_IN = px(10);
+export const CHEVRON_HEIGHT_IN = px(14);
+
+// --- The appendix, dashboard and summary slides ------------------------------
+// The handoff describes the chart slide and nothing else, so what follows is
+// unchanged except for the frame it now sits in.
 
 export const ROW_LABEL_HEIGHT_IN = 0.22;
 
-// "Back to overview" link on the appendix slides. It sits in the strip of
-// whitespace between the header bar and the content area — the top-left of
-// the slide body, where a breadcrumb belongs — rather than inside the header
-// itself, which is already fully occupied by the 24pt slide title starting at
-// this same left edge. Sized to end above CONTENT_TOP_IN, so it adds a
-// navigation affordance without shifting a single row of content (and hence
-// without changing how much fits on an appendix slide).
-export const BACK_LINK_TEXT = '← Back to overview';
-export const BACK_LINK_FONT_SIZE_PT = 9;
-export const BACK_LINK_Y_IN = HEADER_HEIGHT_IN + 0.02;
-export const BACK_LINK_HEIGHT_IN = 0.24;
-// Comfortably wider than the caption measures at 9pt (~1.15in), so the whole
-// phrase stays on one line and the clickable box extends a little past it.
-export const BACK_LINK_WIDTH_IN = 1.5;
-
-// Overview bars: one merged line per task instead of a separate label row
-// stacked above the bar (which doubled the height every task actually
-// needed). The task label and the status text are drawn beside the track, in
-// their own zones; the only text on the track itself is the progress
-// percentage, placed against a measured fit (see below).
-export const ROW_GAP_IN = 0.04;
+/** The unit the appendix's rows are measured in, and the base of its indent
+ * ladder (subtaskRowIndent below). It is not the overview's bar height any
+ * more — the handoff fixes that at 26px — but it keeps its name because the
+ * indent-parity check and its documentation are written against it. */
 export const BAR_HEIGHT_IN = 0.28;
-export const BAR_RADIUS_IN = 0.05;
-export const BAR_LABEL_PADDING_IN = 0.06;
-// The label and status sizes
-// live here so the model can measure a bar's label/status text at exactly
-// the size both engines draw it at, to reserve the status's own width out of
-// the label's box instead of the two overlapping (see truncateToWidth in
-// timelineExportModel.ts).
-export const BAR_LABEL_FONT_SIZE_PT = 11;
-// Status runs a notch smaller than it used to (was 9) and tracked out — see
-// STATUS_LETTER_SPACING_EM. Between the size drop and the tracking it reads
-// as a distinct tier from the bar's own label rather than as more label.
-export const BAR_STATUS_FONT_SIZE_PT = 8;
-// Same purpose, one row down: a detail slide's subtask row packs a label
-// (plus dates/progress) on the left and a status on the right of the same
-// line. Smaller than the overview bar's label, so the dates/progress tail
-// (which never truncates) leaves more of the row for the label itself.
-// The whole appendix tier runs a point larger than it first did (10/9/9):
-// these rows are read close-up in a deck's appendix rather than glanced at
-// like an overview bar, and the row pitch (LIST_ROW_HEIGHT_IN) had the room.
+
+// "Back to overview" on the appendix slides. It sits on the title's own line,
+// at the right — the slot the overview gives its window caption, which every
+// other slide leaves empty. Below the title it crowded the first section's
+// heading, and beside it there is a whole slide's width doing nothing.
+//
+// No arrow glyph in front of it: an appendix slide is not the place to find
+// out that a font substituted one (the handoff's first export trap), and the
+// words say it without help.
+export const BACK_LINK_TEXT = 'Back to overview';
+export const BACK_LINK_FONT_SIZE_PT = META_FONT_SIZE_PT;
+export const BACK_LINK_Y_IN = FRAME_TOP_IN;
+export const BACK_LINK_HEIGHT_IN = TITLE_LINE_HEIGHT_IN;
+export const BACK_LINK_WIDTH_IN = 2.2;
+
+// Left padding inside a column, so no text sits on a column edge.
+export const COLUMN_TEXT_INSET_IN = 0.08;
+
+// Appendix type scale. A detail slide's subtask row packs a label and its
+// dates on the left and a status on the right of one line.
 export const SUBTASK_TEXT_FONT_SIZE_PT = 11;
-// A notch under the row's own text, for the same reason as
-// BAR_STATUS_FONT_SIZE_PT.
 export const SUBTASK_STATUS_FONT_SIZE_PT = 10;
-// Dates on a subtask row, in the monospace face, one point under the row's
-// text so the date tier sits below the task-name tier rather than beside it.
 export const SUBTASK_DATE_FONT_SIZE_PT = 10;
-// Tracking (letter-spacing), as a fraction of the font size, for the two
-// roles that get it. Expressed in em so one value covers every size the role
-// is drawn at; letterSpacingPt() converts. Both engines can apply this —
-// pptxgenjs takes `charSpacing` in points, jsPDF takes setCharSpace in the
-// document unit — but neither folds it into its own text metrics, so
-// anything measured for a collision has to add measureLetterSpacingWidthIn
-// on top (see textMetrics.ts).
 export const STATUS_LETTER_SPACING_EM = 0.06;
 export const DATE_LETTER_SPACING_EM = 0.02;
-// Date captions on the overview's date axis: month-level captions are the
-// primary scale, week-level ones a notch smaller. They live here rather than
-// in each exporter because the model measures a caption's width at exactly
-// the size both engines then draw it at, to decide how many of them fit
-// without colliding (see buildAxisLabels).
-export const AXIS_MONTH_FONT_SIZE_PT = 8;
-export const AXIS_WEEK_FONT_SIZE_PT = 7;
-// Clear space kept between two neighbouring axis captions.
-export const AXIS_LABEL_GAP_IN = 0.08;
-
-// --- Overview slide: three fixed zones ---------------------------------------
-// The on-screen chart is a fixed Status column, a fixed Task column, then the
-// timeline; the slide is laid out the same way so a deck reads top-to-bottom
-// like the app instead of having each task's name chase its own bar around.
-// Both exporters take these from here, which is what keeps the two identical.
-
-// Left padding inside either column, so no text sits on a column edge and
-// every row starts at the same x — the "same indent on every row" the columns
-// exist to give.
-export const COLUMN_TEXT_INSET_IN = 0.08;
-// The status chip: spans its column (minus the inset either side) exactly as
-// the on-screen chip fills its own, with the label inset from the chip's own
-// edges. No dropdown chevron — nothing on a slide is interactive.
-export const STATUS_CHIP_HEIGHT_IN = 0.18;
-export const STATUS_CHIP_RADIUS_IN = 0.03;
-export const STATUS_CHIP_TEXT_INSET_IN = 0.07;
-export const STATUS_CHIP_BORDER_WIDTH_PT = 0.5;
+export const SUMMARY_LEGEND_STATUS_FONT_SIZE_PT = 9;
+/** The clear space between two appendix rows. */
+export const ROW_GAP_IN = 0.04;
 
 /** Width of a status word as it is actually drawn: its glyphs plus its
  * tracking, which neither engine folds into its own metrics. Everything that
@@ -171,58 +266,6 @@ export function statusTextWidthIn(text: string, fontSizePt: number): number {
     measureLetterSpacingWidthIn(text, letterSpacingPt(fontSizePt, STATUS_LETTER_SPACING_EM))
   );
 }
-
-// Widths were measured, not guessed (see textMetrics.ts). The Status column is
-// *derived* from the widest label it has to carry rather than picked: the chip
-// spans the column minus COLUMN_TEXT_INSET_IN either side, and the label sits
-// STATUS_CHIP_TEXT_INSET_IN inside that, on both sides. A hardcoded 0.95in
-// looked like it cleared the widest label ("in progress", 0.678in) with slack,
-// but the arithmetic behind it counted only one of the two insets: the label
-// ended up with 0.07in of chip to its left and 0.042in to its right, and one
-// status word a shade wider would have run out of the chip altogether. Derived,
-// the two insets stay equal whatever the font size, the tracking or the status
-// list does next.
-export const STATUS_COL_WIDTH_IN =
-  Math.max(
-    ...TASK_STATUS_VALUES.map((status) =>
-      statusTextWidthIn(TASK_STATUS_LABELS[status], BAR_STATUS_FONT_SIZE_PT),
-    ),
-  ) +
-  (STATUS_CHIP_TEXT_INSET_IN + COLUMN_TEXT_INSET_IN) * 2;
-// The Task column takes every inch the left margin gave up, and the Status
-// column is not squeezed for it — the two simply move left together.
-//
-// Written as base + reclaimed rather than as one number so the invariant is
-// visible: the column block shifts left by (MARGIN_RIGHT_IN - MARGIN_LEFT_IN)
-// and Task grows by the same amount, which lands TIMELINE_X_IN below exactly
-// where it sat when both margins were 0.5in. The timeline zone therefore keeps
-// its width, and with it its scale — a day is the same number of inches before
-// and after this, so no bar moves and no date line shifts.
-//
-// A task name averages 0.110in per glyph at BAR_LABEL_FONT_SIZE_PT, so the
-// 2.60in this comes to holds roughly 23 characters before the ellipsis, against
-// 21 at the old 2.35in (see labelWidth/truncateToWidth in
-// timelineExportModel.ts).
-const TASK_COL_BASE_WIDTH_IN = 2.35;
-export const TASK_COL_WIDTH_IN = TASK_COL_BASE_WIDTH_IN + (MARGIN_RIGHT_IN - MARGIN_LEFT_IN);
-// Clear space around the divider, split evenly either side of it.
-export const TIMELINE_GUTTER_IN = 0.14;
-export const TIMELINE_X_IN =
-  CONTENT_X_IN + STATUS_COL_WIDTH_IN + TASK_COL_WIDTH_IN + TIMELINE_GUTTER_IN;
-export const TIMELINE_WIDTH_IN = CONTENT_X_IN + CONTENT_WIDTH_IN - TIMELINE_X_IN;
-// The vertical rule between the columns and the timeline, centred in the
-// gutter. Runs from the top of the header row to the bottom of the content
-// area, as the equivalent border does on screen.
-export const COLUMN_DIVIDER_X_IN = TIMELINE_X_IN - TIMELINE_GUTTER_IN / 2;
-export const COLUMN_DIVIDER_WIDTH_PT = 0.75;
-// Column headings ("Status", "Task") sit on the same line as the month
-// captions and at the same size, so the three read as one header row. Sans
-// rather than the mono the dates use — they are words, not dates.
-export const COLUMN_HEADER_FONT_SIZE_PT = AXIS_MONTH_FONT_SIZE_PT;
-// Status names in the summary slide's status-breakdown legend, a notch
-// under the count/percentage they sit next to (10pt) for the same reason as
-// BAR_STATUS_FONT_SIZE_PT.
-export const SUMMARY_LEGEND_STATUS_FONT_SIZE_PT = 9;
 
 /** Tracking in points for `fontSizePt` — the unit pptxgenjs's charSpacing
  * wants, and 1/72 of what jsPDF's setCharSpace wants in inches. */
@@ -240,10 +283,10 @@ export const STATUS_RIGHT_PADDING_IN = 0.12;
 
 // Top of the dashboard tables' slides (Delayed / At risk). A slide's content
 // normally starts at CONTENT_TOP_IN, which is right for text — but these
-// slides open with a filled table header, and a solid band reads as
-// crowding the dark title bar in a way a line of text at the same y does
-// not. Kept as its own constant rather than raising CONTENT_TOP_IN, which
-// the overview's bars-per-slide ceiling is derived from.
+// slides open with a filled table header, and a solid band wants a little
+// more air under the title than a line of text does. Kept as its own constant
+// rather than raising CONTENT_TOP_IN, which the overview's card is measured
+// from.
 export const DASHBOARD_TABLE_TOP_IN = CONTENT_TOP_IN + 0.18;
 // The rest of a dashboard slide's two-column split: the table on the left, the
 // QR code into the same list on screen on the right. These were a private copy
@@ -259,15 +302,10 @@ export const DASHBOARD_TABLE_WIDTH_IN =
 // are drawn off the slide unless the model cuts them first.
 export const DASHBOARD_TABLE_MAX_HEIGHT_IN = CONTENT_BOTTOM_IN - DASHBOARD_TABLE_TOP_IN;
 
-// Minimum clear gap always kept between a label and the status text sharing
-// its row, even after the label has been reserved room / truncated against
-// the status's own measured width — a small buffer against the font-metric
-// approximation in textMetrics.ts, so a truncated label never visually
-// touches the status next to it.
-export const LABEL_STATUS_GAP_IN = 0.1;
-// Same buffer, but for a detail slide's subtask row specifically — kept
-// smaller than LABEL_STATUS_GAP_IN (rather than reusing it) so tightening
-// this one doesn't also widen the overview bar's label column.
+// Minimum clear gap kept between a detail row's label and the status text
+// sharing its line, after the label has been truncated against the status's
+// own measured width — a buffer against the font-metric approximation in
+// textMetrics.ts, so a truncated label never visually touches the status.
 export const SUBTASK_META_STATUS_GAP_IN = 0.05;
 // Gap between the three pieces of a subtask row's left side — task name,
 // then its dates, then its progress. These used to be one string joined by
@@ -299,36 +337,6 @@ export const DETAIL_ROW_INDENT_IN = 0.2;
 export function subtaskRowIndent(depth: number): number {
   return DETAIL_ROW_INDENT_IN + labelIndent(BAR_HEIGHT_IN, depth + 1) - labelIndent(BAR_HEIGHT_IN, 1);
 }
-// Space always reserved after the track for its label + status text, so a
-// bar positioned late in the date range (long duration or near the right
-// edge) never grows wide enough to push its label into the status column.
-export const BAR_LABEL_ZONE_MIN_IN = 2.6;
-// Smallest a track is ever drawn, even for a same-day task or one clipped
-// almost entirely out of an export timeframe window.
-export const MIN_BAR_WIDTH_IN = 0.15;
-
-// Per-row vertical pitch on the overview slide = bar height + gap to the
-// next bar. = 0.28 + 0.04 = 0.32in
-export const ROW_HEIGHT_IN = BAR_HEIGHT_IN + ROW_GAP_IN;
-
-// The vertical day/week/month date lines that run down through the bar area
-// behind the bars don't have their weights here: they're shared with the
-// on-screen chart, so both their colors and their stroke widths live in one
-// table next to the geometry that produces them — see DATE_GRID_STYLES in
-// dateGrid.ts.
-
-// Small heading-weight row, reused for the overview slide's date-scale axis
-// row. = 0.22 + 0.04 = 0.26in
-export const GROUP_HEADER_HEIGHT_IN = ROW_LABEL_HEIGHT_IN + ROW_GAP_IN;
-
-// Overview is always a single slide now (no more auto-pagination), so its
-// bar capacity is a derived ceiling instead of a hardcoded count: how many
-// row pitches fit under the content area once the date-axis row at the top
-// is reserved. Recomputes automatically if any of the geometry above changes.
-export const MAX_OVERVIEW_BARS_PER_SLIDE = Math.floor(
-  (CONTENT_HEIGHT_IN - GROUP_HEADER_HEIGHT_IN) / ROW_HEIGHT_IN,
-);
-
 // Breathing room either side of a slide's own date window, as a fraction of
 // the *widest* window in the export rather than of each slide's own.
 //

@@ -316,3 +316,77 @@ place of our stored `status` (4). I am not proposing either silently.
    lucide's `circle-check`, `circle-play` and `circle` but not identical. Handoff paths, or lucide?
 10. **Task column width.** 480 px = 25 % of 1920. Keep it as a fraction of the slide (so it survives
     a size change), or as the absolute inch equivalent of 480 px at whatever size question 1 picks?
+
+---
+
+# Phase 2 — what was built
+
+The decisions of section 11, as answered, and the ones left to me. Every value
+the handoff fixes now lives in `src/export/slideLayout.ts` written as the
+handoff's own pixels (`px(56)`, `px(480)`, `px(26)`) over one conversion —
+`PX_PER_IN = 144`, since 1920 x 1080 px at 144dpi *is* PowerPoint's 13.333 x
+7.5in page.
+
+## Answered
+
+1. **Slide size** — 13.333 x 7.5in. The shipped `.pptx` is 20 x 11.25in; that is
+   the prototype's export, not the intention.
+2. **Phase colours** — the handoff's four hexes are `PHASE_PALETTE` in
+   `theme.ts`. A root takes the next one in plan order (cycling past four), or
+   its own `TimelineItem.color` where it has one; every task under it inherits
+   that colour, its own included, because the colour says *which branch* and a
+   subtree in four colours says nothing. Nested bars are the same hue at the
+   palette's tint (24–28%), a custom colour at 26%.
+3. **Blocked** — kept, in the product's red, as a fourth icon of the same
+   family and a fourth legend entry.
+4. **Status** — read from the stored field. The handoff's date rule
+   (`end <= today` → done) is not applied anywhere.
+5. **Zoom** — derived from the widest window of the export, which is the window
+   whose density every slide already shares: `slideZoomFor` — ≤45d days, ≤130d
+   weeks, ≤200d half-months, ≤550d months, else quarters. No control was added.
+6. **Rollup** — not adopted. The overview draws every task at every depth, and
+   Compact/Full still handles the overflow.
+7. **The other slides** — dashboard, summary and appendix take the same frame:
+   white page, 22pt title at the top left, the footer line, no navy band. Their
+   own content is untouched.
+8. **The appendix ladder** — untouched, and `barNesting` with it.
+
+## Decided here (questions 8, 9, 10 of the map)
+
+- **Rows per slide.** Rows share the card's height, as the handoff draws them,
+  so the ceiling comes from a floor on the row: `MIN_ROW_HEIGHT_IN` = 48px, the
+  densest row the prototype draws (16 rows in ~761px). That gives 15 rows a
+  slide against the old 12.
+- **Icons.** lucide, and the same four the plan screen already uses —
+  `circle-check`, `clock`, `circle`, `pause` — drawn from primitives in both
+  engines (a ring plus a polyline or two bars) rather than as an image, since
+  jsPDF has no SVG. **This differs from the handoff in one glyph**: its
+  "in progress" is a play triangle, and the app's is a clock. The app's own
+  handoff resolved that question first, and a deck exported from a screen
+  should not rename its vocabulary on the way out.
+- **Task column.** 480px, kept as pixels and converted like everything else, so
+  it stays 25% of the slide whatever the page size does next.
+
+## Deviations worth knowing
+
+- **Columns are equal, bars are not.** `repeat(N, 1fr)` with bars positioned as
+  a percentage of the window is the handoff's own combination, so a 28-day
+  February column is as wide as a 31-day January while the bars inside them
+  stay true to the calendar. On month and quarter zooms the two disagree by
+  under 1% of the width.
+- **A grid level was added.** `halfMonth` (the 1st and the 16th) joins
+  `dateGrid.ts`, because the half-month zoom rules a boundary no existing level
+  claimed, and the coverage audit holds every stroke to being a real mark of a
+  real level. The levels lost their weights and colours in the same move: the
+  handoff rules every boundary as one 1px `--border` hairline, so what a level
+  decides now is only which dates qualify.
+- **A footer the handoff does not have.** It keeps the deck's provenance line
+  and — the reason it stays — the coverage note ("+N tasks not shown"), at the
+  handoff's own 24px floor. The card ends above it.
+- **Chevron marks are triangles now.** They were `◀` / `▶` characters, which is
+  precisely the handoff's first export trap (macOS substitutes a colour emoji).
+  So is the appendix's old `←`; the back link reads "Back to overview" and sits
+  on the title's line, where the overview puts its window caption.
+- **The status chip is gone** from the overview, with the Status column it sat
+  in. Status is the icon beside the name, as the handoff draws it; the word is
+  still written out on every appendix row.
