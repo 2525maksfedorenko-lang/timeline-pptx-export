@@ -1,16 +1,28 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+import { clampListWidth, DEFAULT_LIST_WIDTH_PX } from './geometry';
 import type { TimeScale } from './scale';
 
 /* What the plan screen remembers about how it is being looked at.
  *
- * Deliberately separate from `timelineStore`, and deliberately not persisted:
- * none of it is part of a plan. A collapsed group, a focused branch and a
- * selected row describe this session's view, and reopening the app should
- * show the whole plan again rather than where someone left off looking at it.
+ * Deliberately separate from `timelineStore`: none of it is part of a plan.
+ * Almost all of it is session-only, too — a collapsed group, a focused branch
+ * and a selected row describe where someone is in a plan right now, and
+ * reopening the app should show the whole plan again rather than where they
+ * left off looking at it.
+ *
+ * `listWidth` is the one exception, and it is a different kind of thing: not
+ * a place in a plan but the shape of the workspace, like a window's size. It
+ * is the only key `partialize` lets through to localStorage.
  */
 interface GanttViewStore {
   scale: TimeScale;
   setScale: (scale: TimeScale) => void;
+
+  /** The task column's width, dragged on the seam between it and the chart
+   * and kept between sessions. Always within `clampListWidth`'s range. */
+  listWidth: number;
+  setListWidth: (width: number) => void;
 
   /** Group ids folded away. Absent means expanded. */
   collapsed: Record<string, boolean>;
@@ -49,32 +61,50 @@ interface GanttViewStore {
   requestToday: () => void;
 }
 
-export const useGanttViewStore = create<GanttViewStore>()((set) => ({
-  scale: 'week',
-  setScale: (scale) => set({ scale }),
+export const useGanttViewStore = create<GanttViewStore>()(
+  persist(
+    (set) => ({
+      scale: 'week',
+      setScale: (scale) => set({ scale }),
 
-  collapsed: {},
-  toggleCollapsed: (id) =>
-    set((state) => ({ collapsed: { ...state.collapsed, [id]: !state.collapsed[id] } })),
-  collapseBranch: (ids) =>
-    set((state) => ({
-      collapsed: { ...state.collapsed, ...Object.fromEntries(ids.map((id) => [id, true])) },
-    })),
+      listWidth: DEFAULT_LIST_WIDTH_PX,
+      setListWidth: (width) => set({ listWidth: clampListWidth(width) }),
 
-  selectedId: null,
-  select: (selectedId) => set({ selectedId }),
+      collapsed: {},
+      toggleCollapsed: (id) =>
+        set((state) => ({ collapsed: { ...state.collapsed, [id]: !state.collapsed[id] } })),
+      collapseBranch: (ids) =>
+        set((state) => ({
+          collapsed: { ...state.collapsed, ...Object.fromEntries(ids.map((id) => [id, true])) },
+        })),
 
-  renamingId: null,
-  renameDraft: '',
-  beginRename: (renamingId, label) => set({ renamingId, renameDraft: label }),
-  setRenameDraft: (renameDraft) => set({ renameDraft }),
-  endRename: () => set({ renamingId: null, renameDraft: '' }),
+      selectedId: null,
+      select: (selectedId) => set({ selectedId }),
 
-  focusId: null,
-  // Entering a focus closes the Edit Task panel: the row it was open on is
-  // usually the parent, which is the one row the focused view does not draw.
-  setFocus: (focusId) => set({ focusId, selectedId: null }),
+      renamingId: null,
+      renameDraft: '',
+      beginRename: (renamingId, label) => set({ renamingId, renameDraft: label }),
+      setRenameDraft: (renameDraft) => set({ renameDraft }),
+      endRename: () => set({ renamingId: null, renameDraft: '' }),
 
-  todayNonce: 0,
-  requestToday: () => set((state) => ({ todayNonce: state.todayNonce + 1 })),
-}));
+      focusId: null,
+      // Entering a focus closes the Edit Task panel: the row it was open on is
+      // usually the parent, which is the one row the focused view does not draw.
+      setFocus: (focusId) => set({ focusId, selectedId: null }),
+
+      todayNonce: 0,
+      requestToday: () => set((state) => ({ todayNonce: state.todayNonce + 1 })),
+    }),
+    {
+      name: 'timeline-pptx-export-view',
+      partialize: (state) => ({ listWidth: state.listWidth }),
+      // Clamped again on the way out of storage: the bounds can move with a
+      // release, and a width written by an older one would otherwise come back
+      // outside them.
+      merge: (persisted, current) => ({
+        ...current,
+        listWidth: clampListWidth((persisted as { listWidth?: number } | undefined)?.listWidth ?? current.listWidth),
+      }),
+    },
+  ),
+);

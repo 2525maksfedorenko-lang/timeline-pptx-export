@@ -152,3 +152,43 @@
 .gantt-row-add:hover {
   color: var(--gantt-text-secondary);
 }
+
+/* The seam between the task column and the chart, as a resize target.
+ *
+ * Transparent at rest: the line the eye reads is the list pane's own 1px
+ * border, and a second line drawn over it at all times would only thicken it.
+ * Hover, keyboard focus and the drag itself all show the same 2px mark in the
+ * colour a bar's resize handle uses for its hairline — one resize affordance,
+ * one colour, and nothing about it moves.
+ *
+ * The `left` arithmetic keeps the mark centred on the border regardless of
+ * LIST_RESIZE_HANDLE_PX, which geometry.ts owns. */
+.gantt-col-resize::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(50% - 1px);
+  width: 2px;
+  background: transparent;
+  transition: background-color 150ms;
+}
+
+.gantt-col-resize:hover::after,
+.gantt-col-resize:focus-visible::after,
+.gantt-col-resize[data-dragging='true']::after {
+  background: var(--gantt-handle-hover-inset);
+}
+
+.gantt-col-resize:focus-visible {
+  outline: none;
+}
+
+/* While the seam is being dragged the pointer is captured, so it travels over
+   the chart, the rows and the panel — each of which would otherwise impose its
+   own cursor mid-drag. The class is on <body> for the length of the drag. */
+.gantt-col-resizing,
+.gantt-col-resizing * {
+  cursor: col-resize !important;
+  user-select: none;
+}

@@ -9,9 +9,12 @@ import { useScrollPanes } from './useScrollPanes';
 import { shiftIsoDate } from '../export/dateScale';
 import type { TaskStatus } from '../types/timeline';
 import {
+  clampListWidth,
   HEADER_HEIGHT_PX,
-  LIST_WIDTH_PX,
+  LIST_RESIZE_HANDLE_PX,
+  MAX_LIST_WIDTH_PX,
   MIN_BODY_HEIGHT_PX,
+  MIN_LIST_WIDTH_PX,
   ADD_ROW_HEIGHT_PX,
   ROW_HEIGHT_PX,
   TODAY_SCROLL_LEAD_PX,
@@ -62,6 +65,8 @@ export function GanttScreen() {
   const activePlanId = useTimelineStore((state) => state.activePlanId);
 
   const scale = useGanttViewStore((state) => state.scale);
+  const listWidth = useGanttViewStore((state) => state.listWidth);
+  const setListWidth = useGanttViewStore((state) => state.setListWidth);
   const collapsed = useGanttViewStore((state) => state.collapsed);
   const selectedId = useGanttViewStore((state) => state.selectedId);
   const select = useGanttViewStore((state) => state.select);
@@ -104,6 +109,56 @@ export function GanttScreen() {
   // The three panes and the one scroller between them. The column width is
   // all the hook needs from here: it is how it recognises a scale change.
   const panes = useScrollPanes({ columnWidth });
+
+  // The width a drag on the seam is currently proposing, or null when no drag
+  // is under way. Held here rather than written straight to the store because
+  // the store is persisted: committing on pointerup is one localStorage write
+  // per drag instead of one per pixel moved.
+  const [dragWidth, setDragWidth] = useState<number | null>(null);
+  const listResizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
+  const shownListWidth = dragWidth ?? listWidth;
+  const isResizingList = dragWidth !== null;
+
+  const beginListResize = (event: React.PointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    listResizeRef.current = { startX: event.clientX, startWidth: listWidth };
+    setDragWidth(listWidth);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const moveListResize = (event: React.PointerEvent<HTMLDivElement>) => {
+    const start = listResizeRef.current;
+    if (!start) return;
+    setDragWidth(clampListWidth(start.startWidth + (event.clientX - start.startX)));
+  };
+
+  const endListResize = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!listResizeRef.current) return;
+    listResizeRef.current = null;
+    event.currentTarget.releasePointerCapture(event.pointerId);
+    setDragWidth((width) => {
+      if (width !== null) setListWidth(width);
+      return null;
+    });
+  };
+
+  // The seam is draggable without a pointer too — 16px a press, which is a
+  // visible step without being a jump.
+  const nudgeListResize = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    const step = event.key === 'ArrowLeft' ? -16 : event.key === 'ArrowRight' ? 16 : 0;
+    if (step === 0) return;
+    event.preventDefault();
+    setListWidth(listWidth + step);
+  };
+
+  // The drag holds the col-resize cursor across the whole window, not just the
+  // 9px strip the pointer started on.
+  useEffect(() => {
+    if (!isResizingList) return;
+    document.body.classList.add('gantt-col-resizing');
+    return () => document.body.classList.remove('gantt-col-resizing');
+  }, [isResizingList]);
 
   // How many day columns are actually drawn. At least the plan's own span,
   // and at least enough to fill the timeline zone — otherwise a plan shorter
@@ -500,22 +555,67 @@ export function GanttScreen() {
           </div>
         )}
 
-        {/* The frame. Two fixed tracks by two: the list's width and the header's
-            height are constants, and the timeline zone takes whatever the window
-            leaves. Nothing here scrolls — the frame is what the three panes
-            inside it scroll *within*, which is what keeps the zone the same
-            width at every scale and keeps the scrollbar in view. */}
+        {/* The frame. Two tracks by two: the header's height is a constant, the
+            list's width is the one the seam was last dragged to, and the
+            timeline zone takes whatever is left. Nothing here scrolls — the
+            frame is what the three panes inside it scroll *within*, which is
+            what keeps the zone the same width at every scale and keeps the
+            scrollbar in view.
+            
+            Widening the list narrows the body pane, and the body is what
+            `useScrollPanes` measures — so the canvas's own width, and with it
+            the timeline's right edge, follows the drag without being told. */}
         <div
           style={{
             flex: 1,
             minWidth: 0,
             minHeight: 0,
+            position: 'relative',
             display: 'grid',
-            gridTemplateColumns: `${LIST_WIDTH_PX}px minmax(0, 1fr)`,
+            gridTemplateColumns: `${shownListWidth}px minmax(0, 1fr)`,
             gridTemplateRows: `${HEADER_HEIGHT_PX}px minmax(0, 1fr)`,
             overflow: 'hidden',
           }}
         >
+          {/* The seam, as a grab strip. It sits over the rule the list pane
+              draws rather than replacing it: a 1px border is the right line to
+              look at and the wrong one to aim at, so the target is 9px wide
+              and centred on it, and stays invisible until hovered.
+
+              A sibling of the panes rather than a child of either, because it
+              spans both grid rows — the corner above and the list below — and
+              because being on top is what keeps its press away from the body's
+              grab-to-pan. */}
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize the task column"
+            aria-valuenow={shownListWidth}
+            aria-valuemin={MIN_LIST_WIDTH_PX}
+            aria-valuemax={MAX_LIST_WIDTH_PX}
+            tabIndex={0}
+            className="gantt-col-resize"
+            data-dragging={isResizingList}
+            onPointerDown={beginListResize}
+            onPointerMove={moveListResize}
+            onPointerUp={endListResize}
+            onPointerCancel={endListResize}
+            onKeyDown={nudgeListResize}
+            style={{
+              position: 'absolute',
+              top: 0,
+              bottom: 0,
+              // Centred on the 1px border, not on the column's edge: the
+              // border occupies the pixel before `shownListWidth`, so the
+              // strip starts half its width plus that pixel to the left.
+              left: shownListWidth - Math.ceil(LIST_RESIZE_HANDLE_PX / 2),
+              width: LIST_RESIZE_HANDLE_PX,
+              zIndex: 20,
+              cursor: 'col-resize',
+              touchAction: 'none',
+            }}
+          />
+
           {/* The corner. It follows neither axis, so it is the one pane that is
               simply a box. */}
           <div

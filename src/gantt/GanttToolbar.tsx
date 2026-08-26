@@ -18,8 +18,9 @@ interface GanttToolbarProps {
   showTimelineControls: boolean;
 }
 
-/** The app's one header, in a single row: what the plan *is* on the left, how
- * it is scaled and what can be done to it on the right.
+/** The app's one header, in a single row: whose product this is and what the
+ * plan *is* on the left, how it is scaled and what can be done to it on the
+ * right.
  *
  * The handoff puts a search box and status chips on a second row beneath.
  * Neither is here — the plan screen shows the whole plan, and nothing narrows
@@ -49,6 +50,34 @@ export function GanttToolbar({ actions, showTimelineControls, onOpenSettings }: 
   return (
     <div className="flex-none border-b border-border bg-background">
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, height: 50, padding: '0 14px' }}>
+        {/* The product's mark, then the plan's. They are two different
+            identities and the rule between them says so: aicoo is what this
+            is, and the name beside it is what is open in it.
+
+            `design-system/assets/` holds ten variants; this is the orbit mark
+            with the wordmark in the brand's deep navy, which is the one for a
+            light surface — the design system's own sidebar uses the pale twin
+            because that sidebar is navy. Copied into `public/` rather than
+            imported from `design-system/`, which is reference material and not
+            app source. */}
+        {/* Both axes are given, and neither is `auto`, because the file's
+            `width`/`height` (1260×684) disagree with its `viewBox`
+            (2200×684): sizing by one axis letterboxes the mark inside a box
+            the wrong shape instead of filling it. 71×22 is the viewBox's own
+            3.22:1 at a height that sits comfortably in a 50px row. The file
+            is left byte-identical to the design system's copy. */}
+        <img
+          src="/aicoo-logo.svg"
+          alt="aicoo"
+          width={71}
+          height={22}
+          // In the style and not only in the attributes: the CSS reset sets
+          // `img { height: auto }`, which outranks a plain height attribute
+          // and would put the letterbox straight back.
+          style={{ width: 71, height: 22, flex: 'none', display: 'block' }}
+        />
+        <span className="h-5 w-px flex-none bg-border" />
+
         <PlanMenu onOpenSettings={onOpenSettings}>
           <div
             className="bg-primary text-primary-foreground"

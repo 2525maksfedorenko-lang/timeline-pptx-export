@@ -14,9 +14,29 @@ export const ROW_HEIGHT_PX = 52;
 /** The timeline header strip, and the empty corner block above the list. */
 export const HEADER_HEIGHT_PX = 56;
 
-/** The task list column. Fixed — it is `position: sticky; left: 0` inside the
- * one scroll container, so the bars slide under it. */
-export const LIST_WIDTH_PX = 320;
+/** The task list column: the handoff's width, and the range a drag may take
+ * it to.
+ *
+ * The floor is where a name stops being readable — below ~240 the row's fixed
+ * furniture (caret, grip, status, count badge, add button) leaves the name
+ * too little to say anything before the ellipsis. The ceiling keeps the
+ * timeline the larger half of any ordinary window: past 560 the chart is what
+ * the screen is short of, and this is a plan screen. */
+export const DEFAULT_LIST_WIDTH_PX = 320;
+export const MIN_LIST_WIDTH_PX = 240;
+export const MAX_LIST_WIDTH_PX = 560;
+
+/** The list's width is written by a drag and read back from localStorage, so
+ * it is clamped on the way in from both — a stale or hand-edited value never
+ * reaches the grid. */
+export function clampListWidth(width: number): number {
+  if (!Number.isFinite(width)) return DEFAULT_LIST_WIDTH_PX;
+  return Math.round(Math.min(MAX_LIST_WIDTH_PX, Math.max(MIN_LIST_WIDTH_PX, width)));
+}
+
+/** The grab strip on the seam between the list and the timeline. Wider than
+ * the 1px rule it sits on, because a 1px target is not a target. */
+export const LIST_RESIZE_HANDLE_PX = 9;
 
 /** The inline "add task" row at the foot of the list. */
 export const ADD_ROW_HEIGHT_PX = 46;
