@@ -1,6 +1,7 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { ExportSettingsPanel } from './ExportSettingsPanel';
 import { X } from 'lucide-react';
+import { useFocusTrap } from '../utils/useFocusTrap';
 import { buttonClass } from './systemUi';
 
 interface SettingsFlyoutProps {
@@ -14,8 +15,17 @@ interface SettingsFlyoutProps {
  * — a fixed inset-0 scrim with the surface inside it — just anchored to one
  * edge and full height rather than centered. Closing is unconditional here
  * (backdrop, Escape, the ✕): unlike the task modal there's no draft to
- * lose, since every control inside writes to the store as it's touched. */
+ * lose, since every control inside writes to the store as it's touched.
+ *
+ * Focus is trapped the way the import dialog's is, and for the same reason:
+ * this says `aria-modal`, and without the trap Tab walks straight out of it
+ * onto the chart and the toolbar behind the scrim. It matters more now that
+ * the toolbar's gear is the only way in — the panel has to be operable by
+ * whoever opened it, and closing hands focus back to that gear. */
 export function SettingsFlyout({ onClose }: SettingsFlyoutProps) {
+  const panelRef = useRef<HTMLElement | null>(null);
+  useFocusTrap(panelRef);
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
@@ -31,6 +41,7 @@ export function SettingsFlyout({ onClose }: SettingsFlyoutProps) {
       role="presentation"
     >
       <aside
+        ref={panelRef}
         // The click guard is what makes the backdrop-only close work: a
         // click on a control inside must not bubble up to the scrim.
         onClick={(event) => event.stopPropagation()}

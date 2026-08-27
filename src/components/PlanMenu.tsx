@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, Download, Plus, Settings, X } from 'lucide-react';
+import { Check, ChevronDown, Plus, X } from 'lucide-react';
 import { useTimelineStore } from '../store/timelineStore';
-import { exportPlanToJsonFile } from '../import/planJson';
 import {
+  buttonBaseClass,
   buttonClass,
   INPUT_SHELL_CLASS,
   MENU_ITEM_CLASS,
@@ -15,25 +15,29 @@ interface PlanMenuProps {
    * the caller so the toolbar keeps its own type scale; this component owns
    * only the trigger's behaviour and the menu. */
   children: React.ReactNode;
-  /** Opens the export settings panel. */
-  onOpenSettings: () => void;
 }
 
-/** Switching, creating, deleting, configuring and saving out a plan, behind
- * the plan's own name in the toolbar.
+/** Switching, creating and deleting plans, behind the plan's own name in the
+ * toolbar.
  *
  * This replaces the tab strip that used to sit in its own band above the
  * chart. The band cost a row of the window to show what the toolbar already
- * says — the plan's name — so the name became the control, and the rest of
- * what the strip offered moved into the menu behind it.
+ * says — the plan's name — so the name became the control, and what the strip
+ * offered moved into the menu behind it.
  *
- * The export settings live here too, now that the toolbar's gear is gone.
- * They belong with the plan rather than beside the chart: what to export, in
- * what order, over what window and with which comments are all facts about
- * the plan, and the toolbar's right-hand end is for what is being done to the
- * timeline on screen.
+ * Plans, and nothing else. Two file actions used to live down here as well —
+ * the export settings and "Save as JSON" — and neither was a plan: one is a
+ * panel about the deck, the other is one of four files the Export button
+ * makes. Both moved to the toolbar's right-hand end, where the app's actions
+ * are, which leaves this menu answering exactly the question its trigger asks.
+ *
+ * The trigger is the design system's own: a ghost Button, so it fills with
+ * `--accent` on hover and takes the system focus ring, with a chevron on the
+ * end. It was a bare div with a hover fill and no chevron before — hoverable
+ * but not legible as a control, which is the one thing a menu's trigger has
+ * to be.
  */
-export function PlanMenu({ children, onOpenSettings }: PlanMenuProps) {
+export function PlanMenu({ children }: PlanMenuProps) {
   const savedPlans = useTimelineStore((state) => state.savedPlans);
   const activePlanId = useTimelineStore((state) => state.activePlanId);
   const switchToPlan = useTimelineStore((state) => state.switchToPlan);
@@ -44,6 +48,7 @@ export function PlanMenu({ children, onOpenSettings }: PlanMenuProps) {
   const [isCreating, setIsCreating] = useState(false);
   const [newPlanName, setNewPlanName] = useState('');
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -55,7 +60,15 @@ export function PlanMenu({ children, onOpenSettings }: PlanMenuProps) {
       if (!rootRef.current?.contains(event.target as Node)) setIsOpen(false);
     };
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setIsOpen(false);
+      if (event.key !== 'Escape') return;
+      // The name field inside handles its own Escape (it cancels the draft
+      // and keeps the menu open), and it stops nothing from reaching here —
+      // so a menu in that state closes on the same press, which is what
+      // Escape is expected to do at the level it is pressed.
+      setIsOpen(false);
+      setIsCreating(false);
+      setNewPlanName('');
+      triggerRef.current?.focus();
     };
     document.addEventListener('pointerdown', onPointerDown, true);
     document.addEventListener('keydown', onKeyDown);
@@ -64,8 +77,6 @@ export function PlanMenu({ children, onOpenSettings }: PlanMenuProps) {
       document.removeEventListener('keydown', onKeyDown);
     };
   }, [isOpen]);
-
-  const activePlan = savedPlans.find((plan) => plan.id === activePlanId);
 
   const handleCreate = async () => {
     const name = newPlanName.trim();
@@ -78,26 +89,57 @@ export function PlanMenu({ children, onOpenSettings }: PlanMenuProps) {
   return (
     <div ref={rootRef} className="relative flex-none">
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         aria-expanded={isOpen}
         aria-haspopup="menu"
+        aria-label="Switch plan"
         title="Switch plan"
-        className="flex items-center gap-2.5 rounded-md px-1 py-1 text-left transition-colors hover:bg-accent"
+        // buttonBaseClass, not buttonClass: the row is 50px and none of the
+        // system's three button heights fits the two-line plan block, so the
+        // size is left out and given here — the same deliberate omission the
+        // toolbar's other controls make. Only the height and the padding are
+        // added, and neither is in the base: stacking a second `gap` or
+        // `justify` on top would leave two utilities fighting over one
+        // property. Everything else is the system's — the radius, the
+        // colour-only transition, the accent hover, the focus ring.
+        className={buttonBaseClass('ghost', 'h-10 px-2 text-left')}
       >
         {children}
+        {/* The whole point of this change: something that says "press me".
+            It does not rotate on open — hover and open are colour here, as
+            everywhere else on this screen. */}
+        <ChevronDown
+          size={14}
+          strokeWidth={2}
+          aria-hidden="true"
+          className="ml-0.5 flex-none text-muted-foreground"
+        />
       </button>
 
       {isOpen && (
-        <div className={`absolute left-0 top-[calc(100%+4px)] w-64 ${MENU_SURFACE_CLASS}`}>
-          <div className="max-h-72 overflow-y-auto">
+        <div
+          // The roles the system's own DropdownMenu sets, and which this menu
+          // never had: the trigger promised `aria-haspopup="menu"` and opened
+          // a plain box of buttons, so a screen reader announced a list of
+          // controls with no menu around them. The wrappers are `none` so the
+          // rows stay direct children of the menu, as ARIA requires.
+          role="menu"
+          aria-label="Plans"
+          className={`absolute left-0 top-[calc(100%+4px)] w-64 ${MENU_SURFACE_CLASS}`}
+        >
+          <div role="none" className="max-h-72 overflow-y-auto">
             {savedPlans.length === 0 && (
-              <p className="px-2 py-1.5 text-sm text-muted-foreground">No saved plans</p>
+              <p role="none" className="px-2 py-1.5 text-sm text-muted-foreground">
+                No saved plans
+              </p>
             )}
             {savedPlans.map((plan) => (
-              <div key={plan.id} className="group flex items-center gap-1 rounded-sm hover:bg-accent">
+              <div key={plan.id} role="none" className="group flex items-center gap-1 rounded-sm hover:bg-accent">
                 <button
                   type="button"
+                  role="menuitem"
                   onClick={() => {
                     void switchToPlan(plan.id);
                     setIsOpen(false);
@@ -113,6 +155,7 @@ export function PlanMenu({ children, onOpenSettings }: PlanMenuProps) {
                 </button>
                 <button
                   type="button"
+                  role="menuitem"
                   onClick={() => {
                     if (!window.confirm(`Delete plan "${plan.name}"? This cannot be undone.`)) return;
                     void deletePlan(plan.id);
@@ -128,9 +171,9 @@ export function PlanMenu({ children, onOpenSettings }: PlanMenuProps) {
 
           <div className={MENU_SEPARATOR_CLASS} />
 
-          <div>
+          <div role="none">
             {isCreating ? (
-              <div className="flex items-center gap-1.5 p-1">
+              <div role="none" className="flex items-center gap-1.5 p-1">
                 <input
                   autoFocus
                   type="text"
@@ -152,38 +195,11 @@ export function PlanMenu({ children, onOpenSettings }: PlanMenuProps) {
                 </button>
               </div>
             ) : (
-              <button type="button" onClick={() => setIsCreating(true)} className={MENU_ITEM_CLASS}>
+              <button type="button" role="menuitem" onClick={() => setIsCreating(true)} className={MENU_ITEM_CLASS}>
                 <Plus size={14} strokeWidth={2} aria-hidden="true" />
                 New plan
               </button>
             )}
-            {/* Saving the plan out, only. Importing is one button in the
-                toolbar rather than a second icon here: two entry points for
-                one action meant the format had to be chosen before the file
-                was. */}
-            <button
-              type="button"
-              onClick={() => {
-                onOpenSettings();
-                setIsOpen(false);
-              }}
-              className={MENU_ITEM_CLASS}
-            >
-              <Settings size={14} strokeWidth={2} aria-hidden="true" />
-              Export settings
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (activePlan) exportPlanToJsonFile(activePlan);
-                setIsOpen(false);
-              }}
-              disabled={!activePlan}
-              className={MENU_ITEM_CLASS}
-            >
-              <Download size={14} strokeWidth={2} aria-hidden="true" />
-              Save as JSON
-            </button>
           </div>
         </div>
       )}

@@ -128,8 +128,15 @@ function renamePlanNotices(
  *
  * Leaving a plan has to save it first, and there are two ways to leave one
  * now: switching to another, and making a new one out of a branch of this
- * one. Both flush the same way, so the rule lives here rather than in each. */
-function flushedActivePlan(state: TimelineStore): SavedPlan | null {
+ * one. Both flush the same way, so the rule lives here rather than in each.
+ *
+ * Exported for the third caller, which does not leave the plan at all: saving
+ * it out as a JSON file. `savedPlans` holds each plan as of the last flush, so
+ * reading that record directly would write a file missing every edit made
+ * since — while the deck, the PDF and the CSV beside it all read the working
+ * copy. Call it through `useTimelineStore.getState()` at the moment of the
+ * click, never as a selector: it builds a new object every call. */
+export function flushedActivePlan(state: TimelineStore): SavedPlan | null {
   const outgoing = state.savedPlans.find((plan) => plan.id === state.activePlanId);
   if (!outgoing) return null;
 

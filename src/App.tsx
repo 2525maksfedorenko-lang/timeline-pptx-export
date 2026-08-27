@@ -6,14 +6,16 @@ import { SettingsFlyout } from './components/SettingsFlyout'
 import { ExportOverflowModal } from './components/ExportOverflowModal'
 import { ImportModal } from './components/ImportModal'
 import { ExportMenu, type DeckFormat, type ExportFormat } from './components/ExportMenu'
+import { Settings } from 'lucide-react'
 import { PlanNotice } from './components/PlanNotice'
 import { exportTimelineToPptx } from './export/pptxExporter'
 import { exportTimelineToPdf } from './export/pdfExporter'
 import { downloadPlanCsv } from './export/planCsv'
+import { exportPlanToJsonFile } from './import/planJson'
 import { getExportOverviewItems, planOverview, type ExportMode } from './export/timelineExportModel'
 import { buildExportFilename } from './export/dateScale'
 import { sortItemsForExport } from './utils/sortItemsForExport'
-import { useTimelineStore } from './store/timelineStore'
+import { flushedActivePlan, useTimelineStore } from './store/timelineStore'
 import { buttonBaseClass } from './components/systemUi';
 
 type Tab = 'timeline' | 'dashboard'
@@ -54,6 +56,10 @@ function App() {
   const [activeTab] = useState<Tab>(highlightSection ? 'dashboard' : 'timeline')
   const [overflow, setOverflow] = useState<PendingOverflowExport | null>(null)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  // Only for the Export menu's JSON row, which is disabled until there is a
+  // plan record to write. Everything else about that file is read at the click
+  // (see handleExport), not subscribed to.
+  const activePlanId = useTimelineStore((state) => state.activePlanId)
   const [isImportOpen, setIsImportOpen] = useState(false)
 
   useEffect(() => {
@@ -82,6 +88,16 @@ function App() {
       return
     }
 
+    // The plan itself rather than a rendering of it, so it is the plan record
+    // that is written — with the working copy flushed into it first, or the
+    // file would be missing every edit made since this plan was opened while
+    // the three formats above all read what is on screen.
+    if (format === 'json') {
+      const plan = flushedActivePlan(useTimelineStore.getState())
+      if (plan) exportPlanToJsonFile(plan)
+      return
+    }
+
     const overviewItems = getExportOverviewItems(sortItemsForExport(items, exportOptions.sortMode))
     const plan = planOverview(overviewItems, exportOptions.exportTimeframe)
 
@@ -101,7 +117,6 @@ function App() {
           live once the screen is the plan. */}
       <GanttToolbar
         showTimelineControls={activeTab === 'timeline'}
-        onOpenSettings={() => setIsSettingsOpen(true)}
         actions={
           <>
             {/* The two things the app does to a whole plan, both said as the
@@ -114,7 +129,20 @@ function App() {
             >
               Import
             </button>
-            <ExportMenu onExport={handleExport} />
+            <ExportMenu onExport={handleExport} hasSavedPlan={activePlanId !== null} />
+            {/* The export settings, beside the button whose files they
+                govern — what to include, in what order, over what window.
+                No label: a gear is the one glyph that needs none, and the
+                row's width is the scarcest thing in this header. */}
+            <button
+              type="button"
+              onClick={() => setIsSettingsOpen(true)}
+              title="Export settings"
+              aria-label="Export settings"
+              className={buttonBaseClass('outline', 'h-8 w-8 flex-none px-0')}
+            >
+              <Settings size={15} strokeWidth={2} aria-hidden="true" />
+            </button>
           </>
         }
       />
