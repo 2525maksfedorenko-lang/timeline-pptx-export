@@ -588,6 +588,13 @@ is a measurement rather than an assurance.
 
 ## 10. The six colours the screen takes from the export palette — settled
 
+> **One fewer.** `optionBg` was there for one control — the status chip in the
+> export settings' task list, a native `<select>` whose option list the OS
+> paints from the control's own colours. That list shows a checkbox and a name
+> now, the chip and its `StatusSelect` are gone, and the colour went with them:
+> it was read by nothing and its comment described a control that no longer
+> existed. The rest of this section stands as written.
+
 Six colours reach the screen from `src/export/theme.ts`'s `COLORS`: the bar
 track, the option background, the on-surface text, the assignee fallback, and
 the two connector greys. Four are already exact token values (`barTrack #E5E5E5`
