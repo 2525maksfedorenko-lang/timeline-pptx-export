@@ -87,7 +87,11 @@ export function PlanMenu({ children }: PlanMenuProps) {
   };
 
   return (
-    <div ref={rootRef} className="relative flex-none">
+    // Shrinkable, and `min-w-0` with it: the toolbar centres the timeline
+    // controls between this trigger and the app's actions, and a trigger that
+    // refused to give ground would spill over them on a narrow window instead
+    // of letting the plan's name ellipsise.
+    <div ref={rootRef} className="relative min-w-0 shrink">
       <button
         ref={triggerRef}
         type="button"
@@ -104,7 +108,7 @@ export function PlanMenu({ children }: PlanMenuProps) {
         // `justify` on top would leave two utilities fighting over one
         // property. Everything else is the system's — the radius, the
         // colour-only transition, the accent hover, the focus ring.
-        className={buttonBaseClass('ghost', 'h-10 px-2 text-left')}
+        className={buttonBaseClass('ghost', 'h-10 min-w-0 px-2 text-left')}
       >
         {children}
         {/* The whole point of this change: something that says "press me".
