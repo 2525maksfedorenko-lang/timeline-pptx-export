@@ -230,7 +230,14 @@ export function TaskListRow({
             event.stopPropagation();
             onBeginEdit();
           }}
-          title={item.label}
+          // The name, and then what can be done to it — the form the status
+          // button beside it already uses ("In progress — click to change").
+          // Every other element on this row names its own action in its
+          // title; the name was the one that only repeated itself, and since
+          // the pill came off it is also the one element with nothing at rest
+          // to say it is a field. The name stays first, because the other job
+          // this title has is showing a long name the column had to ellipsise.
+          title={`${item.label} — double-click to rename`}
           style={nameStyle}
         >
           {item.label}
