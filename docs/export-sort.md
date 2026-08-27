@@ -2,6 +2,24 @@
 
 How tasks are ordered on the exported slides, and why it differs from the app.
 
+## There is one order, and nothing chooses it
+
+The export settings used to offer four sort modes — status, start date, parent
+group, progress — in a "Sort by" dropdown. That control is gone, and with it the
+three flat modes: only the status order below ever rebuilt the tree, and the
+other three sorted the plan as a flat list, which puts a subtask's bar somewhere
+other than under its parent's on the Overview.
+
+So `sortItemsForExport(items)` takes no mode, `src/utils/sortItems.ts` (the flat
+sorter it used to delegate to) is deleted, and every deck this app writes —
+PPTX, PDF, and the dashboard slides built from the same ordered list — is drawn
+in the order described here.
+
+`ExportOptions.sortMode` stays in the plan file. A plan saved with
+`"sortMode": "date"` still says so, still opens, still round-trips; nothing
+reads it. That is the same treatment `showProgress` and `showDependencies`
+already had — see the note on the interface in `src/types/timeline.ts`.
+
 ## The order
 
 `STATUS_SORT_ORDER` in `src/utils/sortItemsForExport.ts`:
@@ -25,8 +43,8 @@ The tree is rebuilt from `parentId`, every level is sorted, and the result is
 flattened depth-first. So a parent carries its whole subtree, a child never rises
 above its own parent, and a child never lands between another parent's children.
 
-Sorting the flat list — which is what `sortItems`' own `'status'` mode still does
-for the screen — would scatter subtasks away from their parents.
+Sorting the flat list would scatter subtasks away from their parents, which is
+exactly why the three flat modes went rather than being kept as options.
 
 **Where this is actually visible.** Both slides, and for the same reason.
 `buildTaskHierarchy` preserves the input's relative order at each level, and
@@ -40,11 +58,10 @@ somewhere else on the slide. Concretely:
 - Subtasks & Comments: parent sections follow the same root order, and each
   parent's subtask rows follow the sorted child order.
 
-This is also why the flat sort modes matter more than they used to: `'date'` and
-`'progress'` (`sortItems`) order the list without regard to the tree, so a
-subtask's bar can land far from its parent's on the Overview — exactly as its
-row already does on screen, which is the point of the two surfaces sharing one
-sort.
+This is also what the flat modes used to break: `'date'` and `'progress'`
+ordered the list without regard to the tree, so a subtask's bar could land far
+from its parent's on the Overview. Removing the control removed that failure
+mode with it.
 
 ## What status order costs a long plan
 
@@ -61,7 +78,7 @@ slide, and that had a measurable price when a slide's window came from its own
 tasks. Measured then on a 2.8-year plan — 249 tasks, 50 roots, 1036 days, five
 overview slides:
 
-| sortMode | per-slide windows | share of the plan | a 46-day bar |
+| sort mode (both existed then) | per-slide windows | share of the plan | a 46-day bar |
 | --- | --- | --- | --- |
 | `date` | 256, 292, 262, 240, 86 days | 8–28% | 0.828in |
 | `status` | 982, 756, 980, 771, 67 days | **73–95%** | 0.246in |
@@ -112,13 +129,14 @@ first.
 
 ## The export order is not the screen order
 
-`sortItems` (screen) leads with `todo`; `sortItemsForExport` (slides) leads with
-`done`. Both are reached through the same `exportOptions.sortMode === 'status'`.
+The plan screen does not sort at all: `visibleRows` walks the tree in the plan's
+own order, so a task sits where it was put and a drag moves dates rather than
+rows. The deck sorts, and leads with `done`.
 
 This is deliberate and was specified: a deck is read as a report of what is
-finished, the app is a working view of what is still open. The cost is that the
-same setting means two different orders depending on the surface, and the order
-you see on screen is not the order you get in the file.
+finished, the app is a working view of what is still open. The cost is the one
+worth stating plainly — **the order you see on screen is not the order you get
+in the file**, and there is no longer a setting that could make them agree.
 
 ## Dependency connectors
 

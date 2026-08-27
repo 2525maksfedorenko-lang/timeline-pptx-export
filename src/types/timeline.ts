@@ -101,12 +101,17 @@ export interface ExportTimeframe {
 export interface ExportOptions {
   theme: string;
   scale: Timeline['scale'];
-  // Two switches nothing reads any more: progress and dependency connectors
-  // were taken off both the screen and the slides. They stay in the shape
-  // because they are part of the plan *file* — one written by an older build,
-  // by hand or by another tool still carries them, and normalizeExportOptions
-  // still has to answer for a malformed one rather than a plan failing to
-  // open. Nothing sets them; nothing draws from them.
+  // Four fields nothing reads any more. Progress and dependency connectors
+  // were taken off both the screen and the slides; the comment mode and the
+  // sort order were taken out of the export settings panel, and the deck now
+  // always draws the latest comment (EXPORT_COMMENT_MODE) in one fixed order
+  // (sortItemsForExport, docs/export-sort.md).
+  //
+  // All four stay in the shape because they are part of the plan *file* — one
+  // written by an older build, by hand or by another tool still carries them,
+  // and normalizeExportOptions still has to answer for a malformed one rather
+  // than a plan failing to open. A plan that stored `sortMode: "date"` keeps
+  // storing it; its deck is drawn in the one order like every other.
   showProgress: boolean;
   showDependencies: boolean;
   commentMode: 'latest' | 'pinned' | 'all' | 'none';

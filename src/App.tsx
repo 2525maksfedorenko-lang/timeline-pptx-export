@@ -98,7 +98,7 @@ function App() {
       return
     }
 
-    const overviewItems = getExportOverviewItems(sortItemsForExport(items, exportOptions.sortMode))
+    const overviewItems = getExportOverviewItems(sortItemsForExport(items))
     const plan = planOverview(overviewItems, exportOptions.exportTimeframe)
 
     if (plan.inRange.length <= plan.capacity) {

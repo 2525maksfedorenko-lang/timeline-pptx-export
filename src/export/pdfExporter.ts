@@ -6,6 +6,7 @@ import type { TaskComment, TaskStatus, TimelineItem } from '../types/timeline';
 import { sortItemsForExport } from '../utils/sortItemsForExport';
 import {
   buildExportSlides,
+  EXPORT_COMMENT_MODE,
   type CommentBlockRowModel,
   type DetailSlideModel,
   type ExportMode,
@@ -852,14 +853,14 @@ export async function exportTimelineToPdf(
   fileName: string = 'timeline-export.pdf',
   exportMode: ExportMode = 'compact',
 ): Promise<void> {
-  const sortedItems = sortItemsForExport(items, exportOptions.sortMode);
+  const sortedItems = sortItemsForExport(items);
   // One clock reading for the whole deck: the overview's today rule and the
   // dashboard's overdue counts have to agree about what day it is.
   const now = new Date();
   const slides = buildExportSlides(
     sortedItems,
     comments,
-    exportOptions.commentMode,
+    EXPORT_COMMENT_MODE,
     exportOptions.exportTimeframe,
     exportMode,
     now,

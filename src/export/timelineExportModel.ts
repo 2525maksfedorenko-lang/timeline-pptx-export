@@ -1337,6 +1337,24 @@ function buildDetailSlides(candidates: DetailCandidate[]): DetailSlideModel[] {
   });
 }
 
+/** The comment rule every deck this app exports is drawn by: the most recent
+ * comment on a task, and nothing older.
+ *
+ * It used to be a four-way choice in the export settings — latest, pinned, all,
+ * none — and is now the one the panel defaulted to. Latest rather than all
+ * because the appendix is a summary and a task with twenty comments would push
+ * its neighbours off the slide; latest rather than pinned because nothing in
+ * this app pins a comment (the flag exists in the model and no control sets
+ * it), so "pinned" would have emptied the appendix for most plans.
+ *
+ * `getCommentsForSlide` and `buildExportSlides` still take the mode as an
+ * argument: the model is the shared, pure thing both exporters and
+ * `npm run check:export` build against, and the check deliberately runs all
+ * four modes to prove no task is lost under any of them. This constant is what
+ * the *product* passes. `ExportOptions.commentMode` stays in the plan file and
+ * is read by nothing (see the note on it in types/timeline.ts). */
+export const EXPORT_COMMENT_MODE: ExportOptions['commentMode'] = 'latest';
+
 export function getCommentsForSlide(
   comments: TaskComment[],
   taskId: string,
