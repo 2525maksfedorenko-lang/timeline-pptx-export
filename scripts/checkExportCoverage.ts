@@ -59,7 +59,7 @@ const SCENARIOS: Scenario[] = [
 
 export function buildDeck(plan: FixturePlan, scenario: Pick<Scenario, 'exportMode' | 'commentMode' | 'timeframe'>) {
   // Mirrors what both exporters do before drawing: sort, then build.
-  const sortedItems = sortItemsForExport(plan.items, 'status');
+  const sortedItems = sortItemsForExport(plan.items);
   const slides = buildExportSlides(
     sortedItems,
     plan.comments,

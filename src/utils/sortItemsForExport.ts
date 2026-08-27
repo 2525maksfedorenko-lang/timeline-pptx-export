@@ -1,5 +1,4 @@
-import { getTaskStatus, type SortMode, type TaskStatus, type TimelineItem } from '../types/timeline';
-import { sortItems } from './sortItems';
+import { getTaskStatus, type TaskStatus, type TimelineItem } from '../types/timeline';
 import { buildTaskHierarchy, type TaskNode } from './taskHierarchy';
 
 /** Top-to-bottom status order on the exported slides. Change this one line to
@@ -46,12 +45,18 @@ function sortLevel(nodes: TaskNode[]): TaskNode[] {
 
 /** Orders items for the exported slides, without mutating the input.
  *
+ * The deck's one order, and no longer a choice. The export settings used to
+ * offer four — status, start date, parent group, progress — of which only this
+ * one rebuilt the tree; the other three sorted the flat list, which scatters a
+ * subtask away from the parent whose bar it belongs under. With the control
+ * gone this is what every deck is drawn in, and `ExportOptions.sortMode` is a
+ * field the plan file still carries that nothing reads (see the note on it in
+ * types/timeline.ts). docs/export-sort.md is the written version.
+ *
  * Hierarchical, not flat: the tree is rebuilt from `parentId`, each level is
  * sorted, and the result is flattened depth-first — so a parent carries its
  * whole subtree with it, a child can never rise above its own parent, and a
- * child can never land between another parent's children. Sorting the flat list
- * instead (which is what sortItems does for its own 'status' mode) would
- * scatter subtasks away from their parents.
+ * child can never land between another parent's children.
  *
  * A parent is ranked by its *own* status, never by its children's: a parent's
  * status is a fact about the parent that the user set, and deriving it would
@@ -63,11 +68,7 @@ function sortLevel(nodes: TaskNode[]): TaskNode[] {
  * Pure: no store, no DOM, no dates beyond the items' own — which is what lets
  * both exporters share it.
  */
-export function sortItemsForExport(items: TimelineItem[], mode: SortMode): TimelineItem[] {
-  // Every other mode keeps working exactly as it did; only 'status' gets the
-  // hierarchical treatment, since it is the only one this change is about.
-  if (mode !== 'status') return sortItems(items, mode);
-
+export function sortItemsForExport(items: TimelineItem[]): TimelineItem[] {
   const { roots } = buildTaskHierarchy(items);
   const flattened: TimelineItem[] = [];
 

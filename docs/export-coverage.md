@@ -233,6 +233,19 @@ every cell is measured for wrapping rather than assumed to be one line.
   many were left out. **Closed**: the section heading reads "Comments (1 of 4)"
   when some were dropped (`buildCommentsHeading`) — in the heading rather than on
   a line of its own, so it costs no layout.
+
+  It is no longer a choice. The "Comments in export" dropdown is gone from the
+  export settings and every deck is built with **`latest`** — the mode that
+  dropdown defaulted to, named once as `EXPORT_COMMENT_MODE` in
+  `timelineExportModel.ts` and passed by both exporters. Latest rather than
+  `all` because the appendix is a summary and one talkative task would push its
+  neighbours off the slide; latest rather than `pinned` because nothing in this
+  app pins a comment, so `pinned` emptied the appendix for most plans. The
+  heading count above is what keeps that honest: a task with four comments still
+  says so. `ExportOptions.commentMode` stays in the plan file and is read by
+  nothing; `buildExportSlides` still takes the mode as an argument, and the five
+  scenarios this check runs still cover all four, so the invariant is proved for
+  each rather than only for the one the product ships.
 - **Label truncation** (`truncateToWidth`) shortens a name to its column with an
   ellipsis. Visible by construction, and the ellipsis is the marker.
 
