@@ -1,8 +1,6 @@
 import { useState } from 'react';
-import { StatusSelect } from './StatusSelect';
 import { useIsMobile } from '../utils/useIsMobile';
 import { useTimelineStore } from '../store/timelineStore';
-import { getTaskStatus } from '../types/timeline';
 import { toHtml } from '../utils/renderMarkdown';
 import { buildTaskHierarchy } from '../utils/taskHierarchy';
 import { firstDayOfMonthIso, getDateRange, lastDayOfMonthIso } from '../export/dateScale';
@@ -10,10 +8,6 @@ import { ChevronDown, ChevronRight, Pin } from 'lucide-react';
 import { buttonClass, CHECKBOX_CLASS, INPUT_CLASS_AUTO } from './systemUi';
 import { BAR_HEIGHT_PX } from './ganttLayout';
 import { labelIndent } from '../utils/barNesting';
-
-/** How much of each task row the status chip takes. Wide enough for the
- * longest label ("In progress") plus the chip's padding and caret. */
-const STATUS_CHIP_WIDTH_PX = 104;
 
 const COMMENT_BODY_CLASSES =
   '[&_p]:mb-2 [&_p:last-child]:mb-0 [&_strong]:font-semibold [&_em]:italic ' +
@@ -75,7 +69,13 @@ function SectionToggle({ isOpen, label, onToggle }: { isOpen: boolean; label: st
  * So: the timeframe first, because it is the question about the whole file,
  * then the task list, which is the long one and the one people come here for,
  * and then — only when the plan has any — a read-only transcript of its
- * comments. */
+ * comments.
+ *
+ * The task list asks one question per row and shows one thing: is this task in
+ * the file, and what is it called. A status chip used to sit at the right of
+ * each row and set the status from here; it was the last editing control left
+ * in a panel that decides what a file contains, and the plan screen's own
+ * status icon does that job on the row where the task lives. */
 export function ExportSettingsPanel() {
   const isMobile = useIsMobile();
   const [openSections, setOpenSections] = useState(MOBILE_SECTION_DEFAULTS);
@@ -258,16 +258,14 @@ export function ExportSettingsPanel() {
                 }
                 className={`${CHECKBOX_CLASS} max-md:h-5 max-md:w-5`}
               />
-              <span className="flex-1 truncate text-sm font-medium text-foreground">{item.label}</span>
-              {/* The chip changes the status here as well as in the
-                  plan, rather than being a read-only echo of it. */}
-              <div className="flex-shrink-0" style={{ width: STATUS_CHIP_WIDTH_PX }}>
-                <StatusSelect
-                  status={getTaskStatus(item)}
-                  onChange={(next) => updateItem(item.id, { status: next })}
-                  label={item.label}
-                />
-              </div>
+              {/* A name and nothing else. The status chip that used to sit
+                  here changed the task's status, which is not what this list
+                  is for — and the plan's own row has that control, one click
+                  away. Its 104px go to the name, which is what a person picks
+                  a task out of this list by. */}
+              <span className="flex-1 truncate text-sm font-medium text-foreground" title={item.label}>
+                {item.label}
+              </span>
             </li>
           ))}
         </ul>

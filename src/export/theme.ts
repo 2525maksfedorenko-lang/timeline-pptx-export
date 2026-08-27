@@ -43,9 +43,6 @@ export const COLORS = {
   // The unfilled remainder of a Gantt bar. --border, so the track reads as a
   // neutral rail rather than the slate tint it used to carry.
   barTrack: 'E5E5E5',
-  // --popover / --card: an opaque white surface, for a native <select>'s
-  // option list which the OS paints from the control's own colours.
-  optionBg: 'FFFFFF',
   // Text drawn *on* a status fill (the percentage inside a bar):
   // --primary-foreground, the token the product uses for text on its dark
   // brand surfaces.
