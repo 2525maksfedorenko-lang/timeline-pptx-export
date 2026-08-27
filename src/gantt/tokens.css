@@ -52,10 +52,12 @@
   --gantt-todo-fill: #94a3b8;
   --gantt-icon-todo: #cbd5e1;                   /* the outline circle only */
 
-  /* Name pill */
-  --gantt-pill-border: #bfdbfe;
-  --gantt-pill-bg: #f8fbff;
+  /* Inline rename, and the hover wash that now stands in for the name pill.
+     The handoff's own pill border (#bfdbfe) is gone with the pill; its fill
+     lives on as the rename field's, which is what it always was underneath. */
+  --gantt-edit-bg: #f8fbff;
   --gantt-edit-focus: #60a5fa;
+  --gantt-name-hover: hsl(var(--muted));
 
   /* Badges */
   --gantt-subcount-bg: #475569;
@@ -132,6 +134,23 @@
 
 .gantt-subcount:hover {
   background: var(--gantt-text);
+}
+
+/* A name in the task column is editable on double-click, and the pill that
+ * used to advertise it — a blue border and fill around every task, at rest,
+ * on every row — said it far louder than a name column should. The wash says
+ * the same thing only where the pointer is: the box is the pill's, the
+ * treatment is a flat muted fill and no border, and it appears on the one row
+ * the pointer is over rather than on all of them at once.
+ *
+ * Colour only, per the design system: the box exists at rest (transparent
+ * border, same padding) so nothing about the row moves when it lights up. */
+.gantt-row-name {
+  transition: background-color 150ms;
+}
+
+.gantt-row-name:hover {
+  background: var(--gantt-name-hover);
 }
 
 /* The row's "add sub-task" control. Present in the layout at all times so a

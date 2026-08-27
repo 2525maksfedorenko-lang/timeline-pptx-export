@@ -52,9 +52,9 @@ function DragGrip() {
 /** One line of the task list: what the row is, and what can be done to it.
  *
  * A group starts hard against the column's edge because its caret occupies
- * that space; a task starts where the caret would have ended. A task's name
- * is a pill so the eye can pick a task out of a phase at a glance; a group's
- * is plain text one step larger. */
+ * that space; a task starts where the caret would have ended. Both names are
+ * plain text; what separates a parent from its work is weight and size, not a
+ * frame around one of them. */
 export function TaskListRow({
   row,
   isSelected,
@@ -74,32 +74,46 @@ export function TaskListRow({
 }: TaskListRowProps) {
   const { item, depth, isGroup, childCount, isSubtask, status } = row;
 
+  // Shared by both: one line, ellipsised, and a box for the hover wash to
+  // fill. The wash is what is left of the pill — see .gantt-row-name.
+  const nameBase: React.CSSProperties = {
+    flex: 1,
+    minWidth: 0,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+    borderRadius: 6,
+    boxSizing: 'border-box',
+  };
+
   const nameStyle: React.CSSProperties = isGroup
     ? {
-        flex: 1,
-        minWidth: 0,
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        whiteSpace: 'nowrap',
+        ...nameBase,
         fontSize: 15,
-        fontWeight: 500,
+        // Semibold, so a parent is picked out of the column by weight. It is
+        // now the only thing that does: its children used to be framed.
+        fontWeight: 600,
         color: 'var(--gantt-text)',
+        // A group's name carried no box of its own. It gets the task's, and
+        // an equal negative margin on the left hands the space straight back,
+        // so the name stays exactly where the handoff puts it and the wash
+        // still has the same 11px of run-up before the first letter.
+        border: '1px solid transparent',
+        padding: '6px 10px',
+        marginLeft: -11,
+        lineHeight: '17px',
       }
     : {
-        flex: 1,
-        minWidth: 0,
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        whiteSpace: 'nowrap',
+        ...nameBase,
         fontSize: 14,
         // An untouched task is set in the muted grey; anything under way or
         // done takes the primary text colour.
         color: status === 'todo' ? 'var(--gantt-text-muted)' : 'var(--gantt-text)',
-        border: '1px solid var(--gantt-pill-border)',
-        background: 'var(--gantt-pill-bg)',
-        borderRadius: 6,
+        // The pill's border and fill are gone; its box is not. A transparent
+        // border of the same width keeps every name on the pixel it was on,
+        // and keeps the two name treatments one shape.
+        border: '1px solid transparent',
         padding: '6px 10px',
-        boxSizing: 'border-box',
         lineHeight: '17px',
       };
 
@@ -205,12 +219,13 @@ export function TaskListRow({
             fontSize: 14,
             padding: '0 10px',
             outline: 'none',
-            background: 'var(--gantt-pill-bg)',
+            background: 'var(--gantt-edit-bg)',
             color: 'var(--gantt-text)',
           }}
         />
       ) : (
         <span
+          className="gantt-row-name"
           onDoubleClick={(event) => {
             event.stopPropagation();
             onBeginEdit();

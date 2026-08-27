@@ -35,16 +35,40 @@ function utcMidnight(date: Date): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
 }
 
-/** Empty days the canvas carries before its first task and after its last.
+/** How far past the plan's own extent the canvas runs, at each end.
  *
- * The prototype draws a fixed 133-day window whose data runs from day 7 to
- * day 102, i.e. exactly this much air at each end. A canvas derived from the
- * items instead would end on the last task's last day, and since a drag
- * clamps to `0 … totalDays - span`, the latest task in the plan could then
- * never be dragged to the right at all. The prototype's own headroom is what
- * keeps that from being a wall. */
-const CANVAS_LEAD_DAYS = 7;
-const CANVAS_TRAIL_DAYS = 30;
+ * This is the whole of the screen's "make more room" behaviour, and it is not
+ * a threshold that fires — there is no edge to approach and no step to take.
+ * The canvas is *derived*: every render measures the items and draws this much
+ * empty calendar either side of them. Move the last task later and the space
+ * after it is simply re-measured; there is nothing to trigger and nothing that
+ * can fail to trigger.
+ *
+ * What the number has to be big enough for is a drag. A drag clamps to
+ * `0 … totalDays - span` (see drag.ts), so the empty calendar at an end is
+ * exactly how far the outermost task can be dragged in one gesture before it
+ * hits the wall — release, and the next render has moved the wall back out by
+ * this much again.
+ *
+ * One constant, used at both ends. The prototype's fixed 133-day window has
+ * 7 days of air at its start and 30 at its end, and this screen carried both
+ * numbers until they were found to be the reason a plan could be extended
+ * comfortably into the future and barely at all into the past. A plan grows in
+ * both directions, so the headroom is the same in both. */
+export const CANVAS_PAD_MONTHS = 3;
+
+/** `date` shifted by whole calendar months, in UTC — so three months of
+ * headroom is three months on the calendar the header prints, not an
+ * approximation in days.
+ *
+ * A day-of-month with no counterpart in the target month rolls forward, the
+ * way Date.UTC does: three months back from 31 May is 3 March, not 28
+ * February. The headroom is then 89 days instead of 92, which is a difference
+ * nothing on this screen can see, and clamping it would be arithmetic in
+ * service of nothing. */
+function addMonths(date: Date, months: number): Date {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + months, date.getUTCDate()));
+}
 
 export interface PlanRange {
   /** Day 0 of the canvas. */
@@ -75,8 +99,8 @@ export function planRange(items: TimelineItem[], today: Date): PlanRange {
   const stamps = items.flatMap((item) => [new Date(item.start).getTime(), new Date(item.end).getTime()]);
   const first = new Date(Math.min(todayMidnight.getTime(), ...stamps));
   const last = new Date(Math.max(todayMidnight.getTime(), ...stamps));
-  const minDate = new Date(first.getTime() - CANVAS_LEAD_DAYS * MS_PER_DAY);
-  const maxDate = new Date(last.getTime() + CANVAS_TRAIL_DAYS * MS_PER_DAY);
+  const minDate = addMonths(first, -CANVAS_PAD_MONTHS);
+  const maxDate = addMonths(last, CANVAS_PAD_MONTHS);
 
   const taskStamps = stamps.length > 0 ? stamps : [todayMidnight.getTime()];
 
