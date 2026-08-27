@@ -5,10 +5,7 @@ import { TIME_SCALE_LABELS, TIME_SCALES } from './scale';
 import { useGanttViewStore } from './viewStore';
 
 interface GanttToolbarProps {
-  /** Opens the export settings. Handed to the plan menu, which is where the
-   * app's own plan-level actions live now that the toolbar has none. */
-  onOpenSettings: () => void;
-  /** The app's own actions — import, settings and the two exports — rendered
+  /** The app's own actions — import, export and the settings gear — rendered
    * at the right of the row after the plan's own controls. Passed in rather
    * than built here so this file stays about the plan and not about what
    * surrounds it. */
@@ -28,12 +25,12 @@ interface GanttToolbarProps {
  * and the header is one 50px band.
  *
  * It carries more than the handoff's toolbar does: this app also has an
- * import, an export in two formats and a settings panel, and the handoff has
+ * import, an export in four formats and a settings panel, and the handoff has
  * no slot for any of them. They sit at the right in their most compact
  * legible form — icons where the glyph says it, short labels where it does
  * not — so the row still clears its width budget.
  */
-export function GanttToolbar({ actions, showTimelineControls, onOpenSettings }: GanttToolbarProps) {
+export function GanttToolbar({ actions, showTimelineControls }: GanttToolbarProps) {
   const title = useTimelineStore((state) => state.title);
   const items = useTimelineStore((state) => state.items);
 
@@ -78,7 +75,7 @@ export function GanttToolbar({ actions, showTimelineControls, onOpenSettings }: 
         />
         <span className="h-5 w-px flex-none bg-border" />
 
-        <PlanMenu onOpenSettings={onOpenSettings}>
+        <PlanMenu>
           <div
             className="bg-primary text-primary-foreground"
             aria-hidden="true"
@@ -114,7 +111,16 @@ export function GanttToolbar({ actions, showTimelineControls, onOpenSettings }: 
             </span>
             <span
               className="text-muted-foreground"
-              style={{ fontSize: 10.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+              // The weight is stated because the trigger around this is now a
+              // Button, and `font-medium` comes with that contract; the counts
+              // are a subline and read as one at 400.
+              style={{
+                fontSize: 10.5,
+                fontWeight: 400,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
             >
               {taskCount} work items · {groupCount} groups
             </span>
