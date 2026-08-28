@@ -390,10 +390,9 @@ export function GanttScreen() {
   /** The sub-task count badge's action: this row and everything under it,
    * copied into a plan of its own, which then opens.
    *
-   * A copy and not a view — that is the whole difference between this and
-   * "Show only sub-tasks", which is the same branch left where it is. The plan it was taken from keeps every task it had and is
-   * still in the switcher; the new one is a plan like any other, so it is
-   * edited, saved and exported like any other. */
+   * A copy, not a view: the plan it was taken from keeps every task it had
+   * and is still in the switcher; the new one is a plan like any other, so it
+   * is edited, saved and exported like any other. */
   const makePlanFromBranch = (id: string) => {
     void createPlanFromBranch(id);
     // Whatever was being focused on lives in the plan being left. Clearing it
@@ -425,10 +424,10 @@ export function GanttScreen() {
     if (selectedId === id) select(null);
   };
 
-  /** The rows a right-click offers, on the name and on the bar alike. Six at
-   * most, and three of them only where they mean anything: a task with no
-   * sub-tasks has no branch to fold away or to look at on its own, and a task
-   * that is itself a sub-task takes no sub-tasks of its own.
+  /** The rows a right-click offers, on the name and on the bar alike. Five at
+   * most, and two of them only where they mean anything: a task with no
+   * sub-tasks has no branch to fold away, and a task that is itself a
+   * sub-task takes no sub-tasks of its own.
    *
    * Making a plan out of a branch is not among them: it is the sub-task count
    * badge's click, and the badge is the one thing on a row that already names
@@ -456,11 +455,6 @@ export function GanttScreen() {
       },
       ...(isGroup
         ? [
-            {
-              label: 'Show only sub-tasks',
-              icon: <Layers size={14} strokeWidth={2} aria-hidden="true" />,
-              onSelect: () => setFocus(id),
-            },
             {
               label: 'Hide sub-tasks',
               icon: <ChevronRight size={14} strokeWidth={2} aria-hidden="true" />,
