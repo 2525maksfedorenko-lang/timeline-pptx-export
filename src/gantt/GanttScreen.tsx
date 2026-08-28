@@ -19,6 +19,7 @@ import {
   ADD_ROW_HEIGHT_PX,
   ROW_HEIGHT_PX,
   TODAY_SCROLL_LEAD_PX,
+  type Span,
 } from './geometry';
 import {
   buildHeaderCells,
@@ -311,6 +312,31 @@ export function GanttScreen() {
     // percentage with them; the other two say nothing about it and leave it
     // alone. One rule, shared with the panel's status field.
     updateItem(id, { status: next, progress: progressForStatus(next) ?? item.progress });
+  };
+
+  /** A task drawn on the timeline's create lane, over the days the drag
+   * covered.
+   *
+   * A root task, "not started", like anything the add row makes — the lane
+   * runs under the whole plan rather than inside any one branch's area, so
+   * there is no parent for it to belong to, and it is appended after the last
+   * row exactly as the add row's tasks are. Everything else is
+   * `buildNewTask`'s, so a task drawn here cannot quietly differ from a task
+   * typed in the column.
+   *
+   * The new row is deliberately *not* selected: the Edit Task panel is 348px
+   * that would open across the timeline and re-measure the canvas between one
+   * drawn task and the next, and drawing tasks is usually drawing several. The
+   * bar appearing where the ghost was is confirmation enough. */
+  const createTaskOnLane = (span: Span, name: string) => {
+    addItem(
+      buildNewTask({
+        label: name,
+        start: isoAtIndex(minDate, span.start),
+        end: isoAtIndex(minDate, span.start + span.len - 1),
+        status: 'todo',
+      }),
+    );
   };
 
   const addTask = (name: string) => {
@@ -633,6 +659,9 @@ export function GanttScreen() {
             selectedId={selectedId}
             drag={drag}
             dragLabel={dragLabel}
+            dayCount={renderedDays}
+            formatDay={(index) => formatDayLabel(minDate, index)}
+            onCreateTask={createTaskOnLane}
             onPointerDownBar={beginDrag}
             onContextMenuBar={openMenu}
             onSelectBar={(id) => {

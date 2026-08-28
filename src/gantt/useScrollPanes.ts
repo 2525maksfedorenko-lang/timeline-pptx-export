@@ -47,6 +47,16 @@ export interface ScrollPanes {
  * the grid, the today band — is fair game to pan from. */
 export const BAR_HIT_ATTRIBUTE = 'data-gantt-bar';
 
+/** Marks the create lane, the strip under the last row where a drag draws a
+ * new task's dates. It owns its press for the same reason a bar does, and for
+ * a sharper one: a press that both panned the canvas and drew a task would
+ * mean every scroll ended at a name field. Panning gives up this one 46px
+ * strip; every other pixel of the canvas still pans. */
+export const CREATE_LANE_ATTRIBUTE = 'data-gantt-create';
+
+/** Everything in the body that answers its own pointer. */
+const OWNS_PRESS_SELECTOR = `[${BAR_HIT_ATTRIBUTE}],[${CREATE_LANE_ATTRIBUTE}]`;
+
 interface Options {
   /** Pixels per day at the current scale. A change to it is a scale change,
    * which is what the centre-preserving effect keys on. */
@@ -135,10 +145,10 @@ export function useScrollPanes({ columnWidth }: Options): ScrollPanes {
     let pointerId: number | null = null;
 
     const onPointerDown = (event: PointerEvent) => {
-      // Left button only, and never on a bar: a bar owns its own drag, and
-      // the two would otherwise both run on one press.
+      // Left button only, and never on a bar or the create lane: each owns
+      // its own drag, and the two would otherwise both run on one press.
       if (event.button !== 0) return;
-      if ((event.target as Element | null)?.closest(`[${BAR_HIT_ATTRIBUTE}]`)) return;
+      if ((event.target as Element | null)?.closest(OWNS_PRESS_SELECTOR)) return;
 
       pointerId = event.pointerId;
       startX = event.clientX;
