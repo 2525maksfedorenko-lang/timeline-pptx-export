@@ -23,11 +23,6 @@ interface TaskListProps {
   onAddSubtask: (parentId: string) => void;
   /** A right-click on a row, with the pointer's viewport position. */
   onContextMenu: (id: string, event: React.MouseEvent) => void;
-  /** Whether a task added here would have somewhere to go — false inside a
-   * focus on an item that is itself a sub-task, where a new task would be a
-   * sub-task's sub-task. The row keeps its height either way, since the
-   * canvas beside it is measured with it. */
-  canAddTask: boolean;
   /** The body's content height. The two panes scroll on one offset, so the
    * list has to be exactly as tall as the canvas beside it — otherwise the
    * offset that puts the last bar at the foot of the timeline puts the last
@@ -60,7 +55,6 @@ export function TaskList({
   onMakePlan,
   onAddSubtask,
   onContextMenu,
-  canAddTask,
   minHeight,
 }: TaskListProps) {
   const renamingId = useGanttViewStore((state) => state.renamingId);
@@ -133,20 +127,7 @@ export function TaskList({
           background: 'var(--gantt-add-row)',
         }}
       >
-        {!canAddTask ? (
-          <span
-            style={{
-              fontSize: 12,
-              color: 'var(--gantt-text-muted)',
-              minWidth: 0,
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-            }}
-          >
-            Sub-tasks of a sub-task aren't added here
-          </span>
-        ) : isAdding ? (
+        {isAdding ? (
           <input
             type="text"
             autoFocus

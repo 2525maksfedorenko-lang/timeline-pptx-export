@@ -6,10 +6,10 @@ import type { TimeScale } from './scale';
 /* What the plan screen remembers about how it is being looked at.
  *
  * Deliberately separate from `timelineStore`: none of it is part of a plan.
- * Almost all of it is session-only, too — a collapsed group, a focused branch
- * and a selected row describe where someone is in a plan right now, and
- * reopening the app should show the whole plan again rather than where they
- * left off looking at it.
+ * Almost all of it is session-only, too — a collapsed group and a selected
+ * row describe where someone is in a plan right now, and reopening the app
+ * should show the whole plan again rather than where they left off looking
+ * at it.
  *
  * `listWidth` is the one exception, and it is a different kind of thing: not
  * a place in a plan but the shape of the workspace, like a window's size. It
@@ -46,13 +46,6 @@ interface GanttViewStore {
   setRenameDraft: (text: string) => void;
   endRename: () => void;
 
-  /** The parent whose sub-tasks the plan is narrowed to, or null for the
-   * whole plan. A way of looking at the current plan and nothing more — no
-   * second plan is created, and leaving the focus leaves the plan exactly as
-   * it was. */
-  focusId: string | null;
-  setFocus: (id: string | null) => void;
-
   /** Bumped by the toolbar's Today button. The scroll container lives in the
    * canvas and the button in the header, and they are no longer parent and
    * child — so the ask travels as a counter the canvas watches, rather than
@@ -86,11 +79,6 @@ export const useGanttViewStore = create<GanttViewStore>()(
       beginRename: (renamingId, label) => set({ renamingId, renameDraft: label }),
       setRenameDraft: (renameDraft) => set({ renameDraft }),
       endRename: () => set({ renamingId: null, renameDraft: '' }),
-
-      focusId: null,
-      // Entering a focus closes the Edit Task panel: the row it was open on is
-      // usually the parent, which is the one row the focused view does not draw.
-      setFocus: (focusId) => set({ focusId, selectedId: null }),
 
       todayNonce: 0,
       requestToday: () => set((state) => ({ todayNonce: state.todayNonce + 1 })),

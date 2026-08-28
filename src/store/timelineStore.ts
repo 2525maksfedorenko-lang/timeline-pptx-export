@@ -65,6 +65,11 @@ interface TimelineStore {
   savedPlans: SavedPlan[];
   loadPlans: () => Promise<void>;
   saveCurrentAsPlan: (name: string) => Promise<void>;
+  /** Gives one plan a new name and changes nothing else about it. Not
+   * saveCurrentAsPlan with a different string: that one keys off the name, so
+   * a name nobody holds yet mints a second plan rather than renaming this
+   * one. */
+  renamePlan: (id: string, name: string) => Promise<void>;
   switchToPlan: (id: string) => Promise<void>;
   /** Copies one task and its whole sub-tree into a plan of its own, saves it
    * beside the others and opens it. The plan it was taken from is left
@@ -355,6 +360,34 @@ export const useTimelineStore = create<TimelineStore>()(
             : [...current.savedPlans, plan],
           activePlanId: plan.id,
           title: plan.name,
+        }));
+      },
+
+      renamePlan: async (id, name) => {
+        const state = get();
+        const target = state.savedPlans.find((plan) => plan.id === id);
+        if (!target) return;
+
+        // Unique for the same reason a branch's plan name is: saveCurrentAsPlan
+        // finds a plan by its name, so two plans answering to one name would
+        // leave it overwriting whichever it met first.
+        const unique = uniquePlanName(
+          name.trim(),
+          state.savedPlans.filter((plan) => plan.id !== id).map((plan) => plan.name),
+        );
+        if (unique === '' || unique === target.name) return;
+
+        // The name and nothing else — the working copy is left for the flush
+        // that a switch, an export or a branch already does. A rename is not a
+        // save.
+        const renamed: SavedPlan = { ...target, name: unique, updatedAt: new Date().toISOString() };
+        await persistPlan(renamed);
+
+        set((current) => ({
+          savedPlans: current.savedPlans.map((plan) => (plan.id === id ? renamed : plan)),
+          // The toolbar reads `title`, so the plan on screen has to be told its
+          // own new name; renaming any other plan leaves it alone.
+          title: id === current.activePlanId ? unique : current.title,
         }));
       },
 
