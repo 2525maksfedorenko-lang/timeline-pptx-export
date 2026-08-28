@@ -169,6 +169,29 @@ export function flushedActivePlan(state: TimelineStore): SavedPlan | null {
   };
 }
 
+/** Serialises `loadPlans` against itself.
+ *
+ * The bootstrap inside it is a check-then-write — "the database holds no
+ * plans, so write one" — with an `await` sitting between the check and the
+ * write. Two calls overlapping there both read an empty database, and both go
+ * on to write a plan of their own, so a first visit opens on two identical
+ * "Unnamed" plans.
+ *
+ * The guard is here rather than on whatever called twice, because what called
+ * twice is not the defect. React's StrictMode double-invokes the mount effect
+ * in development, which is how this was found, but a remount, a second
+ * component asking for the list, or an import calling this while a mount is
+ * still resolving would all reach the same window. Nothing may bootstrap a
+ * second plan, whatever the reason there are two callers.
+ *
+ * Queued rather than shared. Handing a late caller the in-flight run's promise
+ * would close the race just as well, but it would answer a question asked
+ * before that caller existed: applying an imported plan writes it to IndexedDB
+ * and *then* calls this to pick it up, and it would be handed a list compiled
+ * before its own write. So every call runs, one after another — which closes
+ * the race too, since the second run finds the plan the first one wrote. */
+let planLoadQueue: Promise<void> = Promise.resolve();
+
 const DEFAULT_UI: UiState = {
   selectedItemId: null,
   zoomLevel: 1,
@@ -291,71 +314,78 @@ export const useTimelineStore = create<TimelineStore>()(
       activePlanId: null,
       savedPlans: [],
 
-      loadPlans: async () => {
-        const { plans, noticesByPlanId } = await getAllPlans();
+      loadPlans: () => {
+        const run = async () => {
+          const { plans, noticesByPlanId } = await getAllPlans();
 
-        // Merged rather than assigned, and deduplicated: the active plan
-        // usually arrives twice in one load — once through the localStorage
-        // mirror below, once from here — and the same repair said twice is
-        // two lines about one thing.
-        set((state) => ({ planNotices: mergePlanNotices(state.planNotices, noticesByPlanId) }));
+          // Merged rather than assigned, and deduplicated: the active plan
+          // usually arrives twice in one load — once through the localStorage
+          // mirror below, once from here — and the same repair said twice is
+          // two lines about one thing.
+          set((state) => ({ planNotices: mergePlanNotices(state.planNotices, noticesByPlanId) }));
 
-        if (plans.length === 0) {
-          const state = get();
-          const defaultPlan = await initializeStore({
-            title: state.title,
-            items: state.items,
-            exportOptions: state.exportOptions,
-          });
-          set((current) => ({
-            savedPlans: [defaultPlan],
-            activePlanId: defaultPlan.id,
-            planNotices: renamePlanNotices(
-              current.planNotices,
-              current.activePlanId ?? UNNAMED_PLAN_KEY,
-              defaultPlan.id,
-            ),
-          }));
-          return;
-        }
-
-        const state = get();
-        const persistedActivePlan = plans.find((plan) => plan.id === state.activePlanId);
-
-        if (persistedActivePlan) {
-          // localStorage already restored the latest items/exportOptions for this plan
-          // (possibly newer than the last IndexedDB flush) — keep them and just sync
-          // IndexedDB, instead of overwriting current state with a stale snapshot.
-          const hasDrift =
-            JSON.stringify(persistedActivePlan.items) !== JSON.stringify(state.items) ||
-            JSON.stringify(persistedActivePlan.exportOptions) !== JSON.stringify(state.exportOptions);
-
-          if (!hasDrift) {
-            set({ savedPlans: plans });
+          if (plans.length === 0) {
+            const state = get();
+            const defaultPlan = await initializeStore({
+              title: state.title,
+              items: state.items,
+              exportOptions: state.exportOptions,
+            });
+            set((current) => ({
+              savedPlans: [defaultPlan],
+              activePlanId: defaultPlan.id,
+              planNotices: renamePlanNotices(
+                current.planNotices,
+                current.activePlanId ?? UNNAMED_PLAN_KEY,
+                defaultPlan.id,
+              ),
+            }));
             return;
           }
 
-          const refreshedPlan: SavedPlan = {
-            ...persistedActivePlan,
-            items: state.items,
-            exportOptions: state.exportOptions,
-            updatedAt: new Date().toISOString(),
-          };
-          await persistPlan(refreshedPlan);
-          set({
-            savedPlans: plans.map((plan) => (plan.id === refreshedPlan.id ? refreshedPlan : plan)),
-          });
-          return;
-        }
+          const state = get();
+          const persistedActivePlan = plans.find((plan) => plan.id === state.activePlanId);
 
-        const fallbackPlan = plans[0];
-        set({
-          savedPlans: plans,
-          activePlanId: fallbackPlan.id,
-          title: fallbackPlan.name,
-          items: fallbackPlan.items,
-          exportOptions: fallbackPlan.exportOptions,
-        });
+          if (persistedActivePlan) {
+            // localStorage already restored the latest items/exportOptions for this plan
+            // (possibly newer than the last IndexedDB flush) — keep them and just sync
+            // IndexedDB, instead of overwriting current state with a stale snapshot.
+            const hasDrift =
+              JSON.stringify(persistedActivePlan.items) !== JSON.stringify(state.items) ||
+              JSON.stringify(persistedActivePlan.exportOptions) !== JSON.stringify(state.exportOptions);
+
+            if (!hasDrift) {
+              set({ savedPlans: plans });
+              return;
+            }
+
+            const refreshedPlan: SavedPlan = {
+              ...persistedActivePlan,
+              items: state.items,
+              exportOptions: state.exportOptions,
+              updatedAt: new Date().toISOString(),
+            };
+            await persistPlan(refreshedPlan);
+            set({
+              savedPlans: plans.map((plan) => (plan.id === refreshedPlan.id ? refreshedPlan : plan)),
+            });
+            return;
+          }
+
+          const fallbackPlan = plans[0];
+          set({
+            savedPlans: plans,
+            activePlanId: fallbackPlan.id,
+            title: fallbackPlan.name,
+            items: fallbackPlan.items,
+            exportOptions: fallbackPlan.exportOptions,
+          });
+        };
+
+        // `.then(run, run)` on both settle paths: one load that threw must not
+        // leave every later one refusing to start.
+        planLoadQueue = planLoadQueue.then(run, run);
+        return planLoadQueue;
       },
 
       createPlan: async (name) => {
