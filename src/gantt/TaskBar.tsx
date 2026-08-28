@@ -10,7 +10,6 @@ import {
 import type { BarStyle } from './barColor';
 import type { GanttRowModel } from './rows';
 import type { DragState } from './drag';
-import { BAR_HIT_ATTRIBUTE } from './useScrollPanes';
 
 interface TaskBarProps {
   row: GanttRowModel;
@@ -80,13 +79,15 @@ export function TaskBar({
         height: ROW_HEIGHT_PX,
         width: canvasWidth,
         zIndex: 5,
+        // The wrapper spans the whole row so the bar can be placed anywhere
+        // along it, which also means it lies over every free pixel of that
+        // row. It answers no press of its own, and the create surface beneath
+        // needs those pixels, so it lets them through and the bar takes its
+        // own back.
+        pointerEvents: 'none',
       }}
     >
       <div
-        // Marks the bar as the one thing in the timeline that owns its own
-        // press: a grab-pan of the canvas refuses to start anywhere inside
-        // this element, so moving a bar and panning past it never both run.
-        {...{ [BAR_HIT_ATTRIBUTE]: '' }}
         onPointerDown={(event) => onPointerDownBar(event, 'move')}
         onClick={onSelect}
         onContextMenu={onContextMenu}
@@ -105,6 +106,7 @@ export function TaskBar({
           alignItems: 'center',
           cursor: 'grab',
           border: 'none',
+          pointerEvents: 'auto',
           // The only elevation on this screen: a ring in the branch's own
           // solid, at half alpha, around the selected bar.
           boxShadow: isSelected ? `0 0 0 2px color-mix(in srgb, ${barStyle.ring} 50%, transparent)` : 'none',
