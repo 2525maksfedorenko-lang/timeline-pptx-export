@@ -10,7 +10,6 @@ import { copyBranch, droppedDependencyNotice, uniquePlanName } from '../utils/br
 import { normalizePlanItems } from '../utils/normalizePlanItems';
 import { repairNotice, type PlanNotice } from '../utils/planNotice';
 import { getDescendantIds } from '../utils/taskHierarchy';
-import { DEV_SEED_COMMENTS, DEV_SEED_ITEMS, DEV_SEED_TITLE } from './devSeed';
 import {
   deletePlan as deletePlanFromDb,
   getAllPlans,
@@ -84,6 +83,11 @@ export const DEFAULT_EXPORT_OPTIONS: ExportOptions = {
   exportTimeframe: null,
 };
 
+/** What the one plan a first-time visitor is given is called. A placeholder
+ * rather than a description, because there is nothing in it to describe yet:
+ * the app opens on an empty plan, not on a sample of someone else's. */
+const DEFAULT_PLAN_NAME = 'Unnamed';
+
 /** Which bucket of `planNotices` a repair belongs to before any plan has been
  * loaded — the mirror can hold items with no plan id beside them. */
 const UNNAMED_PLAN_KEY = '';
@@ -156,7 +160,7 @@ const DEFAULT_UI: UiState = {
 
 /**
  * First-run bootstrap: persists `seed` (whatever is currently in memory —
- * the dev seed on a truly first visit, or in-memory state recovered from
+ * an empty plan on a truly first visit, or in-memory state recovered from
  * localStorage if IndexedDB's plan list is empty for some other reason) as
  * the first saved plan. Kept as a standalone function, separate from the
  * store's closure, so a product integration can call a different bootstrap
@@ -171,7 +175,7 @@ export async function initializeStore(seed: {
   const now = new Date().toISOString();
   const plan: SavedPlan = {
     id: crypto.randomUUID(),
-    name: seed.title || DEV_SEED_TITLE,
+    name: seed.title || DEFAULT_PLAN_NAME,
     items: seed.items,
     exportOptions: seed.exportOptions,
     createdAt: now,
@@ -184,10 +188,10 @@ export async function initializeStore(seed: {
 export const useTimelineStore = create<TimelineStore>()(
   persist(
     (set, get) => ({
-      title: DEV_SEED_TITLE,
+      title: DEFAULT_PLAN_NAME,
       setTitle: (title) => set({ title }),
 
-      items: DEV_SEED_ITEMS,
+      items: [],
       addItem: (item) => set((state) => ({ items: [...state.items, item] })),
       updateItem: (id, patch) =>
         set((state) => ({
@@ -233,7 +237,7 @@ export const useTimelineStore = create<TimelineStore>()(
         }));
       },
 
-      comments: DEV_SEED_COMMENTS,
+      comments: [],
       addComment: (comment) => set((state) => ({ comments: [...state.comments, comment] })),
       removeComment: (id) =>
         set((state) => ({ comments: state.comments.filter((comment) => comment.id !== id) })),
@@ -458,7 +462,7 @@ export const useTimelineStore = create<TimelineStore>()(
       // - localStorage (this `persist` middleware) mirrors only the
       //   *currently active* plan's working state. It's synchronous, so it
       //   restores instantly on reload — before IndexedDB has even opened —
-      //   avoiding a flash of empty/seed data while `loadPlans()` (async)
+      //   avoiding a flash of an empty plan while `loadPlans()` (async)
       //   resolves.
       // - IndexedDB (`planStorage.ts`) is the durable, authoritative store
       //   for the *list* of named saved plans (the multi-plan library
