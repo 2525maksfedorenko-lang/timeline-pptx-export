@@ -64,11 +64,18 @@ interface TimelineStore {
   activePlanId: string | null;
   savedPlans: SavedPlan[];
   loadPlans: () => Promise<void>;
-  saveCurrentAsPlan: (name: string) => Promise<void>;
-  /** Gives one plan a new name and changes nothing else about it. Not
-   * saveCurrentAsPlan with a different string: that one keys off the name, so
-   * a name nobody holds yet mints a second plan rather than renaming this
-   * one. */
+  /** A new, empty plan, saved beside the others and opened.
+   *
+   * Not "save the current one under another name": that is what this used to
+   * be, and it meant the menu's "New plan" handed back a copy of whatever was
+   * already open — the store switched, but to identical items, so the screen
+   * looked as though nothing had happened. A new plan has nothing in it; there
+   * is nothing else it could have. */
+  createPlan: (name: string) => Promise<void>;
+  /** Gives one plan a new name and changes nothing else about it — in
+   * particular it does not mint a second plan, which is what renaming used to
+   * mean back when the only way to name one was to save the current one under
+   * a new name. */
   renamePlan: (id: string, name: string) => Promise<void>;
   switchToPlan: (id: string) => Promise<void>;
   /** Copies one task and its whole sub-tree into a plan of its own, saves it
@@ -337,29 +344,48 @@ export const useTimelineStore = create<TimelineStore>()(
         });
       },
 
-      saveCurrentAsPlan: async (name) => {
+      createPlan: async (name) => {
         const state = get();
+        // Unique for the same reason a rename's is: two plans answering to one
+        // name are two rows in the switcher that cannot be told apart.
+        const unique = uniquePlanName(
+          name.trim() || DEFAULT_PLAN_NAME,
+          state.savedPlans.map((plan) => plan.name),
+        );
+
         const now = new Date().toISOString();
-        const existing = state.savedPlans.find((plan) => plan.name === name);
+        const plan: SavedPlan = {
+          id: crypto.randomUUID(),
+          name: unique,
+          items: [],
+          // The one thing a new plan does inherit. Theme, scale, order, window
+          // and comment mode are facts about how a deck is read rather than
+          // about which tasks are in one — the same reason a plan made from a
+          // branch carries them across.
+          exportOptions: state.exportOptions,
+          createdAt: now,
+          updatedAt: now,
+        };
 
-        const plan: SavedPlan = existing
-          ? { ...existing, items: state.items, exportOptions: state.exportOptions, updatedAt: now }
-          : {
-              id: crypto.randomUUID(),
-              name,
-              items: state.items,
-              exportOptions: state.exportOptions,
-              createdAt: now,
-              updatedAt: now,
-            };
-
+        // The plan being left is written down first, exactly as switching away
+        // from one does. Starting a new plan is not a way of abandoning the
+        // edits made to the old one.
+        const flushed = flushedActivePlan(state);
+        if (flushed) await persistPlan(flushed);
         await persistPlan(plan);
+
         set((current) => ({
-          savedPlans: existing
-            ? current.savedPlans.map((p) => (p.id === plan.id ? plan : p))
-            : [...current.savedPlans, plan],
+          savedPlans: [
+            ...(flushed
+              ? current.savedPlans.map((saved) => (saved.id === flushed.id ? flushed : saved))
+              : current.savedPlans),
+            plan,
+          ],
           activePlanId: plan.id,
           title: plan.name,
+          items: plan.items,
+          exportOptions: plan.exportOptions,
+          ui: DEFAULT_UI,
         }));
       },
 
@@ -368,9 +394,9 @@ export const useTimelineStore = create<TimelineStore>()(
         const target = state.savedPlans.find((plan) => plan.id === id);
         if (!target) return;
 
-        // Unique for the same reason a branch's plan name is: saveCurrentAsPlan
-        // finds a plan by its name, so two plans answering to one name would
-        // leave it overwriting whichever it met first.
+        // Unique for the same reason a branch's plan name is: two plans
+        // answering to one name are two rows in the switcher that cannot be
+        // told apart.
         const unique = uniquePlanName(
           name.trim(),
           state.savedPlans.filter((plan) => plan.id !== id).map((plan) => plan.name),

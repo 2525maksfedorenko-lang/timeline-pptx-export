@@ -41,7 +41,7 @@ export function PlanMenu({ children }: PlanMenuProps) {
   const savedPlans = useTimelineStore((state) => state.savedPlans);
   const activePlanId = useTimelineStore((state) => state.activePlanId);
   const switchToPlan = useTimelineStore((state) => state.switchToPlan);
-  const saveCurrentAsPlan = useTimelineStore((state) => state.saveCurrentAsPlan);
+  const createPlan = useTimelineStore((state) => state.createPlan);
   const renamePlan = useTimelineStore((state) => state.renamePlan);
   const deletePlan = useTimelineStore((state) => state.deletePlan);
 
@@ -89,7 +89,7 @@ export function PlanMenu({ children }: PlanMenuProps) {
   const handleCreate = async () => {
     const name = newPlanName.trim();
     if (name === '') return;
-    await saveCurrentAsPlan(name);
+    await createPlan(name);
     setNewPlanName('');
     setIsCreating(false);
   };
