@@ -6,6 +6,8 @@ import { FALLBACK_BAR_STYLE, type BarStyle } from './barColor';
 import type { GanttRowModel } from './rows';
 import type { DragState } from './drag';
 import { TaskBar } from './TaskBar';
+import { CreateLane } from './CreateLane';
+import { DragPill } from './DragPill';
 
 interface TimelineBodyProps {
   rows: GanttRowModel[];
@@ -32,6 +34,13 @@ interface TimelineBodyProps {
   onPointerDownBar: (id: string, event: React.PointerEvent, mode: DragState['mode']) => void;
   onContextMenuBar: (id: string, event: React.MouseEvent) => void;
   onSelectBar: (id: string) => void;
+  /** Columns drawn on the canvas — what an edge drawn on the create lane is
+   * clamped to. */
+  dayCount: number;
+  /** "Aug 17" for a column index. */
+  formatDay: (index: number) => string;
+  /** A task drawn on the create lane, named and confirmed. */
+  onCreateTask: (span: Span, name: string) => void;
 }
 
 /** The timeline half of the canvas: the ruled grid, the three washes that
@@ -45,7 +54,8 @@ interface TimelineBodyProps {
  *
  * Everything above the grid is stacked deliberately: weekend tint (0), the
  * today band (2), the links (4), the bars (5) with their edge dots (6), and
- * the drag pill over all of it. */
+ * the drag pill over all of it. The create lane sits at the bars' own level,
+ * in the strip beneath the last row that the canvas already reserves for it. */
 export function TimelineBody({
   rows,
   spans,
@@ -65,6 +75,9 @@ export function TimelineBody({
   onPointerDownBar,
   onContextMenuBar,
   onSelectBar,
+  dayCount,
+  formatDay,
+  onCreateTask,
 }: TimelineBodyProps) {
   // Day rules appear only at the week scale: the day scale already rules
   // every column as its period, and at the month scale 7px columns would
@@ -148,26 +161,24 @@ export function TimelineBody({
       })}
 
       {drag && dragSpan && dragRowIndex >= 0 && (
-        <div
-          style={{
-            position: 'absolute',
-            left: dragSpan.start * columnWidth,
-            top: Math.max(0, dragRowIndex * ROW_HEIGHT_PX - 22),
-            zIndex: 20,
-            background: 'var(--gantt-drag-pill-bg)',
-            color: 'var(--gantt-drag-pill-fg)',
-            fontSize: 10.5,
-            fontWeight: 600,
-            padding: '4px 8px',
-            borderRadius: 5,
-            whiteSpace: 'nowrap',
-            pointerEvents: 'none',
-            fontVariantNumeric: 'tabular-nums',
-          }}
-        >
-          {dragLabel}
-        </div>
+        <DragPill
+          left={dragSpan.start * columnWidth}
+          top={Math.max(0, dragRowIndex * ROW_HEIGHT_PX - 22)}
+          label={dragLabel}
+        />
       )}
+
+      {/* The one place on this canvas where a press draws instead of panning:
+          the row under the last one, level with the task column's own add
+          row. */}
+      <CreateLane
+        top={rows.length * ROW_HEIGHT_PX}
+        columnWidth={columnWidth}
+        dayCount={dayCount}
+        canvasWidth={width}
+        formatDay={formatDay}
+        onCreate={onCreateTask}
+      />
     </div>
   );
 }

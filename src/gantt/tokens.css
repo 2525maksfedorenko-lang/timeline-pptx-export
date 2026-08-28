@@ -211,3 +211,20 @@
   cursor: col-resize !important;
   user-select: none;
 }
+
+/* The create lane: the strip under the last row, level with the task column's
+ * own add row, where a drag draws a new task's dates.
+ *
+ * At rest it is nothing but the grid and the rule along its top — the same
+ * rule the add row draws in the column beside it, so one line runs across the
+ * seam and the two halves read as one row. The wash appears only under the
+ * pointer, and it is the wash a row's name already uses to say "this is
+ * something you can act on"; colour only, per the design system, and no
+ * colour that isn't already here. */
+.gantt-create-lane {
+  transition: background-color 150ms;
+}
+
+.gantt-create-lane:hover {
+  background: var(--gantt-name-hover);
+}
