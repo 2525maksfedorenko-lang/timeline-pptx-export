@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, ChevronDown, Plus, X } from 'lucide-react';
+import { Check, ChevronDown, Pencil, Plus, X } from 'lucide-react';
 import { useTimelineStore } from '../store/timelineStore';
 import {
   buttonBaseClass,
@@ -17,8 +17,8 @@ interface PlanMenuProps {
   children: React.ReactNode;
 }
 
-/** Switching, creating and deleting plans, behind the plan's own name in the
- * toolbar.
+/** Switching, creating, renaming and deleting plans, behind the plan's own
+ * name in the toolbar.
  *
  * This replaces the tab strip that used to sit in its own band above the
  * chart. The band cost a row of the window to show what the toolbar already
@@ -42,11 +42,17 @@ export function PlanMenu({ children }: PlanMenuProps) {
   const activePlanId = useTimelineStore((state) => state.activePlanId);
   const switchToPlan = useTimelineStore((state) => state.switchToPlan);
   const saveCurrentAsPlan = useTimelineStore((state) => state.saveCurrentAsPlan);
+  const renamePlan = useTimelineStore((state) => state.renamePlan);
   const deletePlan = useTimelineStore((state) => state.deletePlan);
 
   const [isOpen, setIsOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [newPlanName, setNewPlanName] = useState('');
+  // The plan whose row is currently a name field, and the text in it. One at a
+  // time, and never at the same time as the new-plan field below: two open
+  // name fields in one menu is two places an Enter could go.
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState('');
   const rootRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
 
@@ -68,6 +74,8 @@ export function PlanMenu({ children }: PlanMenuProps) {
       setIsOpen(false);
       setIsCreating(false);
       setNewPlanName('');
+      setRenamingId(null);
+      setRenameDraft('');
       triggerRef.current?.focus();
     };
     document.addEventListener('pointerdown', onPointerDown, true);
@@ -84,6 +92,19 @@ export function PlanMenu({ children }: PlanMenuProps) {
     await saveCurrentAsPlan(name);
     setNewPlanName('');
     setIsCreating(false);
+  };
+
+  const beginRename = (id: string, name: string) => {
+    setIsCreating(false);
+    setNewPlanName('');
+    setRenamingId(id);
+    setRenameDraft(name);
+  };
+
+  const handleRename = async () => {
+    if (renamingId !== null) await renamePlan(renamingId, renameDraft);
+    setRenamingId(null);
+    setRenameDraft('');
   };
 
   return (
@@ -139,38 +160,78 @@ export function PlanMenu({ children }: PlanMenuProps) {
                 No saved plans
               </p>
             )}
-            {savedPlans.map((plan) => (
-              <div key={plan.id} role="none" className="group flex items-center gap-1 rounded-sm hover:bg-accent">
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    void switchToPlan(plan.id);
-                    setIsOpen(false);
-                  }}
-                  className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left text-sm"
-                >
-                  <span className="inline-flex h-3.5 w-3.5 flex-none items-center justify-center">
-                    {plan.id === activePlanId && <Check size={14} strokeWidth={2} />}
-                  </span>
-                  <span className="truncate" title={plan.name}>
-                    {plan.name}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    if (!window.confirm(`Delete plan "${plan.name}"? This cannot be undone.`)) return;
-                    void deletePlan(plan.id);
-                  }}
-                  aria-label={`Delete plan ${plan.name}`}
-                  className="mr-1 flex-none text-muted-foreground/70 opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
-                >
-                  <X size={14} strokeWidth={2} />
-                </button>
-              </div>
-            ))}
+            {savedPlans.map((plan) =>
+              // A row is either the plan or its name field, never both: the
+              // field takes the row's own place, so the list keeps its length
+              // and nothing below it moves while a name is being typed.
+              plan.id === renamingId ? (
+                <div key={plan.id} role="none" className="flex items-center gap-1.5 p-1">
+                  <input
+                    autoFocus
+                    type="text"
+                    value={renameDraft}
+                    onChange={(event) => setRenameDraft(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') void handleRename();
+                      if (event.key === 'Escape') {
+                        setRenamingId(null);
+                        setRenameDraft('');
+                      }
+                    }}
+                    placeholder="Plan name"
+                    aria-label={`Rename plan ${plan.name}`}
+                    className={`${INPUT_SHELL_CLASS} h-9 text-sm`}
+                  />
+                  <button type="button" onClick={() => void handleRename()} className={buttonClass('default', 'sm')}>
+                    Save
+                  </button>
+                </div>
+              ) : (
+                <div key={plan.id} role="none" className="group flex items-center gap-1 rounded-sm hover:bg-accent">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      void switchToPlan(plan.id);
+                      setIsOpen(false);
+                    }}
+                    className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left text-sm"
+                  >
+                    <span className="inline-flex h-3.5 w-3.5 flex-none items-center justify-center">
+                      {plan.id === activePlanId && <Check size={14} strokeWidth={2} />}
+                    </span>
+                    <span className="truncate" title={plan.name}>
+                      {plan.name}
+                    </span>
+                  </button>
+                  {/* The two things done to a plan rather than with it, on the
+                      row they act on and revealed by the same hover. A rename
+                      is not destructive, so it takes the neutral hover the
+                      delete beside it does not. */}
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => beginRename(plan.id, plan.name)}
+                    aria-label={`Rename plan ${plan.name}`}
+                    className="flex-none text-muted-foreground/70 opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
+                  >
+                    <Pencil size={13} strokeWidth={2} />
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      if (!window.confirm(`Delete plan "${plan.name}"? This cannot be undone.`)) return;
+                      void deletePlan(plan.id);
+                    }}
+                    aria-label={`Delete plan ${plan.name}`}
+                    className="mr-1 flex-none text-muted-foreground/70 opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
+                  >
+                    <X size={14} strokeWidth={2} />
+                  </button>
+                </div>
+              ),
+            )}
           </div>
 
           <div className={MENU_SEPARATOR_CLASS} />
