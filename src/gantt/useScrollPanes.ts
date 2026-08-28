@@ -18,6 +18,15 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
  * follows neither. Everything else here exists to keep that one scroller
  * usable: a grab-to-pan, a shift-wheel, wheel forwarding from the list, and
  * a scale change that keeps the date under the middle of the zone.
+ *
+ * The grab-pan is on the **header**, not on the body. It used to be on the
+ * body, and it had to leave: a drag on the grid draws a task now (see
+ * CreateSurface), and one gesture cannot both draw and scroll. The header is
+ * not a consolation prize for it — it is the ruler the plan is measured
+ * against, so pulling it sideways to move through time is the more direct
+ * reading of the same gesture. It pans horizontally only, which is all a
+ * ruler can mean; the rows are scrolled by the wheel and the body's own
+ * scrollbar, as any list is.
  */
 
 export interface ScrollPanes {
@@ -37,25 +46,7 @@ export interface ScrollPanes {
   viewportWidth: number;
   /** Puts a day index at `TODAY_SCROLL_LEAD_PX` from the zone's left edge. */
   scrollToDay: (dayIndex: number, columnWidth: number, lead: number, behavior: ScrollBehavior) => void;
-  /** True while a grab-pan is in flight, so the caller can suppress the click
-   * it would otherwise end with. */
-  isPanningRef: React.RefObject<boolean>;
 }
-
-/** Marks the elements a grab-pan must not start on: the bars, which own the
- * pointer for moving and resizing. Everything else in the body — empty track,
- * the grid, the today band — is fair game to pan from. */
-export const BAR_HIT_ATTRIBUTE = 'data-gantt-bar';
-
-/** Marks the create lane, the strip under the last row where a drag draws a
- * new task's dates. It owns its press for the same reason a bar does, and for
- * a sharper one: a press that both panned the canvas and drew a task would
- * mean every scroll ended at a name field. Panning gives up this one 46px
- * strip; every other pixel of the canvas still pans. */
-export const CREATE_LANE_ATTRIBUTE = 'data-gantt-create';
-
-/** Everything in the body that answers its own pointer. */
-const OWNS_PRESS_SELECTOR = `[${BAR_HIT_ATTRIBUTE}],[${CREATE_LANE_ATTRIBUTE}]`;
 
 interface Options {
   /** Pixels per day at the current scale. A change to it is a scale change,
@@ -67,7 +58,6 @@ export function useScrollPanes({ columnWidth }: Options): ScrollPanes {
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const headerRef = useRef<HTMLDivElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
-  const isPanningRef = useRef(false);
 
   const [gutter, setGutter] = useState({ vertical: 0, horizontal: 0 });
   const [viewportWidth, setViewportWidth] = useState(0);
@@ -133,68 +123,60 @@ export function useScrollPanes({ columnWidth }: Options): ScrollPanes {
     return () => body.removeEventListener('scroll', onScroll);
   }, []);
 
-  // --- grab to pan ---------------------------------------------------------
+  // --- grab the ruler to move through time ---------------------------------
+  // On the header, and horizontal only. The body's own scrollLeft is what is
+  // written, exactly as a scroll would write it, so the sync above carries the
+  // header along and the two can't come apart.
   useEffect(() => {
+    const header = headerRef.current;
     const body = bodyRef.current;
-    if (!body) return;
+    if (!header || !body) return;
 
     let startX = 0;
-    let startY = 0;
     let startLeft = 0;
-    let startTop = 0;
+    let panning = false;
     let pointerId: number | null = null;
 
     const onPointerDown = (event: PointerEvent) => {
-      // Left button only, and never on a bar or the create lane: each owns
-      // its own drag, and the two would otherwise both run on one press.
       if (event.button !== 0) return;
-      if ((event.target as Element | null)?.closest(OWNS_PRESS_SELECTOR)) return;
 
       pointerId = event.pointerId;
       startX = event.clientX;
-      startY = event.clientY;
       startLeft = body.scrollLeft;
-      startTop = body.scrollTop;
-      isPanningRef.current = false;
-      body.setPointerCapture(pointerId);
-      // Stops the press from starting a text selection across the rows.
+      panning = false;
+      header.setPointerCapture(pointerId);
+      // Stops the press from starting a text selection across the date cells.
       event.preventDefault();
     };
 
     const onPointerMove = (event: PointerEvent) => {
       if (pointerId === null || event.pointerId !== pointerId) return;
       const dx = event.clientX - startX;
-      const dy = event.clientY - startY;
       // A press that has not moved is still a click; only real movement turns
       // it into a pan and takes the cursor with it.
-      if (!isPanningRef.current && Math.abs(dx) < 3 && Math.abs(dy) < 3) return;
-      isPanningRef.current = true;
-      body.style.cursor = 'grabbing';
+      if (!panning && Math.abs(dx) < 3) return;
+      panning = true;
+      header.style.cursor = 'grabbing';
       body.scrollLeft = startLeft - dx;
-      body.scrollTop = startTop - dy;
     };
 
     const endPan = (event: PointerEvent) => {
       if (pointerId === null || event.pointerId !== pointerId) return;
-      body.releasePointerCapture(pointerId);
+      header.releasePointerCapture(pointerId);
       pointerId = null;
-      body.style.cursor = '';
-      // Cleared a frame later, so a click fired by this same release still
-      // sees that a pan happened and can bow out.
-      window.setTimeout(() => {
-        isPanningRef.current = false;
-      }, 0);
+      panning = false;
+      header.style.cursor = '';
     };
 
-    body.addEventListener('pointerdown', onPointerDown);
-    body.addEventListener('pointermove', onPointerMove);
-    body.addEventListener('pointerup', endPan);
-    body.addEventListener('pointercancel', endPan);
+    header.addEventListener('pointerdown', onPointerDown);
+    header.addEventListener('pointermove', onPointerMove);
+    header.addEventListener('pointerup', endPan);
+    header.addEventListener('pointercancel', endPan);
     return () => {
-      body.removeEventListener('pointerdown', onPointerDown);
-      body.removeEventListener('pointermove', onPointerMove);
-      body.removeEventListener('pointerup', endPan);
-      body.removeEventListener('pointercancel', endPan);
+      header.removeEventListener('pointerdown', onPointerDown);
+      header.removeEventListener('pointermove', onPointerMove);
+      header.removeEventListener('pointerup', endPan);
+      header.removeEventListener('pointercancel', endPan);
     };
   }, []);
 
@@ -258,5 +240,5 @@ export function useScrollPanes({ columnWidth }: Options): ScrollPanes {
     [],
   );
 
-  return { bodyRef, headerRef, listRef, gutter, viewportWidth, scrollToDay, isPanningRef };
+  return { bodyRef, headerRef, listRef, gutter, viewportWidth, scrollToDay };
 }
