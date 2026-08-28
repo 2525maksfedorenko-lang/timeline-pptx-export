@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Eye, EyeOff, Layers, Pencil, Plus, Trash2 } from 'lucide-react';
-import { buttonBaseClass } from '../components/systemUi';
+import { ChevronRight, Eye, EyeOff, Pencil, Plus, Trash2 } from 'lucide-react';
 import { ContextMenu, type ContextMenuAction } from '../components/ContextMenu';
 import { useTimelineStore } from '../store/timelineStore';
 import { buildNewTask } from '../utils/newTask';
@@ -75,14 +74,6 @@ export function GanttScreen() {
   const toggleCollapsed = useGanttViewStore((state) => state.toggleCollapsed);
   const collapseBranch = useGanttViewStore((state) => state.collapseBranch);
   const beginRename = useGanttViewStore((state) => state.beginRename);
-  const focusId = useGanttViewStore((state) => state.focusId);
-  const setFocus = useGanttViewStore((state) => state.setFocus);
-
-  // Resolved against the plan rather than trusted: the focused parent can be
-  // deleted, or the plan switched under it, and a focus on an item that is no
-  // longer there is simply no focus.
-  const focusItem = focusId === null ? null : (items.find((item) => item.id === focusId) ?? null);
-  const activeFocusId = focusItem?.id ?? null;
 
   // The row a right-click opened a menu on, and where the pointer was.
   const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null);
@@ -101,10 +92,7 @@ export function GanttScreen() {
   );
   const columnWidth = COLUMN_WIDTH_PX[scale];
 
-  const rows = useMemo(
-    () => visibleRows(items, { collapsed, focusId: activeFocusId }),
-    [items, collapsed, activeFocusId],
-  );
+  const rows = useMemo(() => visibleRows(items, { collapsed }), [items, collapsed]);
 
   const bodyHeight = Math.max(rows.length * ROW_HEIGHT_PX + ADD_ROW_HEIGHT_PX, MIN_BODY_HEIGHT_PX);
 
@@ -188,8 +176,7 @@ export function GanttScreen() {
 
   // Colour is branch, not status — the rule the exported deck draws by, shared
   // with it through buildBranchColors so the two can't drift. Both maps are
-  // built from the whole plan: depth so a focused view doesn't repaint a
-  // sub-tree it promoted, colour so excluding a task from the export doesn't
+  // built from the whole plan, so excluding a task from the export doesn't
   // shift the palette under its neighbours.
   const barStyleById = useMemo(
     () => buildBarStyles(buildBranchColors(items), buildDepthMap(items)),
@@ -326,25 +313,13 @@ export function GanttScreen() {
     updateItem(id, { status: next, progress: progressForStatus(next) ?? item.progress });
   };
 
-  /** Whether the list's own add row leads anywhere. It does everywhere except
-   * inside a focus on an item that is itself a sub-task — there a new task
-   * would become that sub-task's sub-task, which is the one thing this screen
-   * does not create. Only a plan that arrived already nested two levels deep
-   * can reach that view at all; the row says why rather than disappearing. */
-  const canAddTask = activeFocusId === null || !isSubtask(items, activeFocusId);
-
   const addTask = (name: string) => {
-    const task = buildNewTask(
-      {
-        label: name,
-        start: isoAtIndex(minDate, todayIndex),
-        end: isoAtIndex(minDate, todayIndex + 4),
-        status: 'todo',
-      },
-      // Inside a focus the list is one parent's sub-tasks, so a task added to
-      // it is one of them — a new root would vanish the moment it was typed.
-      activeFocusId === null ? {} : { parentId: activeFocusId },
-    );
+    const task = buildNewTask({
+      label: name,
+      start: isoAtIndex(minDate, todayIndex),
+      end: isoAtIndex(minDate, todayIndex + 4),
+      status: 'todo',
+    });
     addItem(task);
     select(task.id);
   };
@@ -395,9 +370,6 @@ export function GanttScreen() {
    * is edited, saved and exported like any other. */
   const makePlanFromBranch = (id: string) => {
     void createPlanFromBranch(id);
-    // Whatever was being focused on lives in the plan being left. Clearing it
-    // opens the new plan whole, which is what a plan of its own means.
-    setFocus(null);
   };
 
   /** This item and every group under it — what "the branch" means to the
@@ -498,226 +470,177 @@ export function GanttScreen() {
     : '';
 
   const selectedItem = items.find((item) => item.id === selectedId) ?? null;
-  // Resolved for the same reason the focus is: the row a menu is open on can
-  // be deleted by that very menu.
+  // Resolved against the plan rather than trusted: the row a menu is open on
+  // can be deleted by that very menu.
   const menuItem = menu === null ? null : (items.find((item) => item.id === menu.id) ?? null);
 
   return (
     <div style={{ display: 'flex', flex: 1, minHeight: 0, background: 'var(--gantt-surface)' }}>
-      {/* The plan and, above it when one is open, the bar naming the focus.
-          A column, so the bar is the plan's own strip and does not run under
-          the Edit Task panel beside it. */}
-      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-        {focusItem && (
-          <div
-            style={{
-              flex: 'none',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 10,
-              height: 38,
-              padding: '0 14px',
-              boxSizing: 'border-box',
-              background: 'var(--gantt-band)',
-              borderBottom: '1px solid var(--gantt-rule-strong)',
-            }}
-          >
-            <button
-              type="button"
-              onClick={() => setFocus(null)}
-              className={buttonBaseClass('ghost', 'h-7 gap-1 px-2 text-[11px] font-semibold')}
-              style={{ color: 'var(--gantt-text-secondary)' }}
-            >
-              <ChevronLeft size={14} strokeWidth={2.2} aria-hidden="true" />
-              Back to plan
-            </button>
-            <span className="h-4 w-px flex-none" style={{ background: 'var(--gantt-rule-strong)' }} />
-            <Layers size={13} strokeWidth={2.2} aria-hidden="true" color="var(--gantt-text-secondary)" />
-            {/* Says both what is on screen and what is not: a narrowed chart
-                with no such line reads as a plan that has lost its other
-                tasks. */}
-            <span style={{ fontSize: 12, color: 'var(--gantt-text-secondary)', minWidth: 0 }}>
-              Sub-tasks of{' '}
-              <span
-                title={focusItem.label}
-                style={{
-                  fontWeight: 600,
-                  color: 'var(--gantt-text)',
-                }}
-              >
-                {focusItem.label}
-              </span>
-            </span>
-          </div>
-        )}
+      {/* The frame. Two tracks by two: the header's height is a constant, the
+          list's width is the one the seam was last dragged to, and the
+          timeline zone takes whatever is left. Nothing here scrolls — the
+          frame is what the three panes inside it scroll *within*, which is
+          what keeps the zone the same width at every scale and keeps the
+          scrollbar in view.
 
-        {/* The frame. Two tracks by two: the header's height is a constant, the
-            list's width is the one the seam was last dragged to, and the
-            timeline zone takes whatever is left. Nothing here scrolls — the
-            frame is what the three panes inside it scroll *within*, which is
-            what keeps the zone the same width at every scale and keeps the
-            scrollbar in view.
-            
-            Widening the list narrows the body pane, and the body is what
-            `useScrollPanes` measures — so the canvas's own width, and with it
-            the timeline's right edge, follows the drag without being told. */}
+          Widening the list narrows the body pane, and the body is what
+          `useScrollPanes` measures — so the canvas's own width, and with it
+          the timeline's right edge, follows the drag without being told. */}
+      <div
+        style={{
+          flex: 1,
+          minWidth: 0,
+          minHeight: 0,
+          position: 'relative',
+          display: 'grid',
+          gridTemplateColumns: `${shownListWidth}px minmax(0, 1fr)`,
+          gridTemplateRows: `${HEADER_HEIGHT_PX}px minmax(0, 1fr)`,
+          overflow: 'hidden',
+        }}
+      >
+        {/* The seam, as a grab strip. It sits over the rule the list pane
+            draws rather than replacing it: a 1px border is the right line to
+            look at and the wrong one to aim at, so the target is 9px wide
+            and centred on it, and stays invisible until hovered.
+
+            A sibling of the panes rather than a child of either, because it
+            spans both grid rows — the corner above and the list below — and
+            because being on top is what keeps its press away from the body's
+            grab-to-pan. */}
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize the task column"
+          aria-valuenow={shownListWidth}
+          aria-valuemin={MIN_LIST_WIDTH_PX}
+          aria-valuemax={MAX_LIST_WIDTH_PX}
+          tabIndex={0}
+          className="gantt-col-resize"
+          data-dragging={isResizingList}
+          onPointerDown={beginListResize}
+          onPointerMove={moveListResize}
+          onPointerUp={endListResize}
+          onPointerCancel={endListResize}
+          onKeyDown={nudgeListResize}
+          style={{
+            position: 'absolute',
+            top: 0,
+            bottom: 0,
+            // Centred on the 1px border, not on the column's edge: the
+            // border occupies the pixel before `shownListWidth`, so the
+            // strip starts half its width plus that pixel to the left.
+            left: shownListWidth - Math.ceil(LIST_RESIZE_HANDLE_PX / 2),
+            width: LIST_RESIZE_HANDLE_PX,
+            zIndex: 20,
+            cursor: 'col-resize',
+            touchAction: 'none',
+          }}
+        />
+
+        {/* The corner. It follows neither axis, so it is the one pane that is
+            simply a box. */}
         <div
           style={{
-            flex: 1,
-            minWidth: 0,
-            minHeight: 0,
-            position: 'relative',
-            display: 'grid',
-            gridTemplateColumns: `${shownListWidth}px minmax(0, 1fr)`,
-            gridTemplateRows: `${HEADER_HEIGHT_PX}px minmax(0, 1fr)`,
+            gridColumn: 1,
+            gridRow: 1,
+            background: 'var(--gantt-surface)',
+            borderRight: '1px solid var(--gantt-rule-strong)',
+            borderBottom: '1px solid var(--gantt-rule-strong)',
+            boxSizing: 'border-box',
+          }}
+        />
+
+        {/* The header pane: follows the body sideways, never moves up or
+            down. Its right padding is the width of the body's vertical
+            scrollbar, so the two show the same span of days rather than the
+            header running a scrollbar's width further. */}
+        <div
+          ref={panes.headerRef}
+          style={{
+            gridColumn: 2,
+            gridRow: 1,
             overflow: 'hidden',
+            background: 'var(--gantt-surface)',
+            borderBottom: '1px solid var(--gantt-rule-strong)',
+            boxSizing: 'border-box',
+            paddingRight: panes.gutter.vertical,
           }}
         >
-          {/* The seam, as a grab strip. It sits over the rule the list pane
-              draws rather than replacing it: a 1px border is the right line to
-              look at and the wrong one to aim at, so the target is 9px wide
-              and centred on it, and stays invisible until hovered.
+          <TimelineHeader cells={headerCells} columnWidth={columnWidth} width={canvasWidth} />
+        </div>
 
-              A sibling of the panes rather than a child of either, because it
-              spans both grid rows — the corner above and the list below — and
-              because being on top is what keeps its press away from the body's
-              grab-to-pan. */}
-          <div
-            role="separator"
-            aria-orientation="vertical"
-            aria-label="Resize the task column"
-            aria-valuenow={shownListWidth}
-            aria-valuemin={MIN_LIST_WIDTH_PX}
-            aria-valuemax={MAX_LIST_WIDTH_PX}
-            tabIndex={0}
-            className="gantt-col-resize"
-            data-dragging={isResizingList}
-            onPointerDown={beginListResize}
-            onPointerMove={moveListResize}
-            onPointerUp={endListResize}
-            onPointerCancel={endListResize}
-            onKeyDown={nudgeListResize}
-            style={{
-              position: 'absolute',
-              top: 0,
-              bottom: 0,
-              // Centred on the 1px border, not on the column's edge: the
-              // border occupies the pixel before `shownListWidth`, so the
-              // strip starts half its width plus that pixel to the left.
-              left: shownListWidth - Math.ceil(LIST_RESIZE_HANDLE_PX / 2),
-              width: LIST_RESIZE_HANDLE_PX,
-              zIndex: 20,
-              cursor: 'col-resize',
-              touchAction: 'none',
-            }}
+        {/* The list pane: follows the body down, never moves sideways. Its
+            bottom padding matches the body's horizontal scrollbar for the
+            same reason the header's right padding matches the vertical one. */}
+        <div
+          ref={panes.listRef}
+          style={{
+            gridColumn: 1,
+            gridRow: 2,
+            overflow: 'hidden',
+            background: 'var(--gantt-surface)',
+            borderRight: '1px solid var(--gantt-rule-strong)',
+            boxSizing: 'border-box',
+            paddingBottom: panes.gutter.horizontal,
+          }}
+        >
+          <TaskList
+            rows={rows}
+            collapsed={collapsed}
+            selectedId={selectedId}
+            minHeight={bodyHeight}
+            onSelect={select}
+            onToggleCollapse={toggleCollapsed}
+            onCycleStatus={cycleStatus}
+            onRename={(id, name) => updateItem(id, { label: name })}
+            onAddTask={addTask}
+            onMakePlan={makePlanFromBranch}
+            onAddSubtask={addSubtask}
+            onContextMenu={openMenu}
           />
+        </div>
 
-          {/* The corner. It follows neither axis, so it is the one pane that is
-              simply a box. */}
-          <div
-            style={{
-              gridColumn: 1,
-              gridRow: 1,
-              background: 'var(--gantt-surface)',
-              borderRight: '1px solid var(--gantt-rule-strong)',
-              borderBottom: '1px solid var(--gantt-rule-strong)',
-              boxSizing: 'border-box',
-            }}
-          />
-
-          {/* The header pane: follows the body sideways, never moves up or
-              down. Its right padding is the width of the body's vertical
-              scrollbar, so the two show the same span of days rather than the
-              header running a scrollbar's width further. */}
-          <div
-            ref={panes.headerRef}
-            style={{
-              gridColumn: 2,
-              gridRow: 1,
-              overflow: 'hidden',
-              background: 'var(--gantt-surface)',
-              borderBottom: '1px solid var(--gantt-rule-strong)',
-              boxSizing: 'border-box',
-              paddingRight: panes.gutter.vertical,
-            }}
-          >
-            <TimelineHeader cells={headerCells} columnWidth={columnWidth} width={canvasWidth} />
-          </div>
-
-          {/* The list pane: follows the body down, never moves sideways. Its
-              bottom padding matches the body's horizontal scrollbar for the
-              same reason the header's right padding matches the vertical one. */}
-          <div
-            ref={panes.listRef}
-            style={{
-              gridColumn: 1,
-              gridRow: 2,
-              overflow: 'hidden',
-              background: 'var(--gantt-surface)',
-              borderRight: '1px solid var(--gantt-rule-strong)',
-              boxSizing: 'border-box',
-              paddingBottom: panes.gutter.horizontal,
-            }}
-          >
-            <TaskList
-              rows={rows}
-              collapsed={collapsed}
-              selectedId={selectedId}
-              minHeight={bodyHeight}
-              canAddTask={canAddTask}
-              onSelect={select}
-              onToggleCollapse={toggleCollapsed}
-              onCycleStatus={cycleStatus}
-              onRename={(id, name) => updateItem(id, { label: name })}
-              onAddTask={addTask}
-              onMakePlan={makePlanFromBranch}
-              onAddSubtask={addSubtask}
-              onContextMenu={openMenu}
-            />
-          </div>
-
-          {/* The body: the only scroller on the screen. Both bars belong to it,
-              which puts the horizontal one along the bottom of the timeline and
-              nowhere near the task names. `overflow-x: scroll` rather than
-              `auto` so the bar is a standing part of the zone instead of
-              something that appears and disappears under the pointer. */}
-          <div
-            ref={panes.bodyRef}
-            className="gantt-scroll"
-            style={{
-              gridColumn: 2,
-              gridRow: 2,
-              overflowX: 'scroll',
-              overflowY: 'auto',
-              position: 'relative',
-              cursor: 'grab',
-            }}
-          >
-            <TimelineBody
-              rows={rows}
-              spans={spans}
-              scale={scale}
-              cells={headerCells}
-              barStyleById={barStyleById}
-              columnWidth={columnWidth}
-              width={canvasWidth}
-              height={bodyHeight}
-              todayIndex={todayIndex}
-              weekendStarts={weekends}
-              dateRangeById={dateRangeById}
-              statusLabelById={statusLabelById}
-              selectedId={selectedId}
-              drag={drag}
-              dragLabel={dragLabel}
-              onPointerDownBar={beginDrag}
+        {/* The body: the only scroller on the screen. Both bars belong to it,
+            which puts the horizontal one along the bottom of the timeline and
+            nowhere near the task names. `overflow-x: scroll` rather than
+            `auto` so the bar is a standing part of the zone instead of
+            something that appears and disappears under the pointer. */}
+        <div
+          ref={panes.bodyRef}
+          className="gantt-scroll"
+          style={{
+            gridColumn: 2,
+            gridRow: 2,
+            overflowX: 'scroll',
+            overflowY: 'auto',
+            position: 'relative',
+            cursor: 'grab',
+          }}
+        >
+          <TimelineBody
+            rows={rows}
+            spans={spans}
+            scale={scale}
+            cells={headerCells}
+            barStyleById={barStyleById}
+            columnWidth={columnWidth}
+            width={canvasWidth}
+            height={bodyHeight}
+            todayIndex={todayIndex}
+            weekendStarts={weekends}
+            dateRangeById={dateRangeById}
+            statusLabelById={statusLabelById}
+            selectedId={selectedId}
+            drag={drag}
+            dragLabel={dragLabel}
+            onPointerDownBar={beginDrag}
             onContextMenuBar={openMenu}
-              onSelectBar={(id) => {
-                // A pan ends in a click too, and selecting a task because
-                // someone dragged the canvas past it would be a surprise.
-                if (!movedRef.current && !panes.isPanningRef.current) select(id);
-              }}
-            />
-          </div>
+            onSelectBar={(id) => {
+              // A pan ends in a click too, and selecting a task because
+              // someone dragged the canvas past it would be a surprise.
+              if (!movedRef.current && !panes.isPanningRef.current) select(id);
+            }}
+          />
         </div>
       </div>
 
