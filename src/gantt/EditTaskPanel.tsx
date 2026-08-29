@@ -5,6 +5,8 @@ import { useTimelineStore } from '../store/timelineStore';
 import { getTaskStatus, TASK_STATUS_VALUES, type TaskStatus, type TimelineItem } from '../types/timeline';
 import { progressForStatus } from '../utils/progressForStatus';
 import { toHtml } from '../utils/renderMarkdown';
+import { DateField } from './DateField';
+import { withEnd, withStart } from './dateEdit';
 import { PANEL_WIDTH_PX, type Span } from './geometry';
 import { childrenOf } from './rollup';
 import { isoAtIndex } from './scale';
@@ -81,19 +83,6 @@ const SECTION_STYLE: React.CSSProperties = {
  * input border and radius. */
 const PANEL_FIELD_CLASS = `${INPUT_SHELL_CLASS} h-11 text-[15px]`;
 
-const DATE_FIELD_STYLE: React.CSSProperties = {
-  width: '100%',
-  boxSizing: 'border-box',
-  height: 44,
-  border: '1px solid hsl(var(--input))',
-  borderRadius: 'calc(var(--radius) - 2px)',
-  fontSize: 15,
-  padding: '0 12px',
-  color: 'hsl(var(--foreground))',
-  background: 'transparent',
-  outline: 'none',
-};
-
 /** Everything about one work item, in a column beside the plan.
  *
  * Opens on a bar click and on a list-row click, and every control commits as
@@ -114,6 +103,13 @@ export function EditTaskPanel({ item, minDate, spans }: EditTaskPanelProps) {
 
   const isGroup = childrenOf(items, item.id).length > 0;
   const span = spans.get(item.id);
+
+  // The pair both date fields read, and the pair each of them writes back with
+  // its own end replaced: the drawn span, so a date being dragged on the chart
+  // reads here as it is dropped; off a drag it is the item's own two dates.
+  const shown = span
+    ? { start: isoAtIndex(minDate, span.start), end: isoAtIndex(minDate, span.start + span.len - 1) }
+    : { start: item.start, end: item.end };
   const included = item.includeInExport !== false;
   const itemComments = comments.filter((comment) => comment.taskId === item.id);
 
@@ -222,31 +218,17 @@ export function EditTaskPanel({ item, minDate, spans }: EditTaskPanelProps) {
         <Band label="PLANNING" zIndex={5} topBorder />
         <div style={SECTION_STYLE}>
           <Field label="Start Date" htmlFor={`panel-${item.id}-start`}>
-            <input
+            <DateField
               id={`panel-${item.id}-start`}
-              type="date"
-              // The drawn span, so a date being dragged on the chart reads
-              // here as it is dropped; off a drag it is the item's own pair.
-              value={span ? isoAtIndex(minDate, span.start) : item.start}
-              onChange={(event) => {
-                if (!event.target.value) return;
-                // Moving the start keeps the deadline where it is, so the
-                // task's length is what changes.
-                updateItem(item.id, { start: event.target.value });
-              }}
-              style={DATE_FIELD_STYLE}
+              value={shown.start}
+              onCommit={(start) => updateItem(item.id, withStart(shown, start))}
             />
           </Field>
           <Field label="Deadline" htmlFor={`panel-${item.id}-end`}>
-            <input
+            <DateField
               id={`panel-${item.id}-end`}
-              type="date"
-              value={span ? isoAtIndex(minDate, span.start + span.len - 1) : item.end}
-              onChange={(event) => {
-                if (!event.target.value) return;
-                updateItem(item.id, { end: event.target.value });
-              }}
-              style={DATE_FIELD_STYLE}
+              value={shown.end}
+              onCommit={(end) => updateItem(item.id, withEnd(shown, end))}
             />
           </Field>
 

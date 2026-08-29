@@ -842,3 +842,41 @@ and exports every task (`check:export --plan` on a 5-level fixture: 93 of 93 in
 the deck). A deep row simply has no "+" — the 18px slot stays behind it, since
 the button is invisible at rest and taking its width away too would leave the
 task column with two right edges.
+
+## Where a date field stopped committing every keystroke
+
+Every control in the Edit Task panel commits as it is changed — there is no Save
+— and the two date fields did the same, guarded only against an empty value.
+That guard reads the wrong failure. `<input type="date">` does report `''` while
+a date is incomplete, but a **year** being retyped does not go through `''`: it
+goes through complete, parseable dates with a partial year. Select the year in
+`2026-05-10`, erase it and type it back, and the field says `0002-05-10`,
+`0020-05-10`, `0202-05-10` before it says what was meant. Each of those was
+written straight onto the task, and `planRange` widened the canvas to hold it:
+a plan of 192 columns became one of 45,483, each column a `Date` and a
+`toLocaleString`, and the tab stopped answering on the first digit. (45,483 and
+not the 739,000 days back to the year 2, because `Date.UTC` maps a two-digit
+year into the 1900s — so the canvas was wrong as well as enormous.)
+
+So the panel's date fields now hold a draft, as its name and comment fields
+already do (`DateField` in `src/gantt/DateField.tsx`): the field shows what is
+being typed, the task keeps the date it had, and the write happens on the first
+value that is a date — four digits of year between 1900 and 2100, and a day the
+calendar actually has (`isCommittableDate` in `src/gantt/dateEdit.ts`; the
+round-trip through `toISOString` is what catches 31 February, which `Date` rolls
+forward rather than rejecting). A field left half-typed drops its draft on blur
+and goes back to showing the task.
+
+The same module carries the other rule a committed date needs, because a task's
+two dates are one pair: **the edited field wins and the other end follows**
+(`withStart` / `withEnd`). A deadline set before the start pulls the start back
+to it, a start pushed past the deadline carries the deadline with it, and either
+way the task is one day long. That is the bargain a resize on the chart already
+strikes — `previewSpans` clamps a span to `Math.max(1, …)` — but clamping only
+the *drawing* left an inverted pair stored and the panel showing a deadline the
+task did not have. Writing the pair keeps the field, the bar and the deck saying
+the same thing.
+
+`npm run check:dates` (`scripts/checkDateCommit.ts`) holds both rules: it walks
+the keystrokes a year edit actually produces and asserts only the last one
+commits, and it measures the canvas the held-back values would have asked for.
