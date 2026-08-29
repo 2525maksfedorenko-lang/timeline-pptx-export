@@ -6,7 +6,7 @@ import { FALLBACK_BAR_STYLE, type BarStyle } from './barColor';
 import type { GanttRowModel } from './rows';
 import type { DragState } from './drag';
 import { TaskBar } from './TaskBar';
-import { CreateSurface } from './CreateSurface';
+import { CreateLane } from './CreateLane';
 import { DragPill } from './DragPill';
 
 interface TimelineBodyProps {
@@ -38,9 +38,8 @@ interface TimelineBodyProps {
   dayCount: number;
   /** "Aug 17" for a column index. */
   formatDay: (index: number) => string;
-  /** A task drawn on the grid, named and confirmed: its dates, and the row it
-   * was drawn in. */
-  onCreateTask: (span: Span, rowIndex: number, name: string) => void;
+  /** A task drawn on the create lane, named and confirmed. */
+  onCreateTask: (span: Span, name: string) => void;
 }
 
 /** The timeline half of the canvas: the ruled grid, the three washes that
@@ -53,15 +52,18 @@ interface TimelineBodyProps {
  * period lines on the header's own cell edges, and soft row lines.
  *
  * Everything above the grid is stacked deliberately: weekend tint (0), the
- * today band (2), the create surface (3), the bars (5) with their edge dots
- * (6), and a drawn task's ghost, field and pill over all of it.
+ * today band (2), the bars (5) with their edge dots (6), and the drag pill
+ * over all of it. The create lane sits at the bars' own level, in the strip
+ * beneath the last row that the canvas already reserves for it.
  *
- * That stack is also the hit-test order, and it is the whole of how drawing a
- * task and moving one are told apart. The create surface covers the entire
- * canvas, so the two washes below it are marked `pointer-events: none` — they
- * are decoration and have no press of their own to answer — while the bars
- * above it keep theirs. A press therefore lands on a bar if there is one under
- * it and on the create surface otherwise, with nothing to arbitrate in JS. */
+ * Almost nothing here answers a press. The canvas is panned by dragging it,
+ * and a pan has to be able to start on any free pixel — so the two washes are
+ * marked `pointer-events: none`, the bar wrappers pass their free space
+ * through, and what is left is the body itself. The two exceptions announce
+ * themselves with an attribute rather than by position (BAR_HIT_ATTRIBUTE,
+ * CREATE_LANE_ATTRIBUTE): the bars, which are moved and resized by drag, and
+ * the lane, where a drag draws. The pan reads those attributes and declines to
+ * start; everywhere else it runs. */
 export function TimelineBody({
   rows,
   spans,
@@ -176,10 +178,11 @@ export function TimelineBody({
         />
       )}
 
-      {/* Every free pixel of the canvas: a drag anywhere the bars are not
-          draws a task's dates. Panning by drag lives on the date header now,
-          which is what makes one gesture enough here. */}
-      <CreateSurface
+      {/* The one place on this canvas where a press draws instead of panning:
+          the row under the last one, level with the task column's own add
+          row. */}
+      <CreateLane
+        top={rows.length * ROW_HEIGHT_PX}
         columnWidth={columnWidth}
         dayCount={dayCount}
         canvasWidth={width}

@@ -33,11 +33,6 @@ interface TimelineStore {
 
   items: TimelineItem[];
   addItem: (item: TimelineItem) => void;
-  /** Puts a task straight after `afterId` in the list instead of at its end.
-   * The only caller is the drawn-on-the-grid task, which is drawn at a row
-   * rather than at the bottom and should appear where it was drawn; a missing
-   * or null `afterId` falls back to appending, which is what `addItem` does. */
-  insertItemAfter: (item: TimelineItem, afterId: string | null) => void;
   updateItem: (id: string, patch: Partial<TimelineItem>) => void;
   removeItem: (id: string) => void;
   // Parent-with-subtasks-aware variants of the two actions above: fall back
@@ -233,15 +228,6 @@ export const useTimelineStore = create<TimelineStore>()(
 
       items: [],
       addItem: (item) => set((state) => ({ items: [...state.items, item] })),
-      insertItemAfter: (item, afterId) =>
-        set((state) => {
-          const index = afterId === null ? -1 : state.items.findIndex((c) => c.id === afterId);
-          if (index === -1) return { items: [...state.items, item] };
-
-          const items = [...state.items];
-          items.splice(index + 1, 0, item);
-          return { items };
-        }),
       updateItem: (id, patch) =>
         set((state) => ({
           items: state.items.map((item) => (item.id === id ? { ...item, ...patch } : item)),
