@@ -61,7 +61,6 @@ export function GanttScreen() {
   const items = useTimelineStore((state) => state.items);
   const updateItem = useTimelineStore((state) => state.updateItem);
   const addItem = useTimelineStore((state) => state.addItem);
-  const insertItemAfter = useTimelineStore((state) => state.insertItemAfter);
   const deleteTaskCascade = useTimelineStore((state) => state.deleteTaskCascade);
   const toggleIncludeInExportCascade = useTimelineStore((state) => state.toggleIncludeInExportCascade);
   const createPlanFromBranch = useTimelineStore((state) => state.createPlanFromBranch);
@@ -329,37 +328,14 @@ export function GanttScreen() {
    * that would open across the timeline and re-measure the canvas between one
    * drawn task and the next, and drawing tasks is usually drawing several. The
    * bar appearing where the ghost was is confirmation enough. */
-  /** A task drawn on the grid: the dates come from the drag, and the place in
-   * the list comes from the row it was drawn in.
-   *
-   * The row matters. Appending would be simpler, and it is what every other
-   * way of adding a task does, but those are all reached from the foot of the
-   * list — this one is aimed at a spot halfway up a plan, and a bar that
-   * answered by appearing off the bottom of a long one would look like nothing
-   * had happened.
-   *
-   * It lands after the drawn row's **root**, not after the row itself: a new
-   * task is a top-level one, and `visibleRows` draws a root's whole sub-tree
-   * under it, so slotting it in beside a sub-task would just push it below
-   * that sub-tree anyway. Landing after the branch is the same answer, said
-   * once and predictably. Drawing below the last row appends, which is what
-   * the strip under the plan always did. */
-  const createTaskAtRow = (span: Span, rowIndex: number, name: string) => {
-    const rootAbove = () => {
-      for (let index = Math.min(rowIndex, rows.length - 1); index >= 0; index -= 1) {
-        if (rows[index].depth === 0) return rows[index].item.id;
-      }
-      return null;
-    };
-
-    insertItemAfter(
+  const createTaskOnLane = (span: Span, name: string) => {
+    addItem(
       buildNewTask({
         label: name,
         start: isoAtIndex(minDate, span.start),
         end: isoAtIndex(minDate, span.start + span.len - 1),
         status: 'todo',
       }),
-      rootAbove(),
     );
   };
 
@@ -690,13 +666,14 @@ export function GanttScreen() {
             dragLabel={dragLabel}
             dayCount={renderedDays}
             formatDay={(index) => formatDayLabel(minDate, index)}
-            onCreateTask={createTaskAtRow}
+            onCreateTask={createTaskOnLane}
             onPointerDownBar={beginDrag}
             onContextMenuBar={openMenu}
             onSelectBar={(id) => {
-              // A bar drag ends in a click too, and opening the panel because
-              // someone moved a bar would be a surprise.
-              if (!movedRef.current) select(id);
+              // A bar drag ends in a click too, and so does a pan that happens
+              // to be released over a bar — opening the panel because someone
+              // moved a bar, or scrolled past one, would be a surprise.
+              if (!movedRef.current && !panes.isPanningRef.current) select(id);
             }}
           />
         </div>

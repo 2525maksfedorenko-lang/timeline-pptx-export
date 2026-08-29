@@ -221,10 +221,10 @@
  * pointer, and it is the wash a row's name already uses to say "this is
  * something you can act on"; colour only, per the design system, and no
  * colour that isn't already here. */
-/* The row under the pointer while the grid is idle: the whole affordance for
-   drawing a task on it. The strip under the plan used to fill on hover; over a
-   whole canvas that would be a wash rather than a hint, so the hint is one row
-   wide. Colour only, like every other hover on this screen. */
-.gantt-create-row {
+.gantt-create-lane {
+  transition: background-color 150ms;
+}
+
+.gantt-create-lane:hover {
   background: var(--gantt-name-hover);
 }
