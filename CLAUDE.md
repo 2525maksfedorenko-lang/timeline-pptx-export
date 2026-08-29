@@ -55,10 +55,10 @@ settings, import, exports — still follows the design system as before.
 (pptxgenjs's format), and its grid-line/footer colours have no design-system counterpart. Keep the
 two in their own formats rather than trying to unify them.
 
-## Порт разработки
-Dev-сервер работает строго на порту 5176. В `vite.config.ts` поля `port: 5176` и
-`strictPort: true` менять нельзя — на этот порт настроен внешний туннель cloudflared.
+## Порты
+5176 — постоянный порт пользователя, к нему подключён туннель cloudflared.
+Не занимать, в `vite.config.ts` не менять.
 
-Запускать dev-сервер можно и нужно, когда требуется проверить результат. Перед
-запуском проверь, не занят ли порт: если сервер уже поднят, используй его, а не
-поднимай второй. Освободить порт можно командой `pkill -f vite`.
+Для собственных проверок поднимай сервер на 5180:
+`npm run dev -- --port 5180 --strictPort`
+После проверки останавливай его.
