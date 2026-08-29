@@ -54,3 +54,7 @@ settings, import, exports — still follows the design system as before.
 `src/export/theme.ts` is a **separate** palette for the PPTX/PDF exporters: hex without `#`
 (pptxgenjs's format), and its grid-line/footer colours have no design-system counterpart. Keep the
 two in their own formats rather than trying to unify them.
+
+## Порт разработки
+Dev-сервер работает строго на порту 5176. В `vite.config.ts` поля `port: 5176` и
+`strictPort: true` менять нельзя — на этот порт настроен внешний туннель cloudflared.
