@@ -12,9 +12,6 @@ interface GanttToolbarProps {
    * than built here so this file stays about the plan and not about what
    * surrounds it. */
   actions?: React.ReactNode;
-  /** False on any view that is not the plan: the scale switch and Today
-   * belong to the timeline and to nothing else. */
-  showTimelineControls: boolean;
 }
 
 /** The app's one header, in a single row and three zones: whose product this
@@ -39,9 +36,9 @@ interface GanttToolbarProps {
  * a phone layout is a separate question from this row's balance.
  *
  * The handoff puts a search box and status chips on a second row beneath.
- * Neither is here — the plan screen shows the whole plan, and nothing narrows
- * it but a fold or a focus — so the row the handoff needed for them is gone
- * and the header is one 50px band.
+ * Neither is here — the plan screen shows the whole plan, and a fold is the
+ * only thing that takes rows away — so the row the handoff needed for them is
+ * gone and the header is one 50px band.
  *
  * It carries more than the handoff's toolbar does: this app also has an
  * import, an export in four formats and a settings panel, and the handoff has
@@ -64,7 +61,7 @@ interface GanttToolbarProps {
  * the app is, on a screen where the only thing there is room to say is what
  * the plan is; the plan's own navy initial keeps the brand present.
  */
-export function GanttToolbar({ actions, showTimelineControls }: GanttToolbarProps) {
+export function GanttToolbar({ actions }: GanttToolbarProps) {
   const title = useTimelineStore((state) => state.title);
   const items = useTimelineStore((state) => state.items);
 
@@ -162,7 +159,7 @@ export function GanttToolbar({ actions, showTimelineControls }: GanttToolbarProp
      row they land on is the breakpoint's business, not theirs: the middle of
      the desktop row, or the second row on a phone, where they get a taller
      button because the thing pressing them is a thumb. */
-  const timelineControls = showTimelineControls ? (
+  const timelineControls = (
     <>
       {/* The system has no segmented control, so this is the handoff's
           own recipe over primitives: a muted tray at 8px radius
@@ -199,7 +196,7 @@ export function GanttToolbar({ actions, showTimelineControls }: GanttToolbarProp
         Today
       </button>
     </>
-  ) : null;
+  );
 
   /* The one control that opens the task list, and the only new thing in this
      header. A button rather than an edge swipe: a swipe from the left edge is
@@ -281,11 +278,8 @@ export function GanttToolbar({ actions, showTimelineControls }: GanttToolbarProp
             do; they are the chart's own controls, so they sit over the chart,
             on the row's centre line.
 
-            The zone is rendered even on a view that has no timeline, empty,
-            so the logo and the actions keep the positions they hold on the
-            plan screen instead of shifting when the tab changes. Below the
-            breakpoint there is no centre line to sit on: the controls are on
-            the row beneath, with the plan they belong to. */}
+            Below the breakpoint there is no centre line to sit on: the
+            controls are on the row beneath, with the plan they belong to. */}
         {!isMobile && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: '0 0 auto' }}>
             {timelineControls}
@@ -314,13 +308,13 @@ export function GanttToolbar({ actions, showTimelineControls }: GanttToolbarProp
         </div>
       </div>
 
-      {/* The second row, and only where there is a plan to look at. Everything
-          on it is about the chart: the task list it can put in front of
-          itself, the scale it is drawn at, and the way back to now. What the
-          plan *is*, and the four things done to it, stay on the row above.
-          46px, so the controls here can be the size a thumb needs without the
-          row above having to grow with them. */}
-      {isMobile && showTimelineControls && (
+      {/* The second row, below the breakpoint. Everything on it is about the
+          chart: the task list it can put in front of itself, the scale it is
+          drawn at, and the way back to now. What the plan *is*, and the four
+          things done to it, stay on the row above. 46px, so the controls here
+          can be the size a thumb needs without the row above having to grow
+          with them. */}
+      {isMobile && (
         <div
           style={{
             display: 'flex',

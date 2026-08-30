@@ -204,8 +204,8 @@ Our deck today is 10 × 5.625 in (`slideLayout.ts:21`), a third smaller again.
 | Column header row, per-column captions | axis captions on one line + "Status"/"Task" headings | `slideLayout.ts:218–221`, model `columnHeaders` |
 | Fixed 480 px task column | derived `STATUS_COL_WIDTH_IN` + `TASK_COL_WIDTH_IN` (2.60 in) | `slideLayout.ts:185–212` |
 | Status as a 24×24 icon | **status chip** — pale fill, hairline border, dark label | `OverviewBarModel.statusChip*`, `pptxExporter.ts:340–349` |
-| Bar colour = phase | bar colour = status, or `TimelineItem.color` | `resolveBarColor` |
-| Subtask bar = same hue, 24–28 % alpha, 20 px | subtask bar = shorter by depth ladder (`1 / 0.7 / 0.55`), full opacity | `barNesting.ts:29` |
+| Bar colour = phase | bar colour = **branch**, or `TimelineItem.color` on a root | `branchColors.ts` |
+| Subtask bar = same hue, 24–28 % alpha, 20 px | subtask bar = the branch's tint, and two flat heights by nesting | `branchColors.ts`, `slideLayout.ts:216` |
 | Rows share the card height (`flex:1`) | fixed pitch `ROW_HEIGHT_IN` = 0.32 in, capacity derived from it | `slideLayout.ts:312, 328` |
 | Today line, 2 px `--destructive`, 80 % | today is a grid line among the date grid levels | `dateGrid.ts` |
 | Uniform hairline per column boundary | four grid levels (day/week/month/year) at four greys and widths | `theme.ts:63–70`, `dateGrid.ts` |
@@ -606,3 +606,26 @@ touched a URL.
 `?dashboardView=` still works in `App.tsx`, and the Dashboard screen is still
 built and still exported as slides. Nothing points at the URL any more, which
 is a question for the product rather than for this file.
+
+
+## Two rows of the table above have moved on
+
+Recorded rather than edited in place, since the table is a record of what the
+handoff asked for and what was built against it at the time.
+
+**Bar colour.** The table said "bar colour = status, or `TimelineItem.color`",
+implemented by `resolveBarColor` in `src/utils/barColor.ts`. Colour became
+*branch* afterwards — a root takes a colour and its whole subtree inherits it,
+so the colour answers "what does this belong to" and status is carried by the
+icon beside the name. `src/utils/branchColors.ts` is the one place both the
+screen and the deck read it from, and `npm run check:colors` asserts the two
+agree on every bar. `resolveBarColor` had no caller left and was deleted in the
+cleanup pass (docs/cleanup-audit.md).
+
+**The nested bar's height.** The table cited a depth ladder of `1 / 0.7 / 0.55`
+ratios in `barNesting.ts`. The overview draws two flat heights now —
+`OVERVIEW_BAR_HEIGHT_IN` for a root, `OVERVIEW_NESTED_BAR_HEIGHT_IN` for
+anything under it (`src/export/slideLayout.ts`) — and the plan screen takes its
+own bar height from the Gantt handoff. The ladder had no reader on either side
+and went with the same pass. What `barNesting.ts` still shares is the depth map
+itself and the label indent.

@@ -28,23 +28,6 @@ function stripLineMarkdown(line: string): string {
     .trim();
 }
 
-/** True for table separator rows like "---|---" or ":--|--:". */
-function isTableSeparatorLine(line: string): boolean {
-  return /^[|:\s-]+$/.test(line) && line.includes('-');
-}
-
-/** Renders markdown down to a single line of plain text, e.g. for list previews. */
-export function toPlainSummary(markdown: string): string {
-  return markdown
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0 && !isTableSeparatorLine(line))
-    .map(stripLineMarkdown)
-    .join(' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
 /** Renders markdown to HTML for on-screen display. Internal tool input only —
  * no output sanitization is applied. */
 export function toHtml(markdown: string): string {

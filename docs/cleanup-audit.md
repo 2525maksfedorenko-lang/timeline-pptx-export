@@ -123,12 +123,13 @@ a file that is otherwise alive.
 | `src/utils/barNesting.ts:29,43,56,75` | `BAR_HEIGHT_RATIO_BY_DEPTH`, `barHeightRatio`, `BarVerticalGeometry`, `resolveBarGeometry` | The ratio ladder that used to shrink a nested bar. The slides use two flat constants now (`OVERVIEW_BAR_HEIGHT_IN` 26px / `OVERVIEW_NESTED_BAR_HEIGHT_IN` 20px, `slideLayout.ts:216`), the screen uses `geometry.ts`'s own `barHeight`. Only `labelIndent`, `MAX_LABEL_INDENT_STEPS` and `buildDepthMap` are still read from this file. `timelineExportModel.ts:1414` still *names* `BAR_HEIGHT_RATIO_BY_DEPTH` in a comment describing behaviour it no longer drives; `docs/export-coverage.md:74` and `docs/design-system-map.md:322` do the same. |
 | `src/export/dateScale.ts:10,110` | `shiftIsoDate`, `formatMonthYear` | No caller. |
 | `src/export/slideLayout.ts:259,409,412` | `COLUMN_TEXT_INSET_IN`, `COMMENT_TABLE_ROW_HEIGHT_IN`, `COMMENT_TABLE_HEADER_ROW_HEIGHT_IN` | `COLUMN_TEXT_INSET_IN` is a declaration and nothing else. The other two are a pair: the header constant is an alias of the row constant, nobody reads the alias, and the row constant's only reader *is* the alias. Both die together. (`pdfExporter.ts:494` names `COMMENT_TABLE_ROW_HEIGHT_IN` in a comment.) |
-| `src/export/timelineExportModel.ts:403,1358` | `getItemsInTimeframe`, `getCommentsForSlide` | Superseded by `planOverview` and by the per-slide comment gathering inside `buildExportSlides`. |
+| ~~`src/export/timelineExportModel.ts:403,1358`~~ | ~~`getItemsInTimeframe`, `getCommentsForSlide`~~ | **Wrong — corrected during phase 2.** Both are called from inside their own file (`planOverview` at :436 calls the first, `buildExportSlides` at :1432 the second). They are over-exported, not dead, and deleting either would have broken the deck. See "Corrections" below. |
 | `src/export/dateGrid.ts` | `MAX_VISIBLE_DAYS_FOR_DAY_LINES`, `MAX_VISIBLE_DAYS_FOR_WEEK_LINES` | Declared, used once each inside the file — see the over-exported list below; these two are borderline and belong there rather than here. |
 | `src/gantt/rollup.ts:26` | `isGroup` | A third answer to "does anything call this its parent". The two live answers are `childrenOf(items, id).length > 0` (four call sites) and an inline `items.some(...)` (two). |
 | `src/utils/newTask.ts:14` | `isCompleteTask` | No caller. |
 | `src/utils/renderMarkdown.ts:37` | `toPlainSummary` | No caller. |
-| `src/types/timeline.ts:3,54,140` | `SortMode`, `TASK_STATUS_CHIP`, `Timeline` | `SortMode` describes a sort the export settings no longer offer. `TASK_STATUS_CHIP` is the pale chip the old task column wore. `Timeline` (`{ title, items, scale }`) is a shape nothing constructs — the app's unit is `SavedPlan`. |
+| `src/types/timeline.ts:54` | `TASK_STATUS_CHIP` | The pale chip the old task column wore. Dead; deleted. |
+| ~~`src/types/timeline.ts:3,140`~~ | ~~`SortMode`, `Timeline`~~ | **Wrong — corrected during phase 2.** `SortMode` types `ExportOptions.sortMode`, and `Timeline` types `ExportOptions.scale`, both in the same file. Neither can go without changing `ExportOptions`, which is the plan file's own shape. Both are now marked category C instead. See "Corrections" below. |
 
 **Rough total for category A: five whole files (474 lines), the `ui` slice
 (~15), and ~115 lines of dead symbols inside living files — call it 600
@@ -529,16 +530,52 @@ five spellings of "is this a group" (D6) onto `GanttRowModel.isGroup`.
 
 ---
 
+---
+
+# Corrections to this document, found while acting on it
+
+Four rows of the A7 table were wrong, all in the same way and from the same
+mistake. The tool that produced the list reported, for every exported symbol,
+both "referenced outside its own file" and "mentions inside its own file". The
+first column is what "dead" was defined as here, and it was right every time.
+The second column is what separates *dead* from *merely over-exported*, and for
+four rows the prose was written from the first column alone.
+
+| symbol | what it actually is | if it had been deleted |
+|---|---|---|
+| `getItemsInTimeframe` | called by `planOverview` in the same file (:436) | the overview would stop windowing to the export timeframe — `check:export` fails |
+| `getCommentsForSlide` | called by `buildExportSlides` in the same file (:1432) | no comment reaches any appendix slide — `check:export` fails |
+| `SortMode` | types `ExportOptions.sortMode` (:98) | does not compile |
+| `Timeline` | types `ExportOptions.scale` (:83) | does not compile |
+
+Each was caught by re-reading the symbol before removing it, which is why
+phase 2 checks by hand rather than trusting the list. Nothing was deleted on
+the strength of the table alone. `SortMode` and `Timeline` are now marked in
+`types/timeline.ts` as category C, beside the `ExportOptions` fields they
+describe.
+
+One item was *added* to the deletion list, and it did not come from the audit:
+removing the Dashboard screen made `getDashboardKpis` and `DashboardKpis`
+(`utils/dashboardMetrics.ts`) dead, since the deck's dashboard slides use
+`getDelayedTasks` and `getDaysOverdue` and never asked for the KPI numbers. The
+module stays — it feeds the slides, which is why it was never an orphan — but
+the two symbols the screen alone used went with the screen.
+
 # Phase 2, as three branches
 
 Proposed split, smallest blast radius first. Each ends with all six checks
 green and no check edited.
 
-1. **`chore/remove-dead-code`** — category A, exactly. Five file deletions, the
-   `ui` slice, the A7 symbols, and the doc references that go stale with them
-   (`design-system-map.md`, `export-handoff-map.md`, `status-color-scale.md`,
-   `export-coverage.md`). Plus the category C markers, since the whole point of
-   marking is that it happens in the same commit as the deleting.
+1. **`chore/remove-dead-code`** — **done.** Seven files deleted (the five
+   orphans, plus `Dashboard.tsx` and its `?dashboardView` plumbing in
+   `App.tsx`), the `ui` slice, and the A7 symbols that survived being re-read.
+   `GanttToolbar`'s `showTimelineControls` prop went with the Dashboard: with
+   one screen left it could only ever be `true`. `Person` moved into
+   `scripts/fixturePlan.ts`, its only consumer. Category C markers added to
+   `TimelineItem`'s six fields, `SortMode`, `Timeline`, `initializeStore` and
+   `exportCoverage.ts`; the focus-mode comment drift fixed; four documents
+   updated. Result: **81 files (was 88), zero orphans, zero unreachable
+   modules**, all six checks green with no check edited.
 2. **`chore/remove-duplication`** — D1 through D4 are resolved by branch 1;
    this branch is D6 (one spelling of "is this a group") and the stale comments
    from B2. D5 (`rollup` / `rows` / `taskHierarchy`) is **out of scope** — it
@@ -546,7 +583,9 @@ green and no check edited.
    refactoring logic, not cleaning up.
 3. **`chore/module-boundaries`** — edits 1, 2 and 4 from the list above, plus
    moving `ganttLayout.ts` and `useFocusTrap.ts`. Ends with a proof: the same
-   import-graph script, re-run, reporting zero cycles.
+   import-graph script, re-run, reporting zero cycles. (After branch 1 the graph
+   still reports the one file cycle and the one folder cycle — untouched on
+   purpose, since neither is dead code.)
 
 Edit 5 (Blob entry points) is a new API surface, not a cleanup. It is left for
 its own ask.
@@ -557,7 +596,18 @@ its own ask.
   notice a branch copy raises. That is behaviour.
 - **The Dashboard stays.** Removing a whole screen is a product decision, and
   its metrics module is load bearing for the deck either way.
-- **`rollup` / `rows` / `taskHierarchy` stay as three traversals.** Merging them
-  changes the plan screen's row model.
+- **`rollup` / `rows` / `taskHierarchy` stay as three traversals — known, and
+  deliberately deferred.** `taskHierarchy.buildTaskHierarchy` builds the parent
+  tree once; `rollup` answers one question at a time with an O(n) scan over the
+  flat list (`childrenOf`, `isSubtask`, `statusOf`); `rows.visibleRows` walks the
+  same relation a third time, with a `collapsed` map on top, to produce
+  `GanttRowModel`. Three traversals of one relation, and all three are correct.
+
+  Merging them is not a cleanup. `GanttRowModel` is what every row on the plan
+  screen is drawn from — `depth`, `isGroup`, `childCount`, `isSubtask`, `status`
+  — and rebuilding it on top of `TaskNode` changes the shape the list, the bars,
+  the context menu and the create/rename paths all read. That is reshaping the
+  screen's model, which is logic, not dead weight. It stays on the list as a
+  known duplication with a named cost, and it is not scheduled.
 - **`slideLayout.ts`'s over-exported constants stay exported.** The file is a
   spec sheet; only the three genuinely unreachable ones go.

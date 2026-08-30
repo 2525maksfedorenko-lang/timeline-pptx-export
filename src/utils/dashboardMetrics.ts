@@ -58,29 +58,3 @@ export function getDaysOverdue(item: TimelineItem, today: Date): number {
   return Math.max(0, Math.round((todayTime - endTime) / MS_PER_DAY));
 }
 
-export interface DashboardKpis {
-  total: number;
-  completed: number;
-  completedPercent: number;
-  delayed: number;
-}
-
-/** The 3 KPI numbers shown on the Dashboard's top cards, derived from the
- * same delayed/status functions used everywhere else — so a KPI card's count
- * always matches the corresponding table's row count.
- *
- * There used to be a fourth, "At risk", whose whole definition was "status is
- * blocked". With that status gone the number could only ever be zero, so the
- * card, its table and its slide went with it. "Delayed" is untouched — it is
- * a fact about dates, not about a status. */
-export function getDashboardKpis(items: TimelineItem[], today: Date): DashboardKpis {
-  const total = items.length;
-  const completed = items.filter((item) => getTaskStatus(item) === 'done').length;
-
-  return {
-    total,
-    completed,
-    completedPercent: total > 0 ? Math.round((completed / total) * 100) : 0,
-    delayed: getDelayedTasks(items, today).length,
-  };
-}

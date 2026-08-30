@@ -9,12 +9,6 @@ export interface NewTaskFields {
   status: TaskStatus;
 }
 
-/** Whether a draft has the three fields a task can't exist without. Shared
- * so every form disables its submit at the same moment. */
-export function isCompleteTask(fields: NewTaskFields): boolean {
-  return fields.label.trim() !== '' && fields.start !== '' && fields.end !== '';
-}
-
 /** A brand-new TimelineItem from a form's fields.
  *
  * The point is the defaults: a fresh id, no progress yet, and included in

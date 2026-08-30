@@ -22,11 +22,6 @@ export function childrenOf(items: TimelineItem[], id: string): TimelineItem[] {
   return items.filter((item) => item.parentId === id);
 }
 
-/** True when anything names `item` as its parent. */
-export function isGroup(items: TimelineItem[], id: string): boolean {
-  return items.some((item) => item.parentId === id);
-}
-
 /** True when `id` is itself somebody's sub-task — its `parentId` names a task
  * that is actually in this plan.
  *

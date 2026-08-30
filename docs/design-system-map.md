@@ -931,3 +931,34 @@ are edited in the panel a tap opens. And the **drawer scrolls itself** there,
 writing its offset back to the body, because the body is underneath it and out
 of reach; it is still one offset, and both writes are guarded on the value
 actually changing so the two panes cannot bounce off each other.
+
+## What the cleanup pass took out of this document's scope
+
+Recorded here rather than edited into the sections above, which are a record of
+what each phase decided at the time. See `docs/cleanup-audit.md` for the full
+inventory; three of its deletions touch claims made earlier in this file.
+
+- **§ "Excluded by the task" cites `barNesting.ts`'s ratios** —
+  `BAR_HEIGHT_RATIO_BY_DEPTH [1, 0.7, 0.55]`, `LABEL_INDENT_RATIO 0.5`,
+  `PROGRESS_LABEL_MIN_BAR_HEIGHT_RATIO 2.1` — as "shared by screen and file".
+  Only `MAX_LABEL_INDENT_STEPS` and the indent it feeds are still shared, and
+  they are shared with the *export settings panel*, not with the chart. The
+  height ladder had no reader on either surface: the slides went to two flat
+  heights (`OVERVIEW_BAR_HEIGHT_IN` / `OVERVIEW_NESTED_BAR_HEIGHT_IN`) and the
+  plan screen took its own `barHeight` from the Gantt handoff. The progress
+  ratio went with the progress label. All three are deleted.
+- **Two design-system primitives were transcribed and never used.**
+  `src/components/Switch.tsx` and `src/components/MultiSelect.tsx` were drawn to
+  the system's contract for a UI that was not built. They are deleted. This does
+  not weaken `npm run check:design`, whose only source-side input is
+  `systemUi.ts` — which is also why the two were never held to the system by
+  anything but a reading. If either is wanted later, the transcription rule in
+  `systemUi.ts`'s header is the instruction for redoing it.
+- **`ganttLayout.ts` is now one constant, and it is the export's.** The row in
+  the deviation table above describes it as the on-screen chart's geometry
+  ("row 40, bar 32, zones 118 / 292 / 104"). None of that is there any more —
+  the plan screen carries its own geometry in `src/gantt/geometry.ts`, and what
+  is left in `ganttLayout.ts` is `BAR_HEIGHT_PX = 32`, the reference height the
+  *export's* depth ladder is expressed in. It is read by the export settings
+  panel and by `check:export`, and by nothing on the plan screen. Moving it into
+  `src/export/` is on the boundaries branch, not this one.

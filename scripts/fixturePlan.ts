@@ -12,7 +12,6 @@
  * CLI runs on import, and the export runner needs the same plan without it.
  */
 import { buildDepthMap } from '../src/utils/barNesting';
-import type { Person } from '../src/store/peopleStore';
 import type { TaskComment, TaskStatus, TimelineItem } from '../src/types/timeline';
 
 const PLAN_START_MS = Date.UTC(2026, 0, 5);
@@ -96,6 +95,28 @@ const SHORT_COMMENTS = [
   'Scope trimmed: the reporting piece moves to the next phase.',
   'Rehearsal went fine, one flaky test to chase down.',
 ];
+
+/** A person a fixture task can be assigned to.
+ *
+ * **Category C — kept on purpose.** This used to be the record type of
+ * `src/store/peopleStore.ts`, a saved list of assignees with its own
+ * IndexedDB database and its own colour palette. The store had no caller left
+ * and went with the cleanup; the type did not, because `FixturePlan` carries a
+ * `people` array and `checkExportCoverage --plan` reads that key off a plan
+ * file (`raw.people ?? []`). So the shape is still part of what a fixture file
+ * may contain, and it lives beside the fixture that defines it rather than in
+ * `src/`, where nothing uses it.
+ *
+ * `TimelineItem.assignee` is a different and smaller thing — a name a task
+ * remembers, not a person the app knows about. The two are deliberately not
+ * the same type. */
+export interface Person {
+  id: string;
+  name: string;
+  /** Hex without a leading '#', the convention `export/theme.ts` stores
+   * colours in. */
+  color: string;
+}
 
 export interface FixturePlan {
   items: TimelineItem[];

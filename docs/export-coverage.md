@@ -74,7 +74,9 @@ Worth noting at the time: `buildOverviewSlide` already computed a per-depth bar
 height and label indent (`resolveBarGeometry`, `labelIndent`), but because it was
 only ever fed roots every bar resolved to depth 0 — that machinery was live on
 screen and inert here, which is why the height ladder could be tuned without
-anything in the file changing.
+anything in the file changing. (`resolveBarGeometry` and the ratio ladder behind
+it are gone as of the cleanup pass — the overview settled on two flat heights
+and neither surface read the ratios any more. `labelIndent` is unchanged.)
 
 **Closed.** `planOverview` is fed every exportable task at every depth, and a bar
 is drawn shorter when it is nested — since the export-handoff redesign, the two
