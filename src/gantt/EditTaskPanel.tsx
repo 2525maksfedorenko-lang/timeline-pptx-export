@@ -104,12 +104,17 @@ export function EditTaskPanel({ item, minDate, spans }: EditTaskPanelProps) {
   const isGroup = childrenOf(items, item.id).length > 0;
   const span = spans.get(item.id);
 
-  // The pair both date fields read, and the pair each of them writes back with
-  // its own end replaced: the drawn span, so a date being dragged on the chart
-  // reads here as it is dropped; off a drag it is the item's own two dates.
-  const shown = span
+  // The pair both date fields show: the drawn span, so a date being dragged on
+  // the chart reads here as it is dropped; off a drag it is the item's own two
+  // dates. With one exception — between a field's first keystroke and the end
+  // of that edit the task can hold a deadline before its start (see DateField),
+  // and previewSpans draws that clamped to one day. The clamp is what the plan
+  // can draw, not what the task says, so there the item's own dates win and
+  // each field goes on showing the date it holds.
+  const drawn = span
     ? { start: isoAtIndex(minDate, span.start), end: isoAtIndex(minDate, span.start + span.len - 1) }
-    : { start: item.start, end: item.end };
+    : null;
+  const shown = drawn && item.start <= item.end ? drawn : { start: item.start, end: item.end };
   const included = item.includeInExport !== false;
   const itemComments = comments.filter((comment) => comment.taskId === item.id);
 
@@ -217,18 +222,24 @@ export function EditTaskPanel({ item, minDate, spans }: EditTaskPanelProps) {
 
         <Band label="PLANNING" zIndex={5} topBorder />
         <div style={SECTION_STYLE}>
+          {/* Each field writes its own date as it is typed, and the rule that
+              ties the two together runs once the edit is over — with the date
+              the field settled on, so the pair is read fresh rather than off
+              this render. */}
           <Field label="Start Date" htmlFor={`panel-${item.id}-start`}>
             <DateField
               id={`panel-${item.id}-start`}
               value={shown.start}
-              onCommit={(start) => updateItem(item.id, withStart(shown, start))}
+              onCommit={(start) => updateItem(item.id, { start })}
+              onSettle={(start) => updateItem(item.id, withStart(item, start))}
             />
           </Field>
           <Field label="Deadline" htmlFor={`panel-${item.id}-end`}>
             <DateField
               id={`panel-${item.id}-end`}
               value={shown.end}
-              onCommit={(end) => updateItem(item.id, withEnd(shown, end))}
+              onCommit={(end) => updateItem(item.id, { end })}
+              onSettle={(end) => updateItem(item.id, withEnd(item, end))}
             />
           </Field>
 

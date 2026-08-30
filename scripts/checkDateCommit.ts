@@ -66,8 +66,8 @@ for (const value of ['1900-01-01', '2024-02-29', '2026-05-10', '2100-12-31']) {
   expect(isCommittableDate(value), `${value} should be committable`);
 }
 
-// 3. A committed date never leaves the pair inverted — the edited end wins and
-//    the other follows to a one-day task.
+// 3. Settling never leaves the pair inverted — the edited end wins and the
+//    other follows to a one-day task.
 const pair: DatePair = { start: '2026-05-10', end: '2026-05-20' };
 const cases: [string, DatePair, DatePair][] = [
   ['start before deadline', withStart(pair, '2026-05-12'), { start: '2026-05-12', end: '2026-05-20' }],
@@ -81,7 +81,47 @@ for (const [what, got, want] of cases) {
   console.log(`   ${ok ? 'OK  ' : 'FAIL'}  ${what.padEnd(22)} ${got.start} … ${got.end}`);
 }
 
-// 4. Why: the canvas a held-back value would have asked for.
+// 4. Typing a two-digit month or day: the date nobody touched stays put.
+//
+// These segments cannot be held back the way a year is — the first digit of 11
+// is January the 3rd, a date this check would have to pass. So they commit as
+// they come, and the pair rule runs once the edit is over instead. Applying it
+// per keystroke is the failure: January carries the start date with it, and
+// the second keystroke only fixes the deadline it was typed into.
+function typedInto(pair: DatePair, field: 'start' | 'end', reported: string[], settle: 'per key' | 'at the end'): DatePair {
+  let held = pair;
+  for (const value of reported) {
+    if (!isCommittableDate(value)) continue;
+    held = field === 'start' ? { ...held, start: value } : { ...held, end: value };
+    if (settle === 'per key') held = field === 'start' ? withStart(held, value) : withEnd(held, value);
+  }
+  return field === 'start' ? withStart(held, held.start) : withEnd(held, held.end);
+}
+
+const segments: [string, DatePair, 'start' | 'end', string[], DatePair][] = [
+  // Deadline September → November: the month passes through January.
+  ['deadline month 09 → 11', { start: '2026-08-30', end: '2026-09-03' }, 'end',
+    ['2026-01-03', '2026-11-03'], { start: '2026-08-30', end: '2026-11-03' }],
+  // Deadline the 25th → the 13th, inside one month: the day passes through the 1st.
+  ['deadline day 25 → 13', { start: '2026-09-10', end: '2026-09-25' }, 'end',
+    ['2026-09-01', '2026-09-13'], { start: '2026-09-10', end: '2026-09-13' }],
+  // Start August → December, past the deadline: the deadline follows, once.
+  ['start month 08 → 12', { start: '2026-08-30', end: '2026-09-03' }, 'start',
+    ['2026-01-30', '2026-12-30'], { start: '2026-12-30', end: '2026-12-30' }],
+  // A deadline that really is earlier: settling still pulls the start back.
+  ['deadline year 2026 → 2025', { start: '2026-08-30', end: '2026-09-03' }, 'end',
+    ['2025-09-03'], { start: '2025-09-03', end: '2025-09-03' }],
+];
+for (const [what, pairBefore, field, reported, want] of segments) {
+  const got = typedInto(pairBefore, field, reported, 'at the end');
+  const ok = got.start === want.start && got.end === want.end;
+  expect(ok, `${what}: got ${got.start}…${got.end}, expected ${want.start}…${want.end}`);
+  const perKey = typedInto(pairBefore, field, reported, 'per key');
+  const cost = perKey.start === got.start && perKey.end === got.end ? '' : `  (per keystroke: ${perKey.start} … ${perKey.end})`;
+  console.log(`   ${ok ? 'OK  ' : 'FAIL'}  ${what.padEnd(25)} ${got.start} … ${got.end}${cost}`);
+}
+
+// 5. Why the year is held back at all: the canvas a half-typed one would ask for.
 //
 // Two-digit years read as 1900s inside Date.UTC, which is what the canvas
 // padding uses — so a year-2 start lands the canvas in 1902 rather than in

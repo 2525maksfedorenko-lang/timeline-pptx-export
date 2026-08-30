@@ -29,7 +29,12 @@ const MAX_YEAR = 2100;
  *
  * So: four digits of year inside the window above, and a date the calendar
  * actually has. The round-trip through `toISOString` is what checks the last
- * part — `new Date('2026-02-31')` doesn't fail, it rolls forward to 3 March. */
+ * part — `new Date('2026-02-31')` doesn't fail, it rolls forward to 3 March.
+ *
+ * Only the year can be guarded this way. A half-typed month or day is an
+ * ordinary date — the first digit of 11 is January — and nothing here can tell
+ * it from a date somebody meant, which is why the pair rules below wait for
+ * the end of an edit instead of trusting every value that passes this. */
 export function isCommittableDate(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
 
@@ -52,10 +57,17 @@ export interface DatePair {
  *
  * The field being edited always wins and the other end follows, which is the
  * same bargain a drag on the chart already strikes: a resize never shrinks a
- * bar past one day, it stops. Here the pair is written so that what the panel
- * shows and what the task stores agree — the alternative, storing a deadline
- * before its start, leaves the bar drawing one day (previewSpans clamps it)
- * while the field claims something else. */
+ * bar past one day, it stops.
+ *
+ * Both run when an edit finishes — a blur, Enter, or a date picked from the
+ * calendar — and not on every keystroke, because a keystroke is not a date
+ * somebody chose. Type 11 into a September deadline and the field passes
+ * through January on the way; carrying the start date off to January is a move
+ * the second keystroke cannot undo, since by then the start is simply where it
+ * is. Waiting means the task holds a deadline before its start for as long as
+ * the edit lasts: the plan draws that clamped to one day (previewSpans), the
+ * panel goes on showing the two dates as they are, and settling puts them back
+ * in order. */
 
 /** The pair after Start Date is set to `start`. Moving the start keeps the
  * deadline where it is, so the task's length is what changes — until the start
