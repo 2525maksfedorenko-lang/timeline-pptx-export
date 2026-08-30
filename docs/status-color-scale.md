@@ -44,8 +44,13 @@ Defined once, in `src/types/timeline.ts` as `TASK_STATUS_SCALE`.
 
 ## Contrast
 
-WCAG AA, normal text, threshold **4.5:1**. Ratios computed by
-`contrastRatio()` in `src/utils/colorContrast.ts`.
+WCAG AA, normal text, threshold **4.5:1**. Ratios in the table below were
+computed by `contrastRatio()`, which used to be exported from
+`src/utils/colorContrast.ts`. That module had no caller left and was deleted in
+the cleanup pass (docs/cleanup-audit.md); the same formula, to the same
+decimals, is now private to `src/gantt/barColor.ts`, which is the one place
+that still has to choose a label colour by measurement. The measured values
+here are unchanged — the input colours did not move.
 
 | surface | status | background | text | ratio | passes 4.5:1 |
 |---|---|---|---|---|---|
@@ -82,7 +87,8 @@ projector. Both now use `solid`.
 The chip in the app's left column was already correct and is unchanged: it is
 the design system's own pale-background-with-dark-text chip.
 
-`readableTextOn()` replaced a luminance threshold of 0.35 that mis-picked
+`readableTextOn()` — since folded into `barTextCss` in `src/gantt/barColor.ts`,
+same rule — replaced a luminance threshold of 0.35 that mis-picked
 mid-tones — on the demo plan's purple (`#A855F7`) it chose white at 3.96:1 where
 dark text reaches 5.00:1. Status fills clear AA with light text by construction;
 that function is for fills the palette does not control, namely a user's own

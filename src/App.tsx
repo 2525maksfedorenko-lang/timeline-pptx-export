@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { GanttScreen } from './gantt/GanttScreen'
 import { GanttToolbar } from './gantt/GanttToolbar'
-import { Dashboard, type DashboardSection } from './components/Dashboard'
 import { SettingsFlyout } from './components/SettingsFlyout'
 import { ExportOverflowModal } from './components/ExportOverflowModal'
 import { ImportModal } from './components/ImportModal'
@@ -18,8 +17,6 @@ import { sortItemsForExport } from './utils/sortItemsForExport'
 import { flushedActivePlan, useTimelineStore } from './store/timelineStore'
 import { buttonBaseClass } from './components/systemUi';
 
-type Tab = 'timeline' | 'dashboard'
-
 /** The export the user asked for, held while the overflow modal asks how to
  * handle the tasks that don't fit on one overview slide. */
 interface PendingOverflowExport {
@@ -28,33 +25,16 @@ interface PendingOverflowExport {
   capacity: number
 }
 
-const DASHBOARD_VIEW_SECTIONS: DashboardSection[] = ['status', 'delayed']
-
-/** Reads the initial tab + highlighted dashboard section from
- * ?dashboardView=delayed|status once at startup, so a shared link
- * opens straight on the right view instead of the default Timeline tab. */
-function readDashboardViewParam(): DashboardSection | null {
-  const value = new URLSearchParams(window.location.search).get('dashboardView')
-  return (DASHBOARD_VIEW_SECTIONS as string[]).includes(value ?? '') ? (value as DashboardSection) : null
-}
-
 function App() {
   const loadPlans = useTimelineStore((state) => state.loadPlans)
   const items = useTimelineStore((state) => state.items)
   const exportOptions = useTimelineStore((state) => state.exportOptions)
   const comments = useTimelineStore((state) => state.comments)
 
-  // What the deck is made of: the whole plan. Nothing on the plan screen
-  // narrows it — a focus is a way of looking at a plan rather than a statement
-  // about it, and a branch worth its own deck has its own plan now (see
+  // What the deck is made of: the whole plan. Nothing on this screen narrows
+  // it — a branch worth its own deck has its own plan now (see
   // createPlanFromBranch). What a deck leaves out is said per task, with
   // "Exclude from export", and the exporters read that themselves.
-  const [highlightSection] = useState<DashboardSection | null>(readDashboardViewParam)
-  // Fixed at startup, not switched: the toolbar no longer offers the two
-  // views. ?dashboardView=… is the only thing that selects the dashboard, and
-  // nothing produces that URL any more — the deck's QR codes did, and they are
-  // gone with the tab they opened. The screen is reachable by typing it.
-  const [activeTab] = useState<Tab>(highlightSection ? 'dashboard' : 'timeline')
   const [overflow, setOverflow] = useState<PendingOverflowExport | null>(null)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   // Only for the Export menu's JSON row, which is disabled until there is a
@@ -123,7 +103,6 @@ function App() {
           the right of the top row, because there is nowhere else for them to
           live once the screen is the plan. */}
       <GanttToolbar
-        showTimelineControls={activeTab === 'timeline'}
         actions={
           <>
             {/* The two things the app does to a whole plan, both said as the
@@ -167,16 +146,10 @@ function App() {
           <PlanNotice />
         </div>
 
-        {/* The plan screen runs edge to edge and owns its own scrolling: its
-            canvas is one scroll container that has to reach the window's
-            edges to be worth scrolling. The dashboard keeps page padding. */}
-        {activeTab === 'timeline' ? (
-          <GanttScreen />
-        ) : (
-          <div className="min-h-0 flex-1 overflow-y-auto p-6 max-md:p-3">
-            <Dashboard highlightSection={highlightSection} />
-          </div>
-        )}
+        {/* The one screen this app has. It runs edge to edge and owns its own
+            scrolling: its canvas is one scroll container that has to reach the
+            window's edges to be worth scrolling. */}
+        <GanttScreen />
       </main>
 
       {isSettingsOpen && <SettingsFlyout onClose={() => setIsSettingsOpen(false)} />}

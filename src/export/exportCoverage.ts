@@ -23,6 +23,12 @@ import {
 
 /** Audits a built deck against the plan it was built from.
  *
+ * **Kept on purpose** (docs/cleanup-audit.md, category C): nothing in the app
+ * imports this file — its one caller is `scripts/checkExportCoverage.ts`, and
+ * `npm run check:export` is what runs it. "No importer in `src/`" is what a
+ * check looks like from the inside, not what dead code looks like.
+ *
+ *
  * The invariant, in one line: **the set of tasks with `includeInExport !== false`
  * equals the set of tasks present in the file** — where "present" means drawn as
  * an overview bar, as an appendix section title, or as a subtask row. The only

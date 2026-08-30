@@ -7,12 +7,6 @@ export function daysBetween(from: Date, to: Date) {
   return Math.round((to.getTime() - from.getTime()) / MS_PER_DAY);
 }
 
-export function shiftIsoDate(iso: string, days: number) {
-  const date = new Date(iso);
-  date.setUTCDate(date.getUTCDate() + days);
-  return date.toISOString().slice(0, 10);
-}
-
 /** ISO dates (YYYY-MM-DD) of every **Monday** from `startDate` to `endDate`
  * inclusive. Anchored on the real Monday on or before `startDate` rather
  * than on `startDate` itself, so the markers land on actual week boundaries
@@ -20,8 +14,7 @@ export function shiftIsoDate(iso: string, days: number) {
  * happens to begin. Steps via `setUTCDate` (not raw millisecond/day-of-month
  * arithmetic) so JS Date itself carries the step across a month boundary —
  * 31 -> 1, 28/29/30 -> 1 — instead of hand-rolled rollover logic. UTC-based
- * to match how the rest of this file treats date-only ISO strings (see
- * shiftIsoDate).
+ * to match how the rest of this file treats date-only ISO strings.
  *
  * The first marker can fall *before* `startDate` (when the range doesn't
  * itself begin on a Monday) — callers that scale markers into a drawing
@@ -101,14 +94,6 @@ export function buildExportFilename(
  * date-scale axis, so both formats always agree. */
 export function formatShortDate(date: Date): string {
   return date.toLocaleDateString('en-US', { day: '2-digit', month: 'short' });
-}
-
-/** "Jan 2027" — the axis caption for ranges too long for a day-level date
- * to mean anything (see getVisibleGridLevels). Formatted in UTC because the
- * grid marks it labels are built from UTC date parts, so a 1 January mark
- * can't come out labelled "Dec 2026" west of Greenwich. */
-export function formatMonthYear(date: Date): string {
-  return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' });
 }
 
 export interface DateRange {

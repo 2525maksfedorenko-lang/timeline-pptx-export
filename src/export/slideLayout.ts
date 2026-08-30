@@ -256,8 +256,6 @@ export const BACK_LINK_HEIGHT_IN = TITLE_LINE_HEIGHT_IN;
 export const BACK_LINK_WIDTH_IN = 2.2;
 
 // Left padding inside a column, so no text sits on a column edge.
-export const COLUMN_TEXT_INSET_IN = 0.08;
-
 // Appendix type scale. A detail slide's subtask row packs a label and its
 // dates on the left and a status on the right of one line.
 export const SUBTASK_TEXT_FONT_SIZE_PT = 11;
@@ -406,10 +404,6 @@ export const COMMENT_TABLE_FONT_SIZE_PT = 9;
 export const COMMENT_TABLE_CELL_PADDING_IN = 0.07;
 const PDF_LINE_HEIGHT_FACTOR = 1.15;
 export const COMMENT_TABLE_LINE_HEIGHT_IN = (COMMENT_TABLE_FONT_SIZE_PT * PDF_LINE_HEIGHT_FACTOR) / 72;
-export const COMMENT_TABLE_ROW_HEIGHT_IN =
-  COMMENT_TABLE_LINE_HEIGHT_IN + COMMENT_TABLE_CELL_PADDING_IN * 2;
-// The header row is the same box in a bold face, not a taller one.
-export const COMMENT_TABLE_HEADER_ROW_HEIGHT_IN = COMMENT_TABLE_ROW_HEIGHT_IN;
 
 /** Text width of one column of a `tableWidthIn`-wide table with `columnCount`
  * equal columns. Equal columns are what pptxgenjs is told to draw and what

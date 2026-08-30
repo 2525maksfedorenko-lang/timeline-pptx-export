@@ -491,7 +491,7 @@ function withoutPageBreaks(doc: jsPDF, draw: () => void) {
  *
  * Cell padding and font size come from slideLayout rather than from
  * autoTable's defaults, so a row is exactly as tall as the model reserved for
- * it (COMMENT_TABLE_ROW_HEIGHT_IN) instead of ~18% taller. */
+ * it (tableRowHeightIn) instead of ~18% taller. */
 function drawTableBlock(
   doc: jsPDF,
   table: DashboardTable,

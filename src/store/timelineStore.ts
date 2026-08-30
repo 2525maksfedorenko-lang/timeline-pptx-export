@@ -21,12 +21,6 @@ export type { SavedPlan };
 // Re-exported for convenience; they are declared in types/timeline.ts now.
 export type { ExportOptions, ExportTimeframe };
 
-export interface UiState {
-  selectedItemId: string | null;
-  zoomLevel: number;
-  editingItemId: string | null;
-}
-
 interface TimelineStore {
   title: string;
   setTitle: (title: string) => void;
@@ -46,11 +40,6 @@ interface TimelineStore {
 
   exportOptions: ExportOptions;
   updateExportOptions: (patch: Partial<ExportOptions>) => void;
-
-  ui: UiState;
-  selectItem: (id: string | null) => void;
-  setZoomLevel: (zoomLevel: number) => void;
-  setEditingItem: (id: string | null) => void;
 
   // What each plan has to say about itself this session, keyed by plan id —
   // a repair on the way in, or the links a plan made from a branch could not
@@ -187,12 +176,6 @@ export function flushedActivePlan(state: TimelineStore): SavedPlan | null {
  * the race too, since the second run finds the plan the first one wrote. */
 let planLoadQueue: Promise<void> = Promise.resolve();
 
-const DEFAULT_UI: UiState = {
-  selectedItemId: null,
-  zoomLevel: 1,
-  editingItemId: null,
-};
-
 /**
  * First-run bootstrap: persists `seed` (whatever is currently in memory —
  * an empty plan on a truly first visit, or in-memory state recovered from
@@ -201,6 +184,11 @@ const DEFAULT_UI: UiState = {
  * store's closure, so a product integration can call a different bootstrap
  * (e.g. fetch the user's real plan from an API) instead of editing the
  * store engine itself.
+ *
+ * **Kept on purpose** (docs/cleanup-audit.md, category C): its only caller is
+ * `loadPlans` below, in this same file, so a call graph reports the `export`
+ * as unused. The export is the seam, not an oversight — it is what a host app
+ * replaces to bring its own first plan.
  */
 export async function initializeStore(seed: {
   title: string;
@@ -280,11 +268,6 @@ export const useTimelineStore = create<TimelineStore>()(
       exportOptions: DEFAULT_EXPORT_OPTIONS,
       updateExportOptions: (patch) =>
         set((state) => ({ exportOptions: { ...state.exportOptions, ...patch } })),
-
-      ui: DEFAULT_UI,
-      selectItem: (id) => set((state) => ({ ui: { ...state.ui, selectedItemId: id } })),
-      setZoomLevel: (zoomLevel) => set((state) => ({ ui: { ...state.ui, zoomLevel } })),
-      setEditingItem: (id) => set((state) => ({ ui: { ...state.ui, editingItemId: id } })),
 
       planNotices: {},
       dismissPlanNotices: () =>
@@ -415,7 +398,6 @@ export const useTimelineStore = create<TimelineStore>()(
           title: plan.name,
           items: plan.items,
           exportOptions: plan.exportOptions,
-          ui: DEFAULT_UI,
         }));
       },
 
@@ -466,7 +448,6 @@ export const useTimelineStore = create<TimelineStore>()(
           title: targetPlan.name,
           items: targetPlan.items,
           exportOptions: targetPlan.exportOptions,
-          ui: DEFAULT_UI,
         }));
       },
 
@@ -518,7 +499,6 @@ export const useTimelineStore = create<TimelineStore>()(
           // in one list, keyed by task id — so the copies simply join them,
           // and the ones on the original tasks stay where they were.
           comments: [...current.comments, ...branch.comments],
-          ui: DEFAULT_UI,
           planNotices: notice
             ? mergePlanNotices(current.planNotices, { [plan.id]: notice })
             : current.planNotices,
@@ -542,7 +522,6 @@ export const useTimelineStore = create<TimelineStore>()(
           title: next?.name ?? '',
           items: next?.items ?? [],
           exportOptions: next?.exportOptions ?? DEFAULT_EXPORT_OPTIONS,
-          ui: DEFAULT_UI,
         });
       },
     }),

@@ -86,9 +86,12 @@ export interface BarStyle {
 /** Every task's bar style, keyed by id.
  *
  * `depthById` must be the depth in the **whole plan**, not the row's depth on
- * screen: the focused view promotes a sub-tree to the top level, and a bar that
- * changed from tinted to full strength on entering a focus would be saying its
- * task had been re-parented. */
+ * screen. The two can differ — folding a group away leaves its children out of
+ * the drawn rows, and any depth computed from what is drawn would shift the
+ * ones that remain. A bar that changed from tinted to full strength because a
+ * row above it was folded would be saying its task had been re-parented. The
+ * same rule made the export and the screen agree, which is why the depth map
+ * is built once from the whole plan and handed in. */
 export function buildBarStyles(
   colorById: ReadonlyMap<string, BranchColor>,
   depthById: ReadonlyMap<string, number>,
