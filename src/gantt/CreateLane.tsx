@@ -24,9 +24,9 @@ interface CreateLaneProps {
   /** Columns drawn on the canvas — what a drawn edge is clamped to. */
   dayCount: number;
   canvasWidth: number;
-  /** The canvas's own height — what the date pill measures "off the chart"
-   * against when it decides which side of the ghost to sit on. */
-  canvasHeight: number;
+  /** The canvas's scroller, handed straight to the date pill — see DragPill for
+   * why it places itself against the visible band. */
+  scrollerRef: React.RefObject<HTMLElement | null>;
   /** "Aug 17" for a column index, for the pill. */
   formatDay: (index: number) => string;
   /** Creates the task. Called on Enter with a name typed, and at no other
@@ -59,7 +59,7 @@ export function CreateLane({
   columnWidth,
   dayCount,
   canvasWidth,
-  canvasHeight,
+  scrollerRef,
   formatDay,
   onCreate,
 }: CreateLaneProps) {
@@ -267,10 +267,10 @@ export function CreateLane({
           field, so there is one rule rather than two. */}
       {shown && (
         <DragPill
-          left={barLeft(shown.start, columnWidth)}
+          scrollerRef={scrollerRef}
+          anchorLeft={barLeft(shown.start, columnWidth)}
           anchorTop={top + (ADD_ROW_HEIGHT_PX - ghostHeight) / 2}
           anchorHeight={ghostHeight}
-          canvasHeight={canvasHeight}
           label={`${formatDay(shown.start)} → ${formatDay(shown.start + shown.len - 1)}  (${shown.len}d)`}
         />
       )}
