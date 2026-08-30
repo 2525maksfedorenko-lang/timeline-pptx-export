@@ -12,6 +12,20 @@ import type { GanttRowModel } from './rows';
 import type { DragState } from './drag';
 import { BAR_HIT_ATTRIBUTE } from './useScrollPanes';
 
+/** The narrowest bar still worth setting a name inside.
+ *
+ * Below the mobile breakpoint the task column is a drawer, and a drawer is
+ * usually shut — so the bar is the only thing on screen saying which row it
+ * belongs to. It has carried its own name all along, which answers most of it;
+ * what it cannot do is carry one in 30px. Under this width the name is set
+ * beside the bar instead of inside it, which is the ordinary Gantt treatment
+ * for a short task and costs the chart nothing — the rest of a row is empty.
+ *
+ * 88px is about eleven characters at the bar's own 14px, minus its 12px of
+ * padding at each end. Above it a name is at least recognisable when
+ * ellipsised; below it there is nothing left of it to recognise. */
+const NAMEABLE_BAR_PX = 88;
+
 interface TaskBarProps {
   row: GanttRowModel;
   span: Span;
@@ -26,6 +40,8 @@ interface TaskBarProps {
   /** Human date range for the bar's tooltip, e.g. "Aug 17 – Aug 24". */
   dateRange: string;
   statusLabel: string;
+  /** Whether the task column is a drawer at this width. See NAMEABLE_BAR_PX. */
+  isMobile: boolean;
   onPointerDownBar: (event: React.PointerEvent, mode: DragState['mode']) => void;
   onSelect: () => void;
   onContextMenu: (event: React.MouseEvent) => void;
@@ -39,7 +55,16 @@ interface TaskBarProps {
  * The colour says which branch this task belongs to — the rule the exported
  * deck has always drawn by, and now the only rule. It does *not* say what state
  * the task is in: a done task and an untouched one in the same branch are the
- * same colour, and the status icon in the list is what tells them apart. */
+ * same colour, and the status icon in the list is what tells them apart.
+ *
+ * **A bar is dragged with a pointer and tapped with a finger.** Below the
+ * mobile breakpoint the move-drag and the two resize strips are not rendered
+ * at all, and the reason is measured rather than stylistic: the way through a
+ * plan on a phone is to drag the canvas, bars cover a large share of it, and
+ * there is no hover to warn anyone which pixels are a bar — so a drag that
+ * happened to start on one moved the task by a week instead of scrolling.
+ * Dates are edited in the panel a tap opens, which is a place to see what is
+ * being changed. */
 export function TaskBar({
   row,
   span,
@@ -50,6 +75,7 @@ export function TaskBar({
   barStyle,
   dateRange,
   statusLabel,
+  isMobile,
   onPointerDownBar,
   onSelect,
   onContextMenu,
@@ -59,6 +85,7 @@ export function TaskBar({
   const top = barOffsetY(ROW_HEIGHT_PX);
   const left = barLeft(span.start, columnWidth);
   const width = barWidth(span.len, columnWidth);
+  const namesBeside = isMobile && width < NAMEABLE_BAR_PX;
 
   const handleStyle = (side: 'left' | 'right'): React.CSSProperties => ({
     position: 'absolute',
@@ -93,7 +120,7 @@ export function TaskBar({
         // press: a grab-pan of the canvas refuses to start anywhere inside
         // this element, so moving a bar and panning past it never both run.
         {...{ [BAR_HIT_ATTRIBUTE]: '' }}
-        onPointerDown={(event) => onPointerDownBar(event, 'move')}
+        onPointerDown={isMobile ? undefined : (event) => onPointerDownBar(event, 'move')}
         onClick={onSelect}
         onContextMenu={onContextMenu}
         title={`${item.label} · ${dateRange} · ${statusLabel}`}
@@ -109,7 +136,7 @@ export function TaskBar({
           overflow: 'hidden',
           display: 'flex',
           alignItems: 'center',
-          cursor: 'grab',
+          cursor: isMobile ? 'pointer' : 'grab',
           border: 'none',
           pointerEvents: 'auto',
           // The only elevation on this screen: a ring in the branch's own
@@ -117,14 +144,70 @@ export function TaskBar({
           boxShadow: isSelected ? `0 0 0 2px color-mix(in srgb, ${barStyle.ring} 50%, transparent)` : 'none',
         }}
       >
+        {!namesBeside && (
+          <span
+            style={{
+              position: 'relative',
+              zIndex: 1,
+              padding: '0 12px',
+              fontSize: 14,
+              fontWeight: isGroup ? 600 : 400,
+              color: barStyle.text,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              pointerEvents: 'none',
+            }}
+          >
+            {item.label}
+          </span>
+        )}
+
+        {/* A phase has a duration of its own, so it resizes like anything
+            else: the handoff hid these on a group because a group's span was
+            its children's, and it no longer is. Dragging a phase moves the
+            phase — its sub-tasks stay where they are.
+
+            Absent below the breakpoint, with the move-drag. They are 11px
+            strips that carry `touch-action: none`, so leaving them there would
+            put two dead zones at every bar's ends where a finger cannot scroll
+            the canvas — for a gesture that has no way to succeed on a touch
+            screen anyway. */}
+        {!isMobile && (
+          <>
+            <div
+              onPointerDown={(event) => onPointerDownBar(event, 'start')}
+              title="Drag to change the start date"
+              className="gantt-handle gantt-handle-left"
+              style={handleStyle('left')}
+            />
+            <div
+              onPointerDown={(event) => onPointerDownBar(event, 'end')}
+              title="Drag to change the deadline"
+              className="gantt-handle gantt-handle-right"
+              style={handleStyle('right')}
+            />
+          </>
+        )}
+      </div>
+
+      {namesBeside && (
         <span
+          // Deaf to the pointer, like every other mark on this canvas that is
+          // not a bar: the row's free space is where a pan starts, and a name
+          // lying in it must not be the thing that swallows the gesture. The
+          // bar itself is still what is tapped to open the task.
           style={{
-            position: 'relative',
-            zIndex: 1,
-            padding: '0 12px',
+            position: 'absolute',
+            left: left + width + 8,
+            top,
+            height,
+            maxWidth: Math.max(0, canvasWidth - (left + width + 8) - 8),
+            display: 'flex',
+            alignItems: 'center',
             fontSize: 14,
             fontWeight: isGroup ? 600 : 400,
-            color: barStyle.text,
+            color: 'var(--gantt-text)',
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
@@ -133,24 +216,7 @@ export function TaskBar({
         >
           {item.label}
         </span>
-
-        {/* A phase has a duration of its own, so it resizes like anything
-            else: the handoff hid these on a group because a group's span was
-            its children's, and it no longer is. Dragging a phase moves the
-            phase — its sub-tasks stay where they are. */}
-        <div
-          onPointerDown={(event) => onPointerDownBar(event, 'start')}
-          title="Drag to change the start date"
-          className="gantt-handle gantt-handle-left"
-          style={handleStyle('left')}
-        />
-        <div
-          onPointerDown={(event) => onPointerDownBar(event, 'end')}
-          title="Drag to change the deadline"
-          className="gantt-handle gantt-handle-right"
-          style={handleStyle('right')}
-        />
-      </div>
+      )}
     </div>
   );
 }

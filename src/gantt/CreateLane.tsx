@@ -237,6 +237,7 @@ export function CreateLane({
             // Clicking away discards the draft, as the add row's field does.
             onBlur={closeDraft}
             aria-label="New task name"
+            className="gantt-field"
             style={{
               position: 'absolute',
               left: fieldLeft,
@@ -247,7 +248,6 @@ export function CreateLane({
               border: '1px solid var(--gantt-edit-focus)',
               borderRadius: 6,
               background: 'var(--gantt-surface)',
-              fontSize: 14,
               padding: '0 10px',
               outline: 'none',
               color: 'var(--gantt-text)',

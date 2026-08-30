@@ -110,8 +110,14 @@ function App() {
     setOverflow({ format, totalTasks: plan.inRange.length, capacity: plan.capacity })
   }
 
+  // The shell is `100vh` tall, and `100dvh` below the mobile breakpoint. On
+  // iOS Safari the layout viewport keeps running under the address bar, so a
+  // screen measured in `vh` puts its last row — here the chart's own bottom
+  // edge, and the create lane along it — behind that bar until it retracts.
+  // The two units are the same number on a desktop, and the utility is scoped
+  // to `max-md` anyway: nothing above 768px changes.
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-base-background">
+    <div className="flex h-screen flex-col overflow-hidden bg-base-background max-md:h-[100dvh]">
       {/* One header for the whole app. The plan's own controls are the
           handoff's; this app's four actions and its view switch join them at
           the right of the top row, because there is nowhere else for them to
@@ -126,7 +132,13 @@ function App() {
             <button
               type="button"
               onClick={() => setIsImportOpen(true)}
-              className={buttonBaseClass('outline', 'h-8 whitespace-nowrap px-3 text-xs font-semibold')}
+              // Taller and tighter below the breakpoint: 40px is a target a
+              // thumb can find, and the two px it gives back go to the plan's
+              // name at the other end of the row.
+              className={buttonBaseClass(
+                'outline',
+                'h-8 whitespace-nowrap px-3 text-xs font-semibold max-md:h-10 max-md:px-2.5',
+              )}
             >
               Import
             </button>
@@ -140,7 +152,7 @@ function App() {
               onClick={() => setIsSettingsOpen(true)}
               title="Export settings"
               aria-label="Export settings"
-              className={buttonBaseClass('outline', 'h-8 w-8 flex-none px-0')}
+              className={buttonBaseClass('outline', 'h-8 w-8 flex-none px-0 max-md:h-10 max-md:w-10')}
             >
               <Settings size={15} strokeWidth={2} aria-hidden="true" />
             </button>

@@ -1,6 +1,8 @@
+import { PanelLeft, PanelLeftClose } from 'lucide-react';
 import { buttonBaseClass } from '../components/systemUi';
 import { PlanMenu } from '../components/PlanMenu';
 import { useTimelineStore } from '../store/timelineStore';
+import { useIsMobile } from '../utils/useIsMobile';
 import { TIME_SCALE_LABELS, TIME_SCALES } from './scale';
 import { useGanttViewStore } from './viewStore';
 
@@ -46,6 +48,21 @@ interface GanttToolbarProps {
  * no slot for any of them. They sit at the right in their most compact
  * legible form — icons where the glyph says it, short labels where it does
  * not — so the row still clears its width budget.
+ *
+ * **Below the mobile breakpoint it is two rows, and the split is by kind.**
+ * One row cannot hold this: measured at 375px the fixed parts alone —
+ * a drawer toggle, the scale switch, Today, Import, Export and the gear —
+ * come to more than the 347px inside the padding, before the plan's name has
+ * asked for a single pixel. So the row above is what is *done* to the plan
+ * (open its task list, import, export, set the export up) and the row below
+ * is what is being *looked at* (which plan, at what scale, and the way back
+ * to now). Nothing is hidden behind an overflow menu: Import and Export stay
+ * words on the surface at every width, which is the one thing this header was
+ * asked to keep.
+ *
+ * The product mark goes at that width. It is 71px of a 347px row saying what
+ * the app is, on a screen where the only thing there is room to say is what
+ * the plan is; the plan's own navy initial keeps the brand present.
  */
 export function GanttToolbar({ actions, showTimelineControls }: GanttToolbarProps) {
   const title = useTimelineStore((state) => state.title);
@@ -55,16 +72,174 @@ export function GanttToolbar({ actions, showTimelineControls }: GanttToolbarProp
   const setScale = useGanttViewStore((state) => state.setScale);
   const requestToday = useGanttViewStore((state) => state.requestToday);
 
+  const isMobile = useIsMobile();
+  const isTaskDrawerOpen = useGanttViewStore((state) => state.isTaskDrawerOpen);
+  const toggleTaskDrawer = useGanttViewStore((state) => state.toggleTaskDrawer);
+
   // A group is an item something else calls its parent; everything else is a
   // work item. Two passes over the list rather than one, because the counts
   // are read once per render and the list is a plan, not a feed.
   const groupCount = items.filter((item) => items.some((child) => child.parentId === item.id)).length;
   const taskCount = items.length - groupCount;
 
+  /* Which plan is open, and how big it is. Written once and placed twice: on
+     the left of the desktop row, beside the product's mark, and on the left of
+     the second row on a phone, where the mark is gone and this is what the
+     header leads with. */
+  const planIdentity = (
+  <PlanMenu>
+    <div
+      className="bg-primary text-primary-foreground"
+      aria-hidden="true"
+      style={{
+        width: 24,
+        height: 24,
+        flex: 'none',
+        borderRadius: 6,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: 11,
+        fontWeight: 700,
+      }}
+    >
+      {/* The plan's initial. The handoff sets a fixed "C" for
+          Coordinator; here the mark belongs to the plan on screen,
+          which is the thing that changes. */}
+      {title.trim().charAt(0).toUpperCase()}
+    </div>
+    {/* Capped at 220 so a long name cannot push the timeline controls
+        off the row's centre, and shrinkable below that so a narrow
+        window ellipsises the name rather than overrunning them. */}
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        lineHeight: 1.2,
+        flex: '0 1 auto',
+        minWidth: 0,
+        maxWidth: 220,
+      }}
+    >
+      <span
+        title={title}
+        style={{
+          fontSize: 13.5,
+          fontWeight: 600,
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+        }}
+      >
+        {title}
+      </span>
+      {/* How big the plan is, under its name. Gone below the breakpoint: at
+          375px the trigger has about seventy pixels for text, and a count
+          ellipsised to "13 work…" is not a count — it only reads as something
+          broken. The name is what the header has room to say there. */}
+      {!isMobile && (
+        <span
+          className="text-muted-foreground"
+          // The weight is stated because the trigger around this is now a
+          // Button, and `font-medium` comes with that contract; the counts
+          // are a subline and read as one at 400.
+          style={{
+            fontSize: 10.5,
+            fontWeight: 400,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          {taskCount} work items · {groupCount} groups
+        </span>
+      )}
+    </div>
+  </PlanMenu>
+  );
+
+  /* The chart's own two controls, in the one place they are written. Which
+     row they land on is the breakpoint's business, not theirs: the middle of
+     the desktop row, or the second row on a phone, where they get a taller
+     button because the thing pressing them is a thumb. */
+  const timelineControls = showTimelineControls ? (
+    <>
+      {/* The system has no segmented control, so this is the handoff's
+          own recipe over primitives: a muted tray at 8px radius
+          holding three buttons, the active one filled, the rest
+          ghost. */}
+      <div className="bg-muted" style={{ display: 'flex', borderRadius: 8, padding: 2, gap: 2 }}>
+        {TIME_SCALES.map((option) => (
+          <button
+            key={option}
+            type="button"
+            onClick={() => setScale(option)}
+            aria-pressed={scale === option}
+            className={buttonBaseClass(
+              scale === option ? 'default' : 'ghost',
+              isMobile
+                ? 'h-9 whitespace-nowrap px-2.5 text-[11px] font-semibold'
+                : 'h-7 whitespace-nowrap px-3 text-[11px] font-semibold',
+            )}
+          >
+            {TIME_SCALE_LABELS[option]}
+          </button>
+        ))}
+      </div>
+      <button
+        type="button"
+        onClick={requestToday}
+        className={buttonBaseClass(
+          'outline',
+          isMobile
+            ? 'h-10 whitespace-nowrap px-3 text-xs font-semibold'
+            : 'h-8 whitespace-nowrap px-3 text-xs font-semibold',
+        )}
+      >
+        Today
+      </button>
+    </>
+  ) : null;
+
+  /* The one control that opens the task list, and the only new thing in this
+     header. A button rather than an edge swipe: a swipe from the left edge is
+     the browser's own "back" on both iOS Safari and Chrome for Android, and a
+     drawer that sometimes leaves the app instead of opening is worse than no
+     drawer. Rather than a tab hanging off the edge, too — a tab lives over the
+     chart, in that same back-gesture strip, and this header already exists.
+
+     It is a toggle and says which way it points: the icon is a panel coming
+     out while the drawer is shut and a panel going back in while it is open,
+     so the button that opened it is also one of the four ways to close it. */
+  const taskDrawerToggle = (
+    <button
+      type="button"
+      onClick={toggleTaskDrawer}
+      aria-expanded={isTaskDrawerOpen}
+      aria-controls="gantt-task-drawer"
+      className={buttonBaseClass('outline', 'h-10 flex-none gap-1.5 whitespace-nowrap px-3 text-xs font-semibold')}
+    >
+      {isTaskDrawerOpen ? (
+        <PanelLeftClose size={15} strokeWidth={2} aria-hidden="true" />
+      ) : (
+        <PanelLeft size={15} strokeWidth={2} aria-hidden="true" />
+      )}
+      Tasks
+    </button>
+  );
+
   return (
     <div className="flex-none border-b border-border bg-background">
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, height: 50, padding: '0 14px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: '1 1 0', minWidth: 0 }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            flex: isMobile ? '1 1 auto' : '1 1 0',
+            minWidth: 0,
+          }}
+        >
           {/* The product's mark, then the plan's. They are two different
               identities and the rule between them says so: aicoo is what this
               is, and the name beside it is what is open in it.
@@ -75,6 +250,9 @@ export function GanttToolbar({ actions, showTimelineControls }: GanttToolbarProp
               because that sidebar is navy. Copied into `public/` rather than
               imported from `design-system/`, which is reference material and not
               app source. */}
+          {/* Gone below the breakpoint — see this component's own note. */}
+          {!isMobile && (
+          <>
           {/* Both axes are given, and neither is `auto`, because the file's
               `width`/`height` (1260×684) disagree with its `viewBox`
               (2200×684): sizing by one axis letterboxes the mark inside a box
@@ -92,70 +270,10 @@ export function GanttToolbar({ actions, showTimelineControls }: GanttToolbarProp
             style={{ width: 71, height: 22, flex: 'none', display: 'block' }}
           />
           <span className="h-5 w-px flex-none bg-border" />
+          </>
+          )}
 
-          <PlanMenu>
-            <div
-              className="bg-primary text-primary-foreground"
-              aria-hidden="true"
-              style={{
-                width: 24,
-                height: 24,
-                flex: 'none',
-                borderRadius: 6,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: 11,
-                fontWeight: 700,
-              }}
-            >
-              {/* The plan's initial. The handoff sets a fixed "C" for
-                  Coordinator; here the mark belongs to the plan on screen,
-                  which is the thing that changes. */}
-              {title.trim().charAt(0).toUpperCase()}
-            </div>
-            {/* Capped at 220 so a long name cannot push the timeline controls
-                off the row's centre, and shrinkable below that so a narrow
-                window ellipsises the name rather than overrunning them. */}
-            <div
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                lineHeight: 1.2,
-                flex: '0 1 auto',
-                minWidth: 0,
-                maxWidth: 220,
-              }}
-            >
-              <span
-                title={title}
-                style={{
-                  fontSize: 13.5,
-                  fontWeight: 600,
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                }}
-              >
-                {title}
-              </span>
-              <span
-                className="text-muted-foreground"
-                // The weight is stated because the trigger around this is now a
-                // Button, and `font-medium` comes with that contract; the counts
-                // are a subline and read as one at 400.
-                style={{
-                  fontSize: 10.5,
-                  fontWeight: 400,
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                }}
-              >
-                {taskCount} work items · {groupCount} groups
-              </span>
-            </div>
-          </PlanMenu>
+          {planIdentity}
         </div>
 
         {/* How the timeline is read — the scale it is drawn at, and the way
@@ -165,47 +283,29 @@ export function GanttToolbar({ actions, showTimelineControls }: GanttToolbarProp
 
             The zone is rendered even on a view that has no timeline, empty,
             so the logo and the actions keep the positions they hold on the
-            plan screen instead of shifting when the tab changes. */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: '0 0 auto' }}>
-          {showTimelineControls && (
-            <>
-              {/* The system has no segmented control, so this is the handoff's
-                  own recipe over primitives: a muted tray at 8px radius
-                  holding three buttons, the active one filled, the rest
-                  ghost. */}
-              <div className="bg-muted" style={{ display: 'flex', borderRadius: 8, padding: 2, gap: 2 }}>
-                {TIME_SCALES.map((option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    onClick={() => setScale(option)}
-                    aria-pressed={scale === option}
-                    className={buttonBaseClass(
-                      scale === option ? 'default' : 'ghost',
-                      'h-7 whitespace-nowrap px-3 text-[11px] font-semibold',
-                    )}
-                  >
-                    {TIME_SCALE_LABELS[option]}
-                  </button>
-                ))}
-              </div>
-              <button
-                type="button"
-                onClick={requestToday}
-                className={buttonBaseClass('outline', 'h-8 whitespace-nowrap px-3 text-xs font-semibold')}
-              >
-                Today
-              </button>
-            </>
-          )}
-        </div>
+            plan screen instead of shifting when the tab changes. Below the
+            breakpoint there is no centre line to sit on: the controls are on
+            the row beneath, with the plan they belong to. */}
+        {!isMobile && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: '0 0 auto' }}>
+            {timelineControls}
+          </div>
+        )}
 
+        {/* Above the breakpoint this zone is `1 1 0`, the mirror of the left
+            one, which is what puts the timeline controls between them on the
+            row's centre line. Below it there is no middle group to centre and
+            the row is 375px: an equal share is less than Import, Export and
+            the gear actually measure, and a zero basis means they overrun it
+            instead of shrinking. So there they take exactly their own width
+            and the plan's name — the one thing here that can ellipsise — gets
+            everything left over. */}
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
             gap: 8,
-            flex: '1 1 0',
+            flex: isMobile ? '0 0 auto' : '1 1 0',
             minWidth: 0,
             justifyContent: 'flex-end',
           }}
@@ -213,6 +313,31 @@ export function GanttToolbar({ actions, showTimelineControls }: GanttToolbarProp
           {actions}
         </div>
       </div>
+
+      {/* The second row, and only where there is a plan to look at. Everything
+          on it is about the chart: the task list it can put in front of
+          itself, the scale it is drawn at, and the way back to now. What the
+          plan *is*, and the four things done to it, stay on the row above.
+          46px, so the controls here can be the size a thumb needs without the
+          row above having to grow with them. */}
+      {isMobile && showTimelineControls && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            height: 46,
+            padding: '0 14px',
+            borderTop: '1px solid hsl(var(--border))',
+          }}
+        >
+          {taskDrawerToggle}
+          <span style={{ flex: '1 1 0' }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 'none' }}>
+            {timelineControls}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

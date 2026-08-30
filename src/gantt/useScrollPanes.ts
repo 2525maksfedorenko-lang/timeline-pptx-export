@@ -19,6 +19,13 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
  * usable: a grab-to-pan, a shift-wheel, wheel forwarding from the list, and
  * a scale change that keeps the date under the middle of the zone.
  *
+ * Below the mobile breakpoint the list pane becomes a drawer lying over the
+ * canvas, which puts the body out of reach while it is open — so there the
+ * list scrolls itself and writes its offset back to the body. It is still one
+ * offset and the body still holds it; the only difference is which end the
+ * finger is on. Both writes are guarded on the value actually changing, so
+ * the two cannot bounce off each other.
+ *
  * There are two grab-pans, and the body's is the one that matters. A drag on
  * the canvas moves the plan in both axes — that is the primary way through a
  * plan, and it was briefly taken away when a drag there drew a task instead;
@@ -133,13 +140,36 @@ export function useScrollPanes({ columnWidth }: Options): ScrollPanes {
 
     const onScroll = () => {
       if (headerRef.current) headerRef.current.scrollLeft = body.scrollLeft;
-      if (listRef.current) listRef.current.scrollTop = body.scrollTop;
+      // Compared before it is written, which is what stops the mirror below
+      // from bouncing the two panes off each other: a write that changes
+      // nothing fires no scroll event, so the loop terminates on its first
+      // agreement instead of running forever.
+      const list = listRef.current;
+      if (list && list.scrollTop !== body.scrollTop) list.scrollTop = body.scrollTop;
       middleDayRef.current = (body.scrollLeft + body.clientWidth / 2) / columnWidthRef.current;
+    };
+
+    // The list following the body is the whole arrangement above the mobile
+    // breakpoint, where the list pane is an `overflow: hidden` box that never
+    // scrolls itself. Below it the same pane is a drawer lying over the
+    // canvas, and the canvas is then unreachable — so the drawer scrolls with
+    // a finger like anything else, and what it scrolls is written back here.
+    // On the desktop layout this listener still runs and never does anything:
+    // the only thing that moves the list's offset is the line above, and the
+    // same `!==` guard turns the answering write into a no-op.
+    const onListScroll = () => {
+      const list = listRef.current;
+      if (list && body.scrollTop !== list.scrollTop) body.scrollTop = list.scrollTop;
     };
 
     onScroll();
     body.addEventListener('scroll', onScroll, { passive: true });
-    return () => body.removeEventListener('scroll', onScroll);
+    const list = listRef.current;
+    list?.addEventListener('scroll', onListScroll, { passive: true });
+    return () => {
+      body.removeEventListener('scroll', onScroll);
+      list?.removeEventListener('scroll', onListScroll);
+    };
   }, []);
 
   // --- grab the canvas to move the plan ------------------------------------

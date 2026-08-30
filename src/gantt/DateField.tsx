@@ -7,7 +7,6 @@ const DATE_FIELD_STYLE: React.CSSProperties = {
   height: 44,
   border: '1px solid hsl(var(--input))',
   borderRadius: 'calc(var(--radius) - 2px)',
-  fontSize: 15,
   padding: '0 12px',
   color: 'hsl(var(--foreground))',
   background: 'transparent',
@@ -96,6 +95,11 @@ export function DateField({ id, value, onCommit, onSettle }: DateFieldProps) {
         if (!typed) settle();
       }}
       onBlur={settle}
+      // The 15px this field is set in lives in the stylesheet rather than
+      // here, because it is the one property that has to answer to the
+      // breakpoint: under 16px Safari zooms the page on focus. See
+      // .gantt-date-field.
+      className="gantt-date-field"
       style={DATE_FIELD_STYLE}
     />
   );

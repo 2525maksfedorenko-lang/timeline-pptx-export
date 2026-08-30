@@ -880,3 +880,54 @@ the same thing.
 `npm run check:dates` (`scripts/checkDateCommit.ts`) holds both rules: it walks
 the keystrokes a year edit actually produces and asserts only the last one
 commits, and it measures the canvas the held-back values would have asked for.
+
+## Where the task column becomes a drawer
+
+Below `MOBILE_MEDIA_QUERY` — 767px, the one breakpoint this app has — the plan
+screen's 2×2 frame becomes 1×2. The task column leaves the grid, the chart takes
+the whole width, and the same pane comes back as a drawer lying over the canvas
+from the left edge. Nothing above the breakpoint changes: verified by screenshot
+against the branch point at 768, 1024, 1280 and 1440, with the Edit Task panel
+both shut and open, and the eight files are byte-identical.
+
+Three things about it are worth recording rather than reading off the code.
+
+**It comes from the left, not the right.** The brief said the panel should "fly
+out to the right", which reads two ways — a panel anchored left whose leading
+edge travels right as it opens, or a panel that lives off the right edge and
+retreats there. The first is what is built. The column is on the left at every
+other width, and a name that changed which side of its bar it was read from
+would be a different screen rather than a narrower one; the right edge is also
+where the Edit Task panel comes from on the desktop, and two panels sharing one
+edge is a coin toss the user has to remember the outcome of. The drawer's own
+head is 56px — exactly `HEADER_HEIGHT_PX`, the corner block's height — so the
+first name still sits level with the first bar.
+
+**It is opened by a button and never by an edge swipe.** A swipe from the left
+edge is the browser's own "back" gesture on iOS Safari and on Chrome for Android,
+and a drawer that sometimes leaves the app instead of opening is worse than no
+drawer. A tab hanging off the edge was rejected for the same reason plus one
+more: it would sit over the chart, in that same strip. It closes four ways —
+the header button again, the drawer's own X, a tap on the scrim, and a leftward
+swipe on the drawer itself.
+
+**It is the one thing on this screen that moves.** The design system's rule is
+that hover changes colour only and nothing slides for decoration; a drawer
+sliding is not decoration, it is the drawer saying where it came from and where
+it will go, which is the whole reason the customer asked for a drawer rather
+than a second screen. The values are the system's own — `--duration` 200ms on
+`--ease-out`, the pair it gives sheets and collapses — the shadow is
+`--shadow-lg` (its dialogs-and-sheets step) and the scrim is `--overlay-scrim`
+unaltered, the flat black/80 the readme names. A `prefers-reduced-motion` query
+takes the transition off. Recorded here as a deviation from "colour only"
+rather than smuggled in.
+
+Two gestures had to give way to the finger, and both are recorded in the code
+that gives them up. A **bar is not dragged below the breakpoint** — no move, no
+resize strips: the way through a plan on a phone is to drag the canvas, bars
+cover a large share of it, and with no hover to say which pixels are a bar, a
+drag that started on one moved the task by a week instead of scrolling. Dates
+are edited in the panel a tap opens. And the **drawer scrolls itself** there,
+writing its offset back to the body, because the body is underneath it and out
+of reach; it is still one offset, and both writes are guarded on the value
+actually changing so the two panes cannot bounce off each other.

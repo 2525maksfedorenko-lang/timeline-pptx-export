@@ -129,7 +129,13 @@ export function PlanMenu({ children }: PlanMenuProps) {
         // `justify` on top would leave two utilities fighting over one
         // property. Everything else is the system's — the radius, the
         // colour-only transition, the accent hover, the focus ring.
-        className={buttonBaseClass('ghost', 'h-10 min-w-0 px-2 text-left')}
+        // `max-md:max-w-full` is the phone's: an inline-flex box sizes itself
+        // to its content and will happily overrun a header row 375px wide,
+        // where this trigger shares one with the scale switch. Capped at the
+        // container, the name inside it ellipsises instead. Above the
+        // breakpoint the left zone is wider than the trigger ever is, so the
+        // cap never binds and nothing changes.
+        className={buttonBaseClass('ghost', 'h-10 min-w-0 px-2 text-left max-md:max-w-full')}
       >
         {children}
         {/* The whole point of this change: something that says "press me".
@@ -180,7 +186,7 @@ export function PlanMenu({ children }: PlanMenuProps) {
                     }}
                     placeholder="Plan name"
                     aria-label={`Rename plan ${plan.name}`}
-                    className={`${INPUT_SHELL_CLASS} h-9 text-sm`}
+                    className={`${INPUT_SHELL_CLASS} h-9 text-sm max-md:text-base`}
                   />
                   <button type="button" onClick={() => void handleRename()} className={buttonClass('default', 'sm')}>
                     Save
@@ -253,7 +259,7 @@ export function PlanMenu({ children }: PlanMenuProps) {
                   }}
                   placeholder="Plan name"
                   aria-label="Plan name"
-                  className={`${INPUT_SHELL_CLASS} h-9 text-sm`}
+                  className={`${INPUT_SHELL_CLASS} h-9 text-sm max-md:text-base`}
                 />
                 <button type="button" onClick={() => void handleCreate()} className={buttonClass('default', 'sm')}>
                   Save
