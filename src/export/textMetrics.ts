@@ -23,6 +23,38 @@ const UPPERCASE_WIDTHS = [
   722, 778, 667, 778, 722, 667, 611, 722, 667, 944, 667, 667, 611,
 ];
 
+// Arimo-Bold advance widths for А-Я and а-я, in code-point order. Measured
+// from the very file the PDF embeds (see pdfFont.ts), which is why they can be
+// trusted rather than approximated: Arimo is metrically Arial, and the Latin
+// widths measured out of it come back identical to the Helvetica-Bold table
+// above — A 722, W 944, a 556, i 278, space 278 — so one table serves both
+// alphabets and both engines.
+//
+// Without these every Cyrillic character fell through to FALLBACK_GLYPH_WIDTH,
+// the width of 'W'. Real Cyrillic averages about 620, so a Russian label was
+// measured half again as wide as it draws and `truncateToWidth` cut it off at
+// roughly two thirds of what fitted: "Подготовка к запуску" reached the slide
+// as "Подготовка к зап...". That was true of the PowerPoint file too, where
+// nothing was wrong with the text itself.
+const CYRILLIC_UPPERCASE_WIDTHS = [
+  722, 719, 722, 567, 712, 667, 904, 626, 719, 719, 610, 702, 833, 722, 778, 719,
+  667, 722, 611, 622, 854, 667, 730, 703, 1005, 1019, 870, 979, 719, 711, 1031, 719,
+];
+const CYRILLIC_LOWERCASE_WIDTHS = [
+  556, 618, 615, 417, 635, 556, 709, 497, 615, 615, 500, 635, 740, 604, 611, 604,
+  611, 556, 490, 556, 875, 556, 615, 581, 833, 844, 729, 854, 615, 552, 854, 583,
+];
+
+/** The letters outside the two contiguous runs above — Ё and the ones the
+ * other Cyrillic alphabets add. */
+const CYRILLIC_EXTRA_WIDTHS: Record<string, number> = {
+  Ѐ: 667, Ё: 669, Ђ: 885, Ѓ: 567, Є: 711, Ѕ: 667, І: 278, Ї: 276,
+  Ј: 556, Љ: 1094, Њ: 1063, Ћ: 875, Ќ: 610, Ѝ: 719, Ў: 622, Џ: 719,
+  ѐ: 556, ё: 556, ђ: 611, ѓ: 417, є: 552, ѕ: 556, і: 278, ї: 281,
+  ј: 278, љ: 969, њ: 906, ћ: 611, ќ: 500, ѝ: 615, ў: 556, џ: 604,
+  Ґ: 487, ґ: 447,
+};
+
 function letterWidths(firstLetter: string, widths: number[]): Record<string, number> {
   const firstCharCode = firstLetter.charCodeAt(0);
   return Object.fromEntries(
@@ -45,6 +77,9 @@ const GLYPH_WIDTH_PER_1000_EM: Record<string, number> = {
   ' ': 278,
   ...letterWidths('a', LOWERCASE_WIDTHS),
   ...letterWidths('A', UPPERCASE_WIDTHS),
+  ...letterWidths('а', CYRILLIC_LOWERCASE_WIDTHS),
+  ...letterWidths('А', CYRILLIC_UPPERCASE_WIDTHS),
+  ...CYRILLIC_EXTRA_WIDTHS,
 };
 
 // Widest entry above ('W'), so an unlisted character — punctuation, or any

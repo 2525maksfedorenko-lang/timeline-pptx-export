@@ -1,3 +1,5 @@
+import { PDF_TEXT_FONT_FAMILY } from './pdfFont';
+
 // aicoo brand palette for the PPTX/PDF exporters. Hex values are stored without
 // '#' (pptxgenjs's format); call `withHash()` for APIs that expect a leading
 // '#' (e.g. jsPDF).
@@ -74,12 +76,17 @@ export function withHash(hex: string) {
   return `#${hex}`;
 }
 
-// Closest built-in equivalents for a uniform sans-serif look in each engine.
-// The product itself ships no webfont and rides the platform UI stack, which
-// Office and jsPDF have no access to — Arial/Helvetica are the nearest
-// metric-neutral stand-ins.
+// A uniform sans-serif look in each engine. The product itself ships no
+// webfont and rides the platform UI stack, which Office and jsPDF have no
+// access to, so each is given the nearest metric-neutral stand-in.
+//
+// PowerPoint asks for Arial by name and every reader has it, or a metric
+// clone of it. The PDF cannot: jsPDF's built-in Helvetica is WinAnsiEncoding,
+// which turns Cyrillic into Latin punctuation without complaining, so the file
+// carries its own face instead — Arimo, which *is* an Arial metric clone, so
+// the two renderings still measure a line the same way. See pdfFont.ts.
 export const PPTX_FONT_FACE = 'Arial';
-export const PDF_FONT_FACE = 'helvetica';
+export const PDF_FONT_FACE = PDF_TEXT_FONT_FAMILY;
 
 // Monospace face for dates, so a date is recognizable as a date at a glance
 // rather than blending into the prose around it. 'courier' is one of jsPDF's
@@ -87,6 +94,12 @@ export const PDF_FONT_FACE = 'helvetica';
 // bold), and 'Courier New' is its metric-compatible Office counterpart —
 // both advance a flat 600/1000 em per glyph, which is what
 // measureMonoTextWidthIn in textMetrics.ts relies on.
+//
+// Courier stays a built-in even though the text face no longer is, and it can:
+// the only thing set in it is a date, and a date is written here in English
+// ("Aug 16 – Sep 01", see formatShortDate) — digits, ASCII letters and an en
+// dash, all of which WinAnsi has. Nothing a person typed is ever drawn in it,
+// so it cannot meet a character it lacks.
 export const PPTX_MONO_FONT_FACE = 'Courier New';
 export const PDF_MONO_FONT_FACE = 'courier';
 
