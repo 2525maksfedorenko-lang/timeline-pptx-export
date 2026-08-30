@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState } from 'react';
 import { AlertTriangle, Upload, X } from 'lucide-react';
 import { useTimelineStore } from '../store/timelineStore';
 import { formatShortDate } from '../export/dateScale';
@@ -7,6 +7,7 @@ import { prepareImport, type ImportPreview } from '../import/prepareImport';
 import { buttonClass } from './systemUi';
 import { useApplyImport } from '../import/useApplyImport';
 import { useFocusTrap } from '../utils/useFocusTrap';
+import { useEscapeKey } from './useDismiss';
 
 /** How many skipped rows are listed before the rest are counted. Enough to
  * show a pattern — the same column wrong all the way down — without the list
@@ -40,13 +41,7 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
   const [isBusy, setIsBusy] = useState(false);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
 
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+  useEscapeKey(onClose);
 
   const readFile = async (file: File) => {
     setIsBusy(true);

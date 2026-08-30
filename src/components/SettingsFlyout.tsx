@@ -1,7 +1,8 @@
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import { ExportSettingsPanel } from './ExportSettingsPanel';
 import { X } from 'lucide-react';
 import { useFocusTrap } from '../utils/useFocusTrap';
+import { useEscapeKey } from './useDismiss';
 import { buttonClass } from './systemUi';
 
 interface SettingsFlyoutProps {
@@ -26,13 +27,7 @@ export function SettingsFlyout({ onClose }: SettingsFlyoutProps) {
   const panelRef = useRef<HTMLElement | null>(null);
   useFocusTrap(panelRef);
 
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+  useEscapeKey(onClose);
 
   return (
     <div

@@ -9,7 +9,8 @@ import { toHtml } from '../utils/renderMarkdown';
 import { DateField } from './DateField';
 import { withEnd, withStart } from './dateEdit';
 import { PANEL_WIDTH_PX, type Span } from './geometry';
-import { childrenOf } from './rollup';
+import { confirmTaskDeletion } from './confirmDelete';
+import { isGroup } from './rollup';
 import { isoAtIndex } from './scale';
 import { STATUS_LABEL } from './tone';
 import { useGanttViewStore } from './viewStore';
@@ -109,7 +110,7 @@ export function EditTaskPanel({ item, minDate, spans }: EditTaskPanelProps) {
 
   const [commentDraft, setCommentDraft] = useState('');
 
-  const isGroup = childrenOf(items, item.id).length > 0;
+  const isBranch = isGroup(items, item.id);
   const span = spans.get(item.id);
 
   // The pair both date fields show: the drawn span, so a date being dragged on
@@ -127,14 +128,10 @@ export function EditTaskPanel({ item, minDate, spans }: EditTaskPanelProps) {
   const itemComments = comments.filter((comment) => comment.taskId === item.id);
 
   const handleDelete = () => {
-    const descendants = childrenOf(items, item.id).length;
-    const confirmed = window.confirm(
-      descendants > 0
-        ? `Delete '${item.label}' and its sub-tasks? This can't be undone.`
-        : `Delete '${item.label}'? This can't be undone.`,
-    );
-    if (!confirmed) return;
+    if (!confirmTaskDeletion(items, item)) return;
     deleteTaskCascade(item.id);
+    // Unconditional, unlike the menu's: this panel is only ever open on the
+    // task it just deleted.
     select(null);
   };
 
@@ -229,7 +226,7 @@ export function EditTaskPanel({ item, minDate, spans }: EditTaskPanelProps) {
               // stored and exported, while the plan draws its children's — so
               // the control stays usable and says which of the two it sets.
               // Its dates, unlike its status, are simply its own.
-              title={isGroup ? 'Sub-tasks decide the status shown on the plan' : undefined}
+              title={isBranch ? 'Sub-tasks decide the status shown on the plan' : undefined}
               className={PANEL_FIELD_CLASS}
             >
               {TASK_STATUS_VALUES.map((status) => (
@@ -274,7 +271,7 @@ export function EditTaskPanel({ item, minDate, spans }: EditTaskPanelProps) {
               type="checkbox"
               checked={included}
               onChange={() => {
-                if (isGroup) toggleIncludeInExportCascade(item.id);
+                if (isBranch) toggleIncludeInExportCascade(item.id);
                 else updateItem(item.id, { includeInExport: !included });
               }}
               className={`${CHECKBOX_CLASS} h-5 w-5`}

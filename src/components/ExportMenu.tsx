@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { ChevronDown, FileJson, FileText, Presentation, Sheet } from 'lucide-react';
 import { buttonBaseClass, MENU_ITEM_CLASS, MENU_SEPARATOR_CLASS, MENU_SURFACE_CLASS } from './systemUi';
+import { useMenuDismiss } from './useDismiss';
 
 /** The two formats that make a deck. Kept apart from `ExportFormat` because
  * the overview's slide capacity — and the question the overflow modal asks
@@ -33,28 +34,16 @@ export function ExportMenu({ onExport, hasSavedPlan }: ExportMenuProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    // pointerdown in the capture phase, for the reason written down in
-    // ContextMenu: the plan's canvas cancels the compatibility mouse events.
-    const onPointerDown = (event: Event) => {
-      if (!rootRef.current?.contains(event.target as Node)) setIsOpen(false);
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      setIsOpen(false);
-      // Focus goes back where it was opened from. Dismissing with Escape
-      // otherwise drops it on <body>, and the next Tab restarts at the top of
-      // the page instead of continuing along the toolbar.
-      triggerRef.current?.focus();
-    };
-    document.addEventListener('pointerdown', onPointerDown, true);
-    document.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.removeEventListener('pointerdown', onPointerDown, true);
-      document.removeEventListener('keydown', onKeyDown);
-    };
-  }, [isOpen]);
+  // A press outside and Escape both simply close it — there is no draft in
+  // this menu to decide about. See useDismiss.ts for why the outside press is
+  // watched the way it is, and where focus goes after the key.
+  useMenuDismiss({
+    isOpen,
+    rootRef,
+    triggerRef,
+    onOutsidePress: () => setIsOpen(false),
+    onEscape: () => setIsOpen(false),
+  });
 
   const choose = (format: ExportFormat) => {
     setIsOpen(false);

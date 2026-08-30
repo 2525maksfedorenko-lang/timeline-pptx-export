@@ -31,7 +31,8 @@ import {
   planRange,
   weekendStarts,
 } from './scale';
-import { childrenOf, isSubtask } from './rollup';
+import { confirmTaskDeletion } from './confirmDelete';
+import { childrenOf, isGroup, isSubtask } from './rollup';
 import { visibleRows } from './rows';
 import { previewSpans, type DragState } from './drag';
 import { STATUS_CYCLE, STATUS_LABEL } from './tone';
@@ -446,7 +447,7 @@ export function GanttScreen() {
     const item = items.find((candidate) => candidate.id === id);
     if (!item) return;
     // A group's status is its children's; there is nothing here to cycle.
-    if (items.some((candidate) => candidate.parentId === id)) return;
+    if (isGroup(items, id)) return;
 
     const current: TaskStatus = item.status ?? 'todo';
     const next = STATUS_CYCLE[(STATUS_CYCLE.indexOf(current) + 1) % STATUS_CYCLE.length];
@@ -551,16 +552,10 @@ export function GanttScreen() {
   const deleteTask = (id: string) => {
     const item = items.find((candidate) => candidate.id === id);
     if (!item) return;
-    // Same question, same words as the Edit Task panel's own delete — one
-    // action asked about one way, wherever it is reached from.
-    const descendants = childrenOf(items, id).length;
-    const confirmed = window.confirm(
-      descendants > 0
-        ? `Delete '${item.label}' and its sub-tasks? This can't be undone.`
-        : `Delete '${item.label}'? This can't be undone.`,
-    );
-    if (!confirmed) return;
+    if (!confirmTaskDeletion(items, item)) return;
     deleteTaskCascade(id);
+    // Only when it was this row that was open: deleting from the menu while
+    // the panel shows a different task leaves that panel alone.
     if (selectedId === id) select(null);
   };
 
@@ -573,7 +568,7 @@ export function GanttScreen() {
    * badge's click, and the badge is the one thing on a row that already names
    * the sub-tasks that would come along. */
   const menuActions = (id: string): ContextMenuAction[] => {
-    const isGroup = childrenOf(items, id).length > 0;
+    const isBranch = isGroup(items, id);
     const isIncluded = items.find((candidate) => candidate.id === id)?.includeInExport !== false;
     return [
       ...(isSubtask(items, id)
@@ -593,7 +588,7 @@ export function GanttScreen() {
           if (item) beginRename(item.id, item.label);
         },
       },
-      ...(isGroup
+      ...(isBranch
         ? [
             {
               label: 'Hide sub-tasks',
@@ -608,8 +603,8 @@ export function GanttScreen() {
         // tasks — or tasks without the phase they sit under — is not a thing
         // anyone means to export.
         label: isIncluded
-          ? `Exclude ${isGroup ? 'branch ' : ''}from export`
-          : `Include ${isGroup ? 'branch ' : ''}in export`,
+          ? `Exclude ${isBranch ? 'branch ' : ''}from export`
+          : `Include ${isBranch ? 'branch ' : ''}in export`,
         icon: isIncluded ? (
           <EyeOff size={14} strokeWidth={2} aria-hidden="true" />
         ) : (
