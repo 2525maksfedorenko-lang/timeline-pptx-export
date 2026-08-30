@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Trash2, X } from 'lucide-react';
 import { buttonBaseClass, CHECKBOX_CLASS, INPUT_SHELL_CLASS } from '../components/systemUi';
+import { usePanelDismiss } from '../components/useDismiss';
 import { useTimelineStore } from '../store/timelineStore';
 import { useIsMobile } from '../utils/useIsMobile';
 import { getTaskStatus, TASK_STATUS_VALUES, type TaskStatus, type TimelineItem } from '../types/timeline';
@@ -81,6 +82,30 @@ const SECTION_STYLE: React.CSSProperties = {
   gap: 20,
 };
 
+/** What a press outside the panel is allowed to land on without closing it.
+ *
+ * Three kinds of thing, and each is here for its own reason.
+ *
+ * **`[data-gantt-bar]` and `.gantt-row`** already answer the press: both select
+ * a task. Letting them close the panel first would mean a click on another
+ * bar shut the panel and reopened it on the new task, one frame apart, for no
+ * reason a reader could see. They *switch* the panel; that is not dismissal.
+ *
+ * **`[data-gantt-create]`** owns its press outright — a drag there draws a
+ * task's dates and a release opens a name field. Closing the panel underneath
+ * a gesture that is busy starting is noise, and the field it opens would be
+ * competing with a panel disappearing behind it.
+ *
+ * **`[role="menu"]`** is every layer stacked above: the row's context menu, the
+ * export dropdown, the plan menu. A press inside one of those is a press on
+ * that layer, not on the page behind this panel.
+ *
+ * The list doubles as the Escape guard — in all three, Escape already means
+ * "cancel what I am doing here" (the list's rename field, the create lane's
+ * name field, a menu dismissing itself), and one key press should not also
+ * throw away the panel. */
+const KEEPS_THE_PANEL_OPEN = '[data-gantt-bar],.gantt-row,[data-gantt-create],[role="menu"]';
+
 /** The panel's own field box: 44px tall at 15px type, on the design system's
  * input border and radius.
  *
@@ -109,6 +134,31 @@ export function EditTaskPanel({ item, minDate, spans }: EditTaskPanelProps) {
   const isMobile = useIsMobile();
 
   const [commentDraft, setCommentDraft] = useState('');
+  const panelRef = useRef<HTMLDivElement | null>(null);
+
+  /** Closing, from wherever it is asked for — the X, a press outside, Escape.
+   *
+   * Every control here writes as it is changed, with one exception that makes
+   * this more than `select(null)`: the two date fields hold a draft and settle
+   * it on blur, and settling is where the *pair* rule runs (`withStart` /
+   * `withEnd` — a deadline typed before the start pulls the start back to it).
+   * React does not fire blur on unmount, so a panel closed while a date field
+   * still had focus would take the settle with it and leave the task holding
+   * the inverted pair it was mid-edit.
+   *
+   * Nor does the press outside blur it for us. The canvas calls
+   * `preventDefault()` on its own pointerdown to start a pan, and that cancels
+   * the focus change — the same quirk that once left the create lane's name
+   * field open with the caret still in it. So the blur is asked for
+   * explicitly, and closing by clicking away means exactly what closing by
+   * tabbing away means. */
+  const close = useCallback(() => {
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && panelRef.current?.contains(active)) active.blur();
+    select(null);
+  }, [select]);
+
+  usePanelDismiss({ panelRef, ignoreSelector: KEEPS_THE_PANEL_OPEN, onDismiss: close });
 
   const isBranch = isGroup(items, item.id);
   const span = spans.get(item.id);
@@ -131,7 +181,8 @@ export function EditTaskPanel({ item, minDate, spans }: EditTaskPanelProps) {
     if (!confirmTaskDeletion(items, item)) return;
     deleteTaskCascade(item.id);
     // Unconditional, unlike the menu's: this panel is only ever open on the
-    // task it just deleted.
+    // task it just deleted. `select` rather than `close` — there is nothing
+    // left to commit a draft onto.
     select(null);
   };
 
@@ -149,6 +200,7 @@ export function EditTaskPanel({ item, minDate, spans }: EditTaskPanelProps) {
 
   return (
     <div
+      ref={panelRef}
       className="bg-card text-card-foreground"
       style={{
         display: 'flex',
@@ -193,7 +245,7 @@ export function EditTaskPanel({ item, minDate, spans }: EditTaskPanelProps) {
             stub whose behaviour is undefined. */}
         <button
           type="button"
-          onClick={() => select(null)}
+          onClick={close}
           title="Close"
           aria-label="Close"
           className={buttonBaseClass('ghost', 'h-8 w-8 shrink-0 text-muted-foreground')}
