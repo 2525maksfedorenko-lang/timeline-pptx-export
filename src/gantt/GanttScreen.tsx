@@ -31,7 +31,7 @@ import {
   planRange,
   weekendStarts,
 } from './scale';
-import { confirmTaskDeletion } from './confirmDelete';
+import { confirmTaskDeletion, deleteTaskBranch } from './deleteTask';
 import { childrenOf, isGroup, isSubtask } from './rollup';
 import { visibleRows } from './rows';
 import { previewSpans, type DragState } from './drag';
@@ -79,7 +79,6 @@ export function GanttScreen() {
   const items = useTimelineStore((state) => state.items);
   const updateItem = useTimelineStore((state) => state.updateItem);
   const addItem = useTimelineStore((state) => state.addItem);
-  const deleteTaskCascade = useTimelineStore((state) => state.deleteTaskCascade);
   const toggleIncludeInExportCascade = useTimelineStore((state) => state.toggleIncludeInExportCascade);
   const createPlanFromBranch = useTimelineStore((state) => state.createPlanFromBranch);
   const activePlanId = useTimelineStore((state) => state.activePlanId);
@@ -553,7 +552,7 @@ export function GanttScreen() {
     const item = items.find((candidate) => candidate.id === id);
     if (!item) return;
     if (!confirmTaskDeletion(items, item)) return;
-    deleteTaskCascade(id);
+    deleteTaskBranch(items, id);
     // Only when it was this row that was open: deleting from the menu while
     // the panel shows a different task leaves that panel alone.
     if (selectedId === id) select(null);
@@ -945,9 +944,12 @@ export function GanttScreen() {
 
       {selectedItem && (
         <EditTaskPanel
-          // Keyed on the item, so switching rows resets the panel's own
-          // draft fields instead of carrying one task's half-typed
-          // comment onto the next.
+          // Keyed on the item, so switching rows gives the two date fields a
+          // fresh start — each holds a draft of its own while a date is being
+          // typed (see DateField), and that one is about the keystrokes, not
+          // about the task. The half-written *comment* is no longer among
+          // them: it is keyed by task id in the view store, so it survives the
+          // panel closing and comes back when the task is opened again.
           key={selectedItem.id}
           item={selectedItem}
           minDate={minDate}

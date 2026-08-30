@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useRef } from 'react';
 import { Trash2, X } from 'lucide-react';
 import { buttonBaseClass, CHECKBOX_CLASS, INPUT_SHELL_CLASS } from '../components/systemUi';
 import { usePanelDismiss } from '../components/useDismiss';
@@ -10,7 +10,7 @@ import { toHtml } from '../utils/renderMarkdown';
 import { DateField } from './DateField';
 import { withEnd, withStart } from './dateEdit';
 import { PANEL_WIDTH_PX, type Span } from './geometry';
-import { confirmTaskDeletion } from './confirmDelete';
+import { confirmTaskDeletion, deleteTaskBranch } from './deleteTask';
 import { isGroup } from './rollup';
 import { isoAtIndex } from './scale';
 import { STATUS_LABEL } from './tone';
@@ -128,12 +128,17 @@ export function EditTaskPanel({ item, minDate, spans }: EditTaskPanelProps) {
   const comments = useTimelineStore((state) => state.comments);
   const updateItem = useTimelineStore((state) => state.updateItem);
   const addComment = useTimelineStore((state) => state.addComment);
-  const deleteTaskCascade = useTimelineStore((state) => state.deleteTaskCascade);
   const toggleIncludeInExportCascade = useTimelineStore((state) => state.toggleIncludeInExportCascade);
   const select = useGanttViewStore((state) => state.select);
   const isMobile = useIsMobile();
 
-  const [commentDraft, setCommentDraft] = useState('');
+  // The one field here that holds a draft the plan has not been told about,
+  // and therefore the one that lives outside this component — see
+  // `commentDrafts` in viewStore. Read by task id, so a click straight onto
+  // another bar swaps the draft with the task rather than carrying it over.
+  const commentDraft = useGanttViewStore((state) => state.commentDrafts[item.id] ?? '');
+  const setCommentDraft = useGanttViewStore((state) => state.setCommentDraft);
+  const dropCommentDrafts = useGanttViewStore((state) => state.dropCommentDrafts);
   const panelRef = useRef<HTMLDivElement | null>(null);
 
   /** Closing, from wherever it is asked for — the X, a press outside, Escape.
@@ -179,7 +184,7 @@ export function EditTaskPanel({ item, minDate, spans }: EditTaskPanelProps) {
 
   const handleDelete = () => {
     if (!confirmTaskDeletion(items, item)) return;
-    deleteTaskCascade(item.id);
+    deleteTaskBranch(items, item.id);
     // Unconditional, unlike the menu's: this panel is only ever open on the
     // task it just deleted. `select` rather than `close` — there is nothing
     // left to commit a draft onto.
@@ -195,7 +200,10 @@ export function EditTaskPanel({ item, minDate, spans }: EditTaskPanelProps) {
       body,
       createdAt: new Date().toISOString(),
     });
-    setCommentDraft('');
+    // Posted, so there is no longer a draft — the entry goes rather than being
+    // set to an empty string, which would leave the record growing a key per
+    // task ever commented on.
+    dropCommentDrafts([item.id]);
   };
 
   return (
@@ -360,7 +368,7 @@ export function EditTaskPanel({ item, minDate, spans }: EditTaskPanelProps) {
           <textarea
             id={`panel-${item.id}-comment`}
             value={commentDraft}
-            onChange={(event) => setCommentDraft(event.target.value)}
+            onChange={(event) => setCommentDraft(item.id, event.target.value)}
             placeholder="Add a comment..."
             className={`${INPUT_SHELL_CLASS} min-h-[92px] text-[15px] max-md:text-base`}
           />
