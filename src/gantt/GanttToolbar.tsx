@@ -3,6 +3,7 @@ import { buttonBaseClass } from '../components/systemUi';
 import { PlanMenu } from '../components/PlanMenu';
 import { useTimelineStore } from '../store/timelineStore';
 import { useIsMobile } from '../utils/useIsMobile';
+import { isGroup } from './rollup';
 import { TIME_SCALE_LABELS, TIME_SCALES } from './scale';
 import { useGanttViewStore } from './viewStore';
 
@@ -76,7 +77,7 @@ export function GanttToolbar({ actions }: GanttToolbarProps) {
   // A group is an item something else calls its parent; everything else is a
   // work item. Two passes over the list rather than one, because the counts
   // are read once per render and the list is a plan, not a feed.
-  const groupCount = items.filter((item) => items.some((child) => child.parentId === item.id)).length;
+  const groupCount = items.filter((item) => isGroup(items, item.id)).length;
   const taskCount = items.length - groupCount;
 
   /* Which plan is open, and how big it is. Written once and placed twice: on

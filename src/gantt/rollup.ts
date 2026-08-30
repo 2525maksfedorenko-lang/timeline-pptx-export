@@ -22,6 +22,18 @@ export function childrenOf(items: TimelineItem[], id: string): TimelineItem[] {
   return items.filter((item) => item.parentId === id);
 }
 
+/** True when anything in the plan names `id` as its parent.
+ *
+ * The one spelling. The same question used to be asked four other ways — two
+ * call sites building `childrenOf(...).length > 0` (an array allocated to
+ * answer a boolean), one inline `items.some(...)`, and the toolbar counting
+ * groups with a nested scan of its own. They all agreed; they simply did not
+ * have to. A row that already has its `GanttRowModel` reads `row.isGroup`
+ * instead, which `visibleRows` fills from this same rule. */
+export function isGroup(items: TimelineItem[], id: string): boolean {
+  return items.some((item) => item.parentId === id);
+}
+
 /** True when `id` is itself somebody's sub-task — its `parentId` names a task
  * that is actually in this plan.
  *

@@ -257,14 +257,24 @@ being found.
 
 ## Duplicates — two implementations of one thing
 
+D1–D7 below were found by reading. D7bis, D8 and D9 were not: they came out of
+a second pass that hashed every five-line run of non-comment source and reported
+the ones appearing in more than one file. That pass is worth keeping — it found
+three duplicates a reading had walked past, and after branch 2 the only runs it
+still reports are the import lists the two exporters share, which is what two
+renderers of one model are supposed to have in common.
+
 | # | the two | which is live | note |
 |---|---|---|---|
-| D1 | `src/components/ganttLayout.ts` (`BAR_HEIGHT_PX = 32`) vs `src/gantt/geometry.ts` (the whole plan-screen ladder) | both, for different pictures | Not a true duplicate any more — `ganttLayout.ts` is down to one constant and its header says so. It *is* misfiled: the constant is the **export's** reference bar height, its two readers are `ExportSettingsPanel` and `checkExportCoverage`, and neither is a component. It belongs in `src/export/`. |
-| D2 | `src/utils/barColor.ts` (`resolveBarColor`) vs `src/utils/branchColors.ts` (`buildBranchColors`) | branchColors | Two answers to "what colour is this bar". The loser is dead (A4). |
-| D3 | `src/utils/colorContrast.ts` vs the private `contrastRatio` / `relativeLuminance` in `src/gantt/barColor.ts` | the private pair | Same WCAG formula written twice, to four decimal places of agreement. The loser is dead (A5). |
-| D4 | the `ui` slice of `timelineStore` vs `gantt/viewStore` | viewStore | Selection, zoom and "which row is being edited", modelled twice. The loser is dead (A2). |
-| D5 | `src/gantt/rollup.ts` (`childrenOf`, `isGroup`, `isSubtask`, `statusOf`) + `src/gantt/rows.ts` (`visibleRows`) vs `src/utils/taskHierarchy.ts` (`buildTaskHierarchy`) | both | Not dead, and not simply redundant: `taskHierarchy` builds a tree once, `rollup` answers one question at a time with an O(n) scan, and `visibleRows` walks the tree again with a `collapsed` map on top. Same relation, three traversals. Merging them is a **behaviour-preserving but non-trivial** refactor — it changes the shape of the plan screen's row model. **Flagged, not scheduled.** |
-| D6 | "is this a group?" | — | Five spellings: `rollup.isGroup` (dead), `childrenOf(...).length > 0` (`GanttScreen:576`, `EditTaskPanel:112`), `items.some(c => c.parentId === id)` (`GanttScreen:449`), `items.filter(i => items.some(c => c.parentId === i.id))` (`GanttToolbar:82`), and `GanttRowModel.isGroup` (`rows.ts:12`, the one that is actually passed around). Cheap to collapse onto the last. |
+| D1 ⏸ | `src/components/ganttLayout.ts` (`BAR_HEIGHT_PX = 32`) vs `src/gantt/geometry.ts` (the whole plan-screen ladder) | both, for different pictures | Not a true duplicate any more — `ganttLayout.ts` is down to one constant and its header says so. It *is* misfiled: the constant is the **export's** reference bar height, its two readers are `ExportSettingsPanel` and `checkExportCoverage`, and neither is a component. It belongs in `src/export/`. |
+| D2 ✅ | `src/utils/barColor.ts` (`resolveBarColor`) vs `src/utils/branchColors.ts` (`buildBranchColors`) | branchColors | Two answers to "what colour is this bar". The loser is dead (A4). |
+| D3 ✅ | `src/utils/colorContrast.ts` vs the private `contrastRatio` / `relativeLuminance` in `src/gantt/barColor.ts` | the private pair | Same WCAG formula written twice, to four decimal places of agreement. The loser is dead (A5). |
+| D4 ✅ | the `ui` slice of `timelineStore` vs `gantt/viewStore` | viewStore | Selection, zoom and "which row is being edited", modelled twice. The loser is dead (A2). |
+| D5 ⏸ | `src/gantt/rollup.ts` (`childrenOf`, `isGroup`, `isSubtask`, `statusOf`) + `src/gantt/rows.ts` (`visibleRows`) vs `src/utils/taskHierarchy.ts` (`buildTaskHierarchy`) | both | Not dead, and not simply redundant: `taskHierarchy` builds a tree once, `rollup` answers one question at a time with an O(n) scan, and `visibleRows` walks the tree again with a `collapsed` map on top. Same relation, three traversals. Merging them is a **behaviour-preserving but non-trivial** refactor — it changes the shape of the plan screen's row model. **Flagged, not scheduled.** |
+| D6 ✅ | "is this a group?" | `rollup.isGroup` | *Resolved in branch 2.* Five spellings: `rollup.isGroup` (dead), `childrenOf(...).length > 0` (`GanttScreen:576`, `EditTaskPanel:112`), `items.some(c => c.parentId === id)` (`GanttScreen:449`), `items.filter(i => items.some(c => c.parentId === i.id))` (`GanttToolbar:82`), and `GanttRowModel.isGroup` (`rows.ts:12`, the one that is actually passed around). Cheap to collapse onto the last. |
+| D7bis ✅ | `GanttScreen.deleteTask` vs `EditTaskPanel.handleDelete` | `gantt/confirmDelete.ts` | *Found in branch 2, not in this audit.* The same `window.confirm` wording built from the same four lines in two files, with a comment in one of them saying they must stay identical. The question is shared now; the cascade and the selection handling stay with each caller, because those differ for a real reason. |
+| D8 ✅ | `ExportMenu` vs `PlanMenu` dismissal effects | `components/useDismiss.ts` | *Found in branch 2.* ~22 lines each of capture-phase `pointerdown` + Escape + focus restore, with the platform quirk behind it explained twice in two different wordings. |
+| D9 ✅ | `ImportModal` vs `SettingsFlyout` Escape effects | `useEscapeKey` | *Found in branch 2.* Byte-identical seven-line effects. |
 | D7 | `ExportOptions` / `ExportTimeframe` | `types/timeline.ts` | Declared in `types/`, re-exported by `store/timelineStore.ts:22` "for convenience". Five files import them from the store, one (`checkExportCoverage.ts:37`) from `types/`. This aliasing is what creates the module cycle — see below. It is the single highest-value line in this document. |
 
 ## Files nobody imports
@@ -576,11 +586,43 @@ green and no check edited.
    `exportCoverage.ts`; the focus-mode comment drift fixed; four documents
    updated. Result: **81 files (was 88), zero orphans, zero unreachable
    modules**, all six checks green with no check edited.
-2. **`chore/remove-duplication`** — D1 through D4 are resolved by branch 1;
-   this branch is D6 (one spelling of "is this a group") and the stale comments
-   from B2. D5 (`rollup` / `rows` / `taskHierarchy`) is **out of scope** — it
-   cannot be done without reshaping the plan screen's row model, which is
-   refactoring logic, not cleaning up.
+2. **`chore/remove-duplication`** — **done.** D1–D4 fell out of branch 1 and
+   the B2 comments were fixed there; this branch is D6 plus three duplicates
+   the audit had not found, all located by scanning for five-line runs repeated
+   across files rather than by reading:
+
+   - **D6 — one spelling of "is this a group".** `isGroup(items, id)` is back in
+     `gantt/rollup.ts` as the canonical one (branch 1 deleted it as dead, which
+     it was — nothing called it while four other spellings did the work). Two
+     call sites stop allocating an array to answer a boolean. A row that already
+     has a `GanttRowModel` still reads `row.isGroup`.
+   - **D7bis — the delete question, asked twice.** `GanttScreen.deleteTask` and
+     `EditTaskPanel.handleDelete` built the same `window.confirm` string from
+     the same four lines, kept in step by a comment saying they must be. Now
+     `gantt/confirmDelete.ts` asks it; the cascade and what each door does to
+     the selection stay with the callers, because those genuinely differ.
+   - **D8 — the dropdown dismissal, wired twice.** `ExportMenu` and `PlanMenu`
+     each carried ~22 lines of the same capture-phase `pointerdown` + Escape +
+     focus-restore effect, and each explained the platform quirk behind it in
+     its own words. `components/useDismiss.ts` holds the wiring and the one
+     explanation. The two callbacks stay separate on purpose: the plan menu
+     clears its half-typed name on Escape and leaves it standing when the press
+     merely went elsewhere, and collapsing them to one would have changed that.
+     `ContextMenu` deliberately does not use the hook — portaled, opened at the
+     pointer, no trigger to return focus to, and it listens for `contextmenu`
+     too — and its comment now points at the shared explanation.
+   - **D9 — Escape-to-close, written twice.** `ImportModal` and `SettingsFlyout`
+     had byte-identical seven-line effects. `useEscapeKey` in the same module.
+
+   Verified in a browser, since none of this is what the six checks watch: 20
+   interaction assertions covering both menus opening, closing on an outside
+   press on the canvas, closing on Escape, focus landing back on the trigger,
+   the plan menu's draft surviving one dismissal and not the other, both modals
+   closing on Escape, the branch/leaf wording in the row menu, and both delete
+   doors asking the identical question.
+
+   D5 (`rollup` / `rows` / `taskHierarchy`) stays **out of scope**, as agreed —
+   see the note at the end of this document.
 3. **`chore/module-boundaries`** — edits 1, 2 and 4 from the list above, plus
    moving `ganttLayout.ts` and `useFocusTrap.ts`. Ends with a proof: the same
    import-graph script, re-run, reporting zero cycles. (After branch 1 the graph

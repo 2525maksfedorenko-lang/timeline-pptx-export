@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { Check, ChevronDown, Pencil, Plus, X } from 'lucide-react';
 import { useTimelineStore } from '../store/timelineStore';
 import {
@@ -9,6 +9,7 @@ import {
   MENU_SEPARATOR_CLASS,
   MENU_SURFACE_CLASS,
 } from './systemUi';
+import { useMenuDismiss } from './useDismiss';
 
 interface PlanMenuProps {
   /** What the plan is: its name, and the two counts under it. Rendered by
@@ -56,35 +57,26 @@ export function PlanMenu({ children }: PlanMenuProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    // pointerdown, not mousedown: the plan's canvas calls preventDefault() on
-    // its own pointerdown to start a pan, which suppresses the compatibility
-    // mouse events — so a mousedown listener never hears a press on the chart
-    // and this menu stayed open over it.
-    const onPointerDown = (event: Event) => {
-      if (!rootRef.current?.contains(event.target as Node)) setIsOpen(false);
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      // The name field inside handles its own Escape (it cancels the draft
-      // and keeps the menu open), and it stops nothing from reaching here —
-      // so a menu in that state closes on the same press, which is what
-      // Escape is expected to do at the level it is pressed.
+  // Escape does more here than close: the name field inside handles its own
+  // Escape (it cancels the draft and keeps the menu open) and stops nothing
+  // from reaching this one, so a menu in that state closes on the same press
+  // — which is what Escape is expected to do at the level it is pressed — and
+  // takes the half-typed name with it. A press that simply landed elsewhere
+  // leaves the draft standing, which is why the two are separate callbacks.
+  // See useDismiss.ts.
+  useMenuDismiss({
+    isOpen,
+    rootRef,
+    triggerRef,
+    onOutsidePress: () => setIsOpen(false),
+    onEscape: () => {
       setIsOpen(false);
       setIsCreating(false);
       setNewPlanName('');
       setRenamingId(null);
       setRenameDraft('');
-      triggerRef.current?.focus();
-    };
-    document.addEventListener('pointerdown', onPointerDown, true);
-    document.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.removeEventListener('pointerdown', onPointerDown, true);
-      document.removeEventListener('keydown', onKeyDown);
-    };
-  }, [isOpen]);
+    },
+  });
 
   const handleCreate = async () => {
     const name = newPlanName.trim();
