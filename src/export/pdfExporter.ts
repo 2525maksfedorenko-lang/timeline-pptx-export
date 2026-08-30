@@ -21,6 +21,12 @@ import {
 import { buildSlideLinks, type SlideLinks } from './slideLinks';
 import { orderExportSlides } from './slideOrder';
 import { COLORS, EXPORT_MARK_TEXT, PDF_FONT_FACE, PDF_MONO_FONT_FACE, withHash } from './theme';
+import {
+  ARIMO_BOLD_BASE64,
+  ARIMO_REGULAR_BASE64,
+  PDF_TEXT_FONT_FAMILY,
+  PDF_TEXT_FONT_FILES,
+} from './pdfFont';
 import { measureLetterSpacingWidthIn, measureTextWidthIn } from './textMetrics';
 import {
   BACK_LINK_FONT_SIZE_PT,
@@ -821,6 +827,18 @@ export async function exportTimelineToPdf(
     unit: 'in',
     format: [PAGE_WIDTH_IN, PAGE_HEIGHT_IN],
   });
+
+  // The text face, before anything is drawn in it. Registering a TTF is what
+  // moves jsPDF off WinAnsiEncoding and onto Identity-H, which is the whole of
+  // the fix: with a standard-14 face it writes the low byte of each code point
+  // and Cyrillic silently becomes Latin punctuation. `addFileToVFS` takes the
+  // font as base64 into jsPDF's in-memory file system; `addFont` then names it
+  // per weight, so `setFont(PDF_FONT_FACE, 'bold')` keeps working unchanged at
+  // every one of its call sites.
+  doc.addFileToVFS(PDF_TEXT_FONT_FILES.normal, ARIMO_REGULAR_BASE64);
+  doc.addFont(PDF_TEXT_FONT_FILES.normal, PDF_TEXT_FONT_FAMILY, 'normal');
+  doc.addFileToVFS(PDF_TEXT_FONT_FILES.bold, ARIMO_BOLD_BASE64);
+  doc.addFont(PDF_TEXT_FONT_FILES.bold, PDF_TEXT_FONT_FAMILY, 'bold');
 
   // Resolved from the ordered deck up front, so a bar drawn on page 1 can
   // link forward to an appendix page that hasn't been added yet.
