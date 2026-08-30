@@ -13,11 +13,9 @@ import {
 } from './timelineExportModel';
 import {
   buildDashboardSlides,
-  type DashboardSlideModel,
   type DashboardTable,
   type DashboardTableSlideModel,
 } from './dashboardSlides';
-import { getQrCodeDataUrl, getSummaryQrCodes, type QrCodeModel } from './qrCode';
 import { buildSlideLinks, type SlideLinks } from './slideLinks';
 import { orderExportSlides } from './slideOrder';
 import { COLORS, EXPORT_MARK_TEXT, PPTX_FONT_FACE, PPTX_MONO_FONT_FACE } from './theme';
@@ -50,9 +48,6 @@ import {
   CONTENT_TOP_IN,
   CONTENT_WIDTH_IN,
   CONTENT_X_IN,
-  DASHBOARD_TABLE_GAP_IN,
-  DASHBOARD_TABLE_QR_COLUMN_WIDTH_IN,
-  DASHBOARD_TABLE_QR_SIZE_IN,
   DASHBOARD_TABLE_TOP_IN,
   DASHBOARD_TABLE_WIDTH_IN,
   DATE_LETTER_SPACING_EM,
@@ -805,52 +800,22 @@ function drawStatusDonutChart(
   );
 }
 
-/** Draws a QR code image with a link caption beneath — shared by the
- * summary slide and the dashboard slides, each pointing at a different
- * deep link (so each takes its own caption text and data URL). */
-function drawQrWithLink(
-  slide: PptxSlide,
-  qrCodeDataUrl: string,
-  linkDisplay: string,
-  x: number,
-  w: number,
-  y: number,
-  size: number,
-) {
-  const imageX = x + (w - size) / 2;
-
-  slide.addImage({ data: qrCodeDataUrl, x: imageX, y, w: size, h: size });
-
-  slide.addText(linkDisplay, {
-    x,
-    y: y + size + 0.1,
-    w,
-    h: 0.3,
-    fontSize: 8,
-    color: COLORS.footerText,
-    fontFace: PPTX_FONT_FACE,
-    align: 'center',
-  });
-}
-
 const SUMMARY_CHART_WIDTH_IN = 3.6;
 const SUMMARY_CHART_GAP_IN = 0.3;
 const SUMMARY_STAT_GAP_IN = 0.3;
-// The stats text is left-aligned and never wraps at these widths, so this
-// box is narrower than it used to be purely to free up room for the second
-// QR code — the donut and the stat figures render in exactly the same spot.
-const SUMMARY_STATS_WIDTH_IN = 2.2;
-const SUMMARY_QR_GAP_IN = 0.3;
-const SUMMARY_QR_SIZE_IN = 1.15;
 
-function drawSummarySlide(slide: PptxSlide, model: SummarySlideModel, qrCodes: QrCodeModel[]) {
+function drawSummarySlide(slide: PptxSlide, model: SummarySlideModel) {
   drawChrome(slide, model.title);
 
   const chartH = CONTENT_BOTTOM_IN - CONTENT_TOP_IN;
   drawStatusDonutChart(slide, model.segments, CONTENT_X_IN, CONTENT_TOP_IN, SUMMARY_CHART_WIDTH_IN, chartH);
 
   const statsX = CONTENT_X_IN + SUMMARY_CHART_WIDTH_IN + SUMMARY_CHART_GAP_IN;
-  const statsW = SUMMARY_STATS_WIDTH_IN;
+  // Everything to the right of the donut. Two QR codes used to take the far
+  // end of this row, and the stats box was narrowed to 2.2in to leave room for
+  // them; the text is left-aligned and never wraps at either width, so the
+  // figures land in exactly the same place as before.
+  const statsW = CONTENT_X_IN + CONTENT_WIDTH_IN - statsX;
   const statH = (chartH - SUMMARY_STAT_GAP_IN * (model.stats.length - 1)) / model.stats.length;
 
   model.stats.forEach((stat, index) => {
@@ -879,26 +844,9 @@ function drawSummarySlide(slide: PptxSlide, model: SummarySlideModel, qrCodes: Q
     });
   });
 
-  // The QR codes split the right-hand column into equal cells, side by side
-  // and symmetric about its center — the export link plus a deep link to the
-  // status view that used to have its own slide.
-  const qrX = statsX + statsW + SUMMARY_QR_GAP_IN;
-  const qrCellWidth = (CONTENT_X_IN + CONTENT_WIDTH_IN - qrX) / qrCodes.length;
-
-  qrCodes.forEach((qr, index) => {
-    drawQrWithLink(
-      slide,
-      qr.dataUrl,
-      qr.display,
-      qrX + index * qrCellWidth,
-      qrCellWidth,
-      CONTENT_TOP_IN,
-      SUMMARY_QR_SIZE_IN,
-    );
-  });
 }
 
-function drawDashboardTableSlide(slide: PptxSlide, model: DashboardTableSlideModel, qrCodeDataUrl: string) {
+function drawDashboardTableSlide(slide: PptxSlide, model: DashboardTableSlideModel) {
   drawChrome(slide, model.title);
   // The model cut this table to the rows that fit the slide; the note is how
   // the slide says so — the same footer line the overview announces its own
@@ -921,16 +869,6 @@ function drawDashboardTableSlide(slide: PptxSlide, model: DashboardTableSlideMod
     });
   }
 
-  const qrX = CONTENT_X_IN + tableWidth + DASHBOARD_TABLE_GAP_IN;
-  drawQrWithLink(
-    slide,
-    qrCodeDataUrl,
-    model.qrDisplay,
-    qrX,
-    DASHBOARD_TABLE_QR_COLUMN_WIDTH_IN,
-    DASHBOARD_TABLE_TOP_IN,
-    DASHBOARD_TABLE_QR_SIZE_IN,
-  );
 }
 
 export async function exportTimelineToPptx(
@@ -953,17 +891,6 @@ export async function exportTimelineToPptx(
     now,
   );
   const dashboardSlides = buildDashboardSlides(sortedItems, now);
-  const summaryQrCodes = await getSummaryQrCodes();
-  // Keyed by the slide model itself rather than by position, so the deck
-  // order (see slideOrder.ts) can change without silently pairing a slide
-  // with another slide's QR code.
-  const dashboardQrCodeDataUrls = new Map<DashboardSlideModel, string>(
-    await Promise.all(
-      dashboardSlides.map(
-        async (slideModel) => [slideModel, await getQrCodeDataUrl(slideModel.qrUrl)] as const,
-      ),
-    ),
-  );
 
   const pptx = new pptxgen();
   // PowerPoint's own 16:9 page, which is what the export handoff's 1920x1080
@@ -983,9 +910,9 @@ export async function exportTimelineToPptx(
     } else if (slideModel.kind === 'detail') {
       drawDetailSlide(slide, slideModel, links);
     } else if (slideModel.kind === 'summary') {
-      drawSummarySlide(slide, slideModel, summaryQrCodes);
+      drawSummarySlide(slide, slideModel);
     } else {
-      drawDashboardTableSlide(slide, slideModel, dashboardQrCodeDataUrls.get(slideModel)!);
+      drawDashboardTableSlide(slide, slideModel);
     }
   });
 

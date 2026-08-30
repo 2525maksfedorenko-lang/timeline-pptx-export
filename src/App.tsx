@@ -51,8 +51,9 @@ function App() {
   // "Exclude from export", and the exporters read that themselves.
   const [highlightSection] = useState<DashboardSection | null>(readDashboardViewParam)
   // Fixed at startup, not switched: the toolbar no longer offers the two
-  // views. The dashboard is what a deck's QR codes open (?dashboardView=…),
-  // which is the only thing that still selects it.
+  // views. ?dashboardView=… is the only thing that selects the dashboard, and
+  // nothing produces that URL any more — the deck's QR codes did, and they are
+  // gone with the tab they opened. The screen is reachable by typing it.
   const [activeTab] = useState<Tab>(highlightSection ? 'dashboard' : 'timeline')
   const [overflow, setOverflow] = useState<PendingOverflowExport | null>(null)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)

@@ -300,15 +300,12 @@ export const STATUS_RIGHT_PADDING_IN = 0.12;
 // rather than raising CONTENT_TOP_IN, which the overview's card is measured
 // from.
 export const DASHBOARD_TABLE_TOP_IN = CONTENT_TOP_IN + 0.18;
-// The rest of a dashboard slide's two-column split: the table on the left, the
-// QR code into the same list on screen on the right. These were a private copy
-// in each exporter until the model had to know how wide a table's columns are
-// to work out how many of its rows fit (see fitTableRows in dashboardSlides).
-export const DASHBOARD_TABLE_QR_COLUMN_WIDTH_IN = 2.0;
-export const DASHBOARD_TABLE_QR_SIZE_IN = 1.5;
-export const DASHBOARD_TABLE_GAP_IN = 0.4;
-export const DASHBOARD_TABLE_WIDTH_IN =
-  CONTENT_WIDTH_IN - DASHBOARD_TABLE_QR_COLUMN_WIDTH_IN - DASHBOARD_TABLE_GAP_IN;
+// How wide a dashboard table is drawn. The whole content width now: the slide
+// used to keep a 2.4in column on the right for a QR code into the same list on
+// screen, and that screen is gone. Lives here rather than privately in each
+// exporter because the model has to know how wide a table's columns are to work
+// out how many of its rows fit (see fitTableRows in dashboardSlides).
+export const DASHBOARD_TABLE_WIDTH_IN = CONTENT_WIDTH_IN;
 // All the height a dashboard table has. Neither engine paginates a table — the
 // PDF is explicitly stopped from trying (withoutPageBreaks) — so rows past this
 // are drawn off the slide unless the model cuts them first.
