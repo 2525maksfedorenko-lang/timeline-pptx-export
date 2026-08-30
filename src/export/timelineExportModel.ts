@@ -1,24 +1,20 @@
-import type { ExportOptions, ExportTimeframe } from '../store/timelineStore';
 import {
   getTaskStatus,
-  TASK_STATUS_COLORS,
   TASK_STATUS_LABELS,
+  type ExportOptions,
+  type ExportTimeframe,
   type TaskComment,
   type TaskStatus,
   type TimelineItem,
 } from '../types/timeline';
+import { TASK_STATUS_COLORS } from '../utils/statusColors';
 import { parseMarkdownBlocks, type MarkdownBlock } from '../utils/renderMarkdown';
 import { getStatusSegments, type StatusSegment } from '../utils/dashboardMetrics';
 import { buildDepthMap } from '../utils/barNesting';
 import { buildTaskHierarchy, type TaskNode } from '../utils/taskHierarchy';
 import { buildBranchColors, branchFillAlpha, FLAT_PLAN_COLOR, type BranchColor } from '../utils/branchColors';
-import {
-  daysBetween,
-  BASE_PX_PER_DAY,
-  formatShortDate,
-  getDateRange,
-  getItemBar,
-} from './dateScale';
+import { daysBetween, formatShortDate, getDateRange } from '../utils/dates';
+import { BASE_PX_PER_DAY, getItemBar } from './dateScale';
 import {
   buildDateGrid,
   DATE_GRID_LEVELS,

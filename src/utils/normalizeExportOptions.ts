@@ -1,4 +1,4 @@
-import type { ExportOptions } from '../store/timelineStore';
+import type { ExportOptions } from '../types/timeline';
 
 /** The export options that are plain on/off switches. Spelled out rather than
  * derived from the type, because the rest of ExportOptions is not booleans and

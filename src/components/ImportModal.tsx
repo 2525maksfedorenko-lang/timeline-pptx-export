@@ -1,12 +1,12 @@
 import { useRef, useState } from 'react';
 import { AlertTriangle, Upload, X } from 'lucide-react';
 import { useTimelineStore } from '../store/timelineStore';
-import { formatShortDate } from '../export/dateScale';
+import { formatShortDate } from '../utils/dates';
 import { IMPORT_ACCEPT, IMPORTABLE_EXTENSIONS } from '../import/detectFormat';
 import { prepareImport, type ImportPreview } from '../import/prepareImport';
 import { buttonClass } from './systemUi';
 import { useApplyImport } from '../import/useApplyImport';
-import { useFocusTrap } from '../utils/useFocusTrap';
+import { useFocusTrap } from './useFocusTrap';
 import { useEscapeKey } from './useDismiss';
 
 /** How many skipped rows are listed before the rest are counted. Enough to

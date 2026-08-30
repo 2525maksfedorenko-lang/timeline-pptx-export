@@ -30,7 +30,7 @@ import { BAR_HEIGHT_IN, subtaskRowIndent } from '../src/export/slideLayout';
 import { buildSlideLinks } from '../src/export/slideLinks';
 import { orderExportSlides } from '../src/export/slideOrder';
 import { buildExportSlides, type ExportMode } from '../src/export/timelineExportModel';
-import { BAR_HEIGHT_PX } from '../src/components/ganttLayout';
+import { BAR_HEIGHT_PX } from '../src/export/barLadder';
 import { buildDepthMap, labelIndent, MAX_LABEL_INDENT_STEPS } from '../src/utils/barNesting';
 import { sortItemsForExport } from '../src/utils/sortItemsForExport';
 import { buildFixturePlan, isoDay, type FixturePlan } from './fixturePlan';
@@ -84,7 +84,7 @@ export function buildDeck(plan: FixturePlan, scenario: Pick<Scenario, 'exportMod
 // src/gantt/ — 52px rows, 34px bars, no depth-stepped bar heights at all.
 //
 // So the "screen" column below is no longer a second surface: it is the
-// reference ladder in src/components/ganttLayout.ts, expressed in px, which the
+// reference ladder in src/export/barLadder.ts, expressed in px, which the
 // export settings panel's task list still indents on. What these checks are
 // really asserting is that the slides' own ladder and that reference stay one
 // rule at every depth, in two units. That is still worth asserting — it is the

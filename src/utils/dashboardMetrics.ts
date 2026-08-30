@@ -1,11 +1,11 @@
-import { MS_PER_DAY } from '../export/dateScale';
+import { MS_PER_DAY } from './dates';
 import {
   getTaskStatus,
-  TASK_STATUS_COLORS,
   TASK_STATUS_LABELS,
   type TaskStatus,
   type TimelineItem,
 } from '../types/timeline';
+import { TASK_STATUS_COLORS } from './statusColors';
 
 export interface StatusSegment {
   status: TaskStatus;

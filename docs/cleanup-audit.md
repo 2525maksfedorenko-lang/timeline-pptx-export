@@ -345,7 +345,13 @@ Two things noticed while counting, neither a cleanup item:
 
 ## Layer dependencies, and the cycles
 
-Folder-level edges, as they actually are:
+> **Resolved in branch 3.** Everything in this section describes the graph as
+> it was when the audit was taken. The current graph has no cycles at all — see
+> "Score after the three branches". It is kept because the *diagnosis* is what
+> made the fix cheap: four of the seven edges turned out to carry one type
+> alias.
+
+Folder-level edges, as they were:
 
 ```
 main.tsx → App.tsx → gantt, components, export, import, utils, store
@@ -499,9 +505,30 @@ Same rubric as the previous audit, which scored **3.5 / 5**.
 | Module hygiene | **3 / 5** | Five orphan files, ~450 dead lines, four live/dead pairs of the same idea. Nothing is broken; there is simply more here than the app uses. |
 | **Overall** | **3.7 / 5** | Up from 3.5. The model and the export/screen border improved; the cycle and the dead weight are what is holding it back, and both are on this list. |
 
+## Score after the three branches
+
+The table above is the reading taken before any of it was done. Re-taken after,
+against the same rubric:
+
+| dimension | before | after | what moved it |
+|---|---:|---:|---|
+| Data model independence | 4.5 | **5** | `types/timeline.ts` imports nothing and now carries no palette. The English labels stayed, and that is correct — they are the vocabulary the importer accepts, not decoration. |
+| Layer boundaries and cycles | 3 | **5** | Zero file cycles, zero folder cycles. `utils` depends on `types` and nothing else; `export` on `types` and `utils`; `store` on `types` and `utils`. A clean DAG with one entry point above it. |
+| Export ↔ screen separation | 4 | **4.5** | Nothing in `export/` reaches into the UI, and the two generic modules filed under it are down to one crossing — two colour constants the two surfaces are *required* to share, asserted by `check:colors`. Half a point held back for the DOM in `planCsv`. |
+| Environment coupling | 4 | **4** | Unchanged. The two download helpers and the one absolute asset path are still there; splitting them is edit 5, which is a new API surface rather than a cleanup. |
+| Module hygiene | 3 | **4.5** | Zero orphan files, zero unreachable modules, ~600 lines of dead source gone, and four repeated ideas down to one spelling each. Half a point held for D5, knowingly deferred. |
+| **Overall** | **3.7** | **4.6** | |
+
+What is left between here and 5 is two items, both already named: the Blob
+entry points (edit 5) and the `rollup`/`rows`/`taskHierarchy` merge (D5).
+Neither is cleanup — one is new API, the other reshapes the plan screen's row
+model — so neither was in scope for these three branches.
+
 ## The five edits with the most effect
 
-In this order. The first is worth more than the other four together.
+In this order. The first is worth more than the other four together. **1, 2 and
+4 are done** (branch 3); **3 is done** (branch 1); **5 is not started** — see
+the note under it.
 
 1. **Import `ExportOptions` / `ExportTimeframe` from `src/types/timeline.ts`,
    not from `src/store/timelineStore.ts`.** Five import lines:
@@ -527,7 +554,8 @@ In this order. The first is worth more than the other four together.
    `TASK_STATUS_LABELS` to a presentation module (and delete
    `TASK_STATUS_CHIP`, which is dead). The domain shape then travels without a
    palette or an English string attached.
-5. **Separate "build the file" from "hand it to the browser."**
+5. **Not done — a new API, not a cleanup.** *Separate "build the file" from
+   "hand it to the browser."*
    `planCsv.buildPlanCsv` / `downloadPlanCsv` are already split inside one file;
    do the same for `planJson` and give `pptxExporter` / `pdfExporter` a
    Blob-returning entry point beside their `writeFile` / `save` ones. A host app
@@ -623,11 +651,45 @@ green and no check edited.
 
    D5 (`rollup` / `rows` / `taskHierarchy`) stays **out of scope**, as agreed —
    see the note at the end of this document.
-3. **`chore/module-boundaries`** — edits 1, 2 and 4 from the list above, plus
-   moving `ganttLayout.ts` and `useFocusTrap.ts`. Ends with a proof: the same
-   import-graph script, re-run, reporting zero cycles. (After branch 1 the graph
-   still reports the one file cycle and the one folder cycle — untouched on
-   purpose, since neither is dead code.)
+3. **`chore/module-boundaries`** — **done.** Edits 1, 2 and 4, plus the two
+   moves. The proof is the same import-graph script re-run: **zero file cycles,
+   zero folder cycles, zero orphans**, and `src/utils` now depends on nothing
+   but `src/types`.
+
+   - **Edit 1** — five type imports repointed from `store/timelineStore` to
+     `types/timeline`, and the store's `export type { ExportOptions,
+     ExportTimeframe }` re-export dropped. That alone took out `export → store`,
+     `utils → store` and the `planStorage ↔ timelineStore` file cycle. Five
+     lines, no runtime effect, exactly as predicted.
+   - **Edit 2** — the generic date arithmetic moved to `src/utils/dates.ts`
+     (`MS_PER_DAY`, `daysBetween`, `getWeekMarkers`, `firstDayOfMonthIso`,
+     `lastDayOfMonthIso`, `formatShortDate`, `getDateRange`/`DateRange`). What
+     stayed in `export/dateScale.ts` is the deck's own: `BASE_PX_PER_DAY`,
+     `buildExportFilename`, `getItemBar`/`ItemBar`. The test used was "would
+     this still make sense in an app that exported nothing". This removed the
+     last `utils → export` edge and with it the folder cycle.
+   - **Edit 4 — narrowed, and the narrowing is the finding.** Only the colours
+     left `types/timeline.ts` (`TASK_STATUS_SCALE`, `TASK_STATUS_COLORS` → 
+     `src/utils/statusColors.ts`, beside `branchColors.ts`).
+     **`TASK_STATUS_LABELS` stayed, because it is not presentation.**
+     `normalizeStatus.ts` builds its accepted-spellings table from those labels
+     — "In Progress" typed into a spreadsheet is a valid status *because* the
+     label says so — and quotes them back in the error when nothing matches.
+     Moving them would have split what the model accepts away from the model.
+     The audit's edit 4 said to move all four; three was the right number.
+   - **Moves** — `components/ganttLayout.ts` → `export/barLadder.ts` (export
+     geometry, now filed with the export), `utils/useFocusTrap.ts` →
+     `components/useFocusTrap.ts` (it reads `document.activeElement`, and
+     `utils/` is the layer being kept free of the DOM).
+
+   **One crossing was left in place on purpose.** `gantt/barColor.ts` still
+   imports `COLORS` from `export/theme.ts`, for exactly two of its twenty
+   entries — `textOnFill` and `textOnSurface`, the pair a bar's label is chosen
+   between. That is not a layering accident: the screen and the deck have to
+   pick the same colour for the same fill, and `check:colors` asserts they do.
+   Moving two constants to make the arrows prettier would hide the reason they
+   are shared. `gantt → export` is a top layer depending on a lower one, which
+   is what layers are for.
 
 Edit 5 (Blob entry points) is a new API surface, not a cleanup. It is left for
 its own ask.

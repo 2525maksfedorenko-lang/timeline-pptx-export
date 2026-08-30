@@ -3,10 +3,10 @@ import { useIsMobile } from '../utils/useIsMobile';
 import { useTimelineStore } from '../store/timelineStore';
 import { toHtml } from '../utils/renderMarkdown';
 import { buildTaskHierarchy } from '../utils/taskHierarchy';
-import { firstDayOfMonthIso, getDateRange, lastDayOfMonthIso } from '../export/dateScale';
+import { firstDayOfMonthIso, getDateRange, lastDayOfMonthIso } from '../utils/dates';
 import { ChevronDown, ChevronRight, Pin } from 'lucide-react';
 import { buttonClass, CHECKBOX_CLASS, INPUT_CLASS_AUTO } from './systemUi';
-import { BAR_HEIGHT_PX } from './ganttLayout';
+import { BAR_HEIGHT_PX } from '../export/barLadder';
 import { labelIndent } from '../utils/barNesting';
 
 const COMMENT_BODY_CLASSES =

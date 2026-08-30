@@ -1,5 +1,5 @@
 import type { TimelineItem } from '../types/timeline';
-import { daysBetween, MS_PER_DAY } from '../export/dateScale';
+import { daysBetween, MS_PER_DAY } from '../utils/dates';
 
 /** The three timeline scales the handoff's toolbar switches between. Named
  * for what the *header* groups by, which is the only thing that changes

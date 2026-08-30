@@ -1,11 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type {
-  ExportOptions,
-  ExportTimeframe,
-  TaskComment,
-  TimelineItem,
-} from '../types/timeline';
+import type { ExportOptions, TaskComment, TimelineItem } from '../types/timeline';
 import { copyBranch, droppedDependencyNotice, uniquePlanName } from '../utils/branchPlan';
 import { normalizePlanItems } from '../utils/normalizePlanItems';
 import { repairNotice, type PlanNotice } from '../utils/planNotice';
@@ -18,8 +13,6 @@ import {
 } from './planStorage';
 
 export type { SavedPlan };
-// Re-exported for convenience; they are declared in types/timeline.ts now.
-export type { ExportOptions, ExportTimeframe };
 
 interface TimelineStore {
   title: string;
