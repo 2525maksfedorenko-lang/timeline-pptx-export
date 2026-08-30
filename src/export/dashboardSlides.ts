@@ -1,6 +1,6 @@
 import type { TimelineItem } from '../types/timeline';
 import { getDaysOverdue, getDelayedTasks } from '../utils/dashboardMetrics';
-import { formatShortDate } from './dateScale';
+import { formatShortDate } from '../utils/dates';
 import {
   DASHBOARD_TABLE_MAX_HEIGHT_IN,
   DASHBOARD_TABLE_WIDTH_IN,

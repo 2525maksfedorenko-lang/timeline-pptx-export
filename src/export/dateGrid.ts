@@ -1,4 +1,4 @@
-import { daysBetween, getWeekMarkers, MS_PER_DAY } from './dateScale';
+import { daysBetween, getWeekMarkers, MS_PER_DAY } from '../utils/dates';
 
 /** The densities of vertical date line the overview slide can be ruled at.
  * Which of them a slide actually uses is decided by its zoom level; see

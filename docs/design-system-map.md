@@ -958,7 +958,24 @@ inventory; three of its deletions touch claims made earlier in this file.
   the deviation table above describes it as the on-screen chart's geometry
   ("row 40, bar 32, zones 118 / 292 / 104"). None of that is there any more —
   the plan screen carries its own geometry in `src/gantt/geometry.ts`, and what
-  is left in `ganttLayout.ts` is `BAR_HEIGHT_PX = 32`, the reference height the
-  *export's* depth ladder is expressed in. It is read by the export settings
-  panel and by `check:export`, and by nothing on the plan screen. Moving it into
-  `src/export/` is on the boundaries branch, not this one.
+  is left is `BAR_HEIGHT_PX = 32`, the reference height the *export's* depth
+  ladder is expressed in. It is read by the export settings panel and by
+  `check:export`, and by nothing on the plan screen. It has since moved to
+  `src/export/barLadder.ts`, with the surface it measures.
+
+Two more moves followed on the same pass, for the same reason — a module filed
+under the layer that happened to write it first rather than under the layer it
+belongs to:
+
+- **`TASK_STATUS_SCALE` and `TASK_STATUS_COLORS` left `src/types/timeline.ts`**
+  for `src/utils/statusColors.ts`, beside `branchColors.ts`, which is the same
+  kind of thing: a colour rule the screen and both exporters have to agree on
+  and neither owns. The references at §"What the system has" and in
+  `docs/status-color-scale.md` name the old path. `TASK_STATUS_LABELS`
+  deliberately stayed in the model — `normalizeStatus.ts` accepts a status
+  typed as its display label, so those words are the vocabulary the model
+  accepts, not decoration on top of it.
+- **`useFocusTrap` moved from `src/utils/` to `src/components/`.** It reads
+  `document.activeElement` and traps Tab inside a panel; both its callers are
+  components, and `utils/` is the layer this project is trying to keep free of
+  the DOM.

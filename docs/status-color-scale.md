@@ -33,7 +33,9 @@ No derivation function was needed, so none was added.
 
 ## The scale
 
-Defined once, in `src/types/timeline.ts` as `TASK_STATUS_SCALE`.
+Defined once, as `TASK_STATUS_SCALE` — in `src/utils/statusColors.ts` since
+the boundaries pass, and in `src/types/timeline.ts` before it. It moved so the
+model could be taken without a palette; the sixteen values are unchanged.
 
 | role | step | used for | design-system token |
 |---|---|---|---|

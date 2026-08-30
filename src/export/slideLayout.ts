@@ -11,7 +11,7 @@ import { estimateWrappedLines, measureLetterSpacingWidthIn, measureTextWidthIn }
 // type scale; the palette has one home per concern and duplicating any of it
 // here would create a second one:
 //
-//   status colours   src/types/timeline.ts  — TASK_STATUS_SCALE
+//   status colours   src/utils/statusColors.ts — TASK_STATUS_SCALE
 //   phase + neutrals src/export/theme.ts    — COLORS, PHASE_PALETTE
 //
 // Both exporters already read one computed model (timelineExportModel.ts),

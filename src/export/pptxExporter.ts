@@ -1,5 +1,5 @@
 import pptxgen from 'pptxgenjs';
-import type { ExportOptions } from '../store/timelineStore';
+import type { ExportOptions } from '../types/timeline';
 import type { TaskComment, TaskStatus, TimelineItem } from '../types/timeline';
 import { sortItemsForExport } from '../utils/sortItemsForExport';
 import {

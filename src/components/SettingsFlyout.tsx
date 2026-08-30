@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import { ExportSettingsPanel } from './ExportSettingsPanel';
 import { X } from 'lucide-react';
-import { useFocusTrap } from '../utils/useFocusTrap';
+import { useFocusTrap } from './useFocusTrap';
 import { useEscapeKey } from './useDismiss';
 import { buttonClass } from './systemUi';
 

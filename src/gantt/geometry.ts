@@ -1,6 +1,6 @@
 /* The plan screen's geometry, as the handoff measures it.
  *
- * Separate from `src/components/ganttLayout.ts`, which holds the *export*
+ * Separate from `src/export/barLadder.ts`, which holds the *export*
  * surface's row/bar ladder and is what `npm run check:export` compares the
  * slides against. The two describe different pictures now and are kept apart
  * rather than reconciled — see the note in docs/design-system-map.md.

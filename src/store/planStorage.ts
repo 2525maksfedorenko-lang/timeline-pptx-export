@@ -2,7 +2,7 @@ import { openDB, type IDBPDatabase } from 'idb';
 import type { TimelineItem } from '../types/timeline';
 import { normalizePlanItems } from '../utils/normalizePlanItems';
 import { repairNotice, type PlanNotice } from '../utils/planNotice';
-import type { ExportOptions } from './timelineStore';
+import type { ExportOptions } from '../types/timeline';
 
 export interface SavedPlan {
   id: string;
