@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 
-import { ROW_HEIGHT_PX, type Span } from './geometry';
+import { barHeight, barOffsetY, ROW_HEIGHT_PX, type Span } from './geometry';
 import { periodRuleLayer, type HeaderCell, type TimeScale } from './scale';
 import { FALLBACK_BAR_STYLE, type BarStyle } from './barColor';
 import type { GanttRowModel } from './rows';
@@ -178,10 +178,15 @@ export function TimelineBody({
         );
       })}
 
+      {/* Anchored on the bar itself rather than on its row, so the pill clears
+          what is actually being dragged and the clearance is the same one the
+          create lane's ghost gets. */}
       {drag && dragSpan && dragRowIndex >= 0 && (
         <DragPill
           left={dragSpan.start * columnWidth}
-          top={Math.max(0, dragRowIndex * ROW_HEIGHT_PX - 22)}
+          anchorTop={dragRowIndex * ROW_HEIGHT_PX + barOffsetY(ROW_HEIGHT_PX)}
+          anchorHeight={barHeight(ROW_HEIGHT_PX)}
+          canvasHeight={height}
           label={dragLabel}
         />
       )}
@@ -194,6 +199,7 @@ export function TimelineBody({
         columnWidth={columnWidth}
         dayCount={dayCount}
         canvasWidth={width}
+        canvasHeight={height}
         formatDay={formatDay}
         onCreate={onCreateTask}
       />

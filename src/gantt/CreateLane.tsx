@@ -24,6 +24,9 @@ interface CreateLaneProps {
   /** Columns drawn on the canvas — what a drawn edge is clamped to. */
   dayCount: number;
   canvasWidth: number;
+  /** The canvas's own height — what the date pill measures "off the chart"
+   * against when it decides which side of the ghost to sit on. */
+  canvasHeight: number;
   /** "Aug 17" for a column index, for the pill. */
   formatDay: (index: number) => string;
   /** Creates the task. Called on Enter with a name typed, and at no other
@@ -56,6 +59,7 @@ export function CreateLane({
   columnWidth,
   dayCount,
   canvasWidth,
+  canvasHeight,
   formatDay,
   onCreate,
 }: CreateLaneProps) {
@@ -257,10 +261,16 @@ export function CreateLane({
         )}
       </div>
 
+      {/* Anchored on the ghost, which is what the dates describe — and which
+          is also where the name field sits once the gesture is released. The
+          pill clearing the ghost is the same thing as the pill clearing the
+          field, so there is one rule rather than two. */}
       {shown && (
         <DragPill
           left={barLeft(shown.start, columnWidth)}
-          top={Math.max(0, top - 22)}
+          anchorTop={top + (ADD_ROW_HEIGHT_PX - ghostHeight) / 2}
+          anchorHeight={ghostHeight}
+          canvasHeight={canvasHeight}
           label={`${formatDay(shown.start)} → ${formatDay(shown.start + shown.len - 1)}  (${shown.len}d)`}
         />
       )}
