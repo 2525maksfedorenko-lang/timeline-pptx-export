@@ -36,6 +36,9 @@ interface TimelineBodyProps {
   onSelectBar: (id: string) => void;
   /** Columns drawn on the canvas — what a drawn edge is clamped to. */
   dayCount: number;
+  /** The canvas's scroller, so the date pill can place itself against the band
+   * that is actually on screen rather than against the canvas. */
+  scrollerRef: React.RefObject<HTMLElement | null>;
   /** Whether the task column is a drawer rather than a column at this width.
    * The bars care because a drawer is usually shut: a bar too narrow to hold
    * its own name has to put it somewhere, and there is no column to fall back
@@ -90,6 +93,7 @@ export function TimelineBody({
   onContextMenuBar,
   onSelectBar,
   dayCount,
+  scrollerRef,
   isMobile,
   formatDay,
   onCreateTask,
@@ -183,10 +187,10 @@ export function TimelineBody({
           create lane's ghost gets. */}
       {drag && dragSpan && dragRowIndex >= 0 && (
         <DragPill
-          left={dragSpan.start * columnWidth}
+          scrollerRef={scrollerRef}
+          anchorLeft={dragSpan.start * columnWidth}
           anchorTop={dragRowIndex * ROW_HEIGHT_PX + barOffsetY(ROW_HEIGHT_PX)}
           anchorHeight={barHeight(ROW_HEIGHT_PX)}
-          canvasHeight={height}
           label={dragLabel}
         />
       )}
@@ -199,7 +203,7 @@ export function TimelineBody({
         columnWidth={columnWidth}
         dayCount={dayCount}
         canvasWidth={width}
-        canvasHeight={height}
+        scrollerRef={scrollerRef}
         formatDay={formatDay}
         onCreate={onCreateTask}
       />

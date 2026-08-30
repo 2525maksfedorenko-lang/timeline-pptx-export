@@ -917,6 +917,7 @@ export function GanttScreen() {
             drag={drag}
             dragLabel={dragLabel}
             dayCount={renderedDays}
+            scrollerRef={panes.bodyRef}
             isMobile={isMobile}
             formatDay={(index) => formatDayLabel(minDate, index)}
             onCreateTask={createTaskOnLane}

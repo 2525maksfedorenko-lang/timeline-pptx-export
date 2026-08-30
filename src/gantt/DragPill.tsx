@@ -1,3 +1,5 @@
+import { useLayoutEffect, useRef } from 'react';
+
 /** How tall the pill is, stated rather than emergent.
  *
  * It used to be whatever 10.5px text plus 4px of padding came out to — 28px in
@@ -12,19 +14,26 @@ const PILL_HEIGHT_PX = 28;
  * a separate object rather than a label stuck to the bar. */
 const PILL_GAP_PX = 6;
 
+/** And the clearance it keeps from the edge of the visible chart, so a pill
+ * pushed against one does not look wedged into it. */
+const EDGE_INSET_PX = 4;
+
 interface DragPillProps {
-  left: number;
+  /** The canvas's scroller. What "off screen" is measured against — see the
+   * placement note below. */
+  scrollerRef: React.RefObject<HTMLElement | null>;
+  /** Where the pill would like to start: the left edge of what it describes. */
+  anchorLeft: number;
   /** The top edge of what the pill describes — the bar being dragged, or the
    * ghost being drawn — in canvas coordinates. */
   anchorTop: number;
   /** That same thing's height. The pill clears the whole of it, on whichever
    * side it ends up. */
   anchorHeight: number;
-  /** The canvas's own height, which is what "off the chart" is measured
-   * against. See the flip below. */
-  canvasHeight: number;
   label: string;
 }
+
+const clamp = (value: number, low: number, high: number) => Math.min(Math.max(value, low), high);
 
 /** The dark pill that floats above a gesture in flight, reading out the dates
  * it is currently proposing.
@@ -37,29 +46,88 @@ interface DragPillProps {
  * that keeps the pill off the thing it describes: a bar has empty track over
  * it, and the create lane has a name field in it that the pill was covering
  * (a task drawn on an empty plan put the dates squarely over the field, so you
- * could not see what you were typing). At the top of the chart there is
- * nothing above to use — the first row starts at zero — so the pill goes under
- * the anchor instead of being clamped to the edge, on top of the very bar it
- * is describing, which is what it used to do.
+ * could not see what you were typing).
  *
- * The flip is decided against the **canvas**, not the scroll viewport, and
- * that is exact rather than approximate: the body scrolls no further than its
- * own content, so the only way the space above an anchor is off screen is if
- * the anchor is near the canvas's own top. Below has room by construction —
- * the canvas is never shorter than MIN_BODY_HEIGHT_PX — and is clamped to the
- * bottom edge anyway for the case where a future layout makes it tight. */
-export function DragPill({ left, anchorTop, anchorHeight, canvasHeight, label }: DragPillProps) {
-  const above = anchorTop - PILL_HEIGHT_PX - PILL_GAP_PX;
-  const below = anchorTop + anchorHeight + PILL_GAP_PX;
-  const top =
-    above >= 0 ? above : Math.max(0, Math.min(below, canvasHeight - PILL_HEIGHT_PX));
+ * **Placed against the visible chart, not against the canvas.** The canvas is
+ * both taller and wider than the window onto it, so "inside the canvas" is not
+ * the same question as "on screen", and an earlier version of this that asked
+ * the first one was wrong twice over: scroll a row to the top of the viewport
+ * and drag its bar, and the pill went 25px above the visible area; park a bar
+ * against the right-hand edge and 69px of the pill went past it. The scroller's
+ * own `scrollTop` / `scrollLeft` and client box give the band that is actually
+ * on screen, in the same coordinates the pill is positioned in, and everything
+ * below is decided against that band.
+ *
+ * Which is also why the placement is measured rather than computed: the pill's
+ * width depends on the dates in it — "Aug 3 → Aug 9  (7d)" is not the width of
+ * "Aug 28 → Sep 14  (18d)" — so there is no arithmetic that keeps it inside the
+ * right-hand edge without asking the DOM how wide it came out. It is asked in a
+ * layout effect, which runs before the browser paints, so nothing is ever drawn
+ * at the unplaced position. */
+export function DragPill({ scrollerRef, anchorLeft, anchorTop, anchorHeight, label }: DragPillProps) {
+  const pillRef = useRef<HTMLDivElement | null>(null);
+
+  // Deliberately on every render and with no dependency list: `anchorLeft` and
+  // `anchorTop` change with every column the gesture crosses, and the label —
+  // and so the width — changes with them. The scroll listener is here for the
+  // one case a render does not cover: the create lane keeps the pill up while
+  // its name field is open, and the canvas can be wheeled underneath it.
+  useLayoutEffect(() => {
+    const pill = pillRef.current;
+    const scroller = scrollerRef.current;
+    if (!pill) return;
+
+    const place = () => {
+      const width = pill.offsetWidth;
+      // With no scroller to ask, fall back to the preferred position rather
+      // than to nothing: a pill in the right place for the canvas beats a pill
+      // in the corner.
+      const visibleTop = scroller ? scroller.scrollTop + EDGE_INSET_PX : -Infinity;
+      const visibleBottom = scroller
+        ? scroller.scrollTop + scroller.clientHeight - EDGE_INSET_PX
+        : Infinity;
+      const visibleLeft = scroller ? scroller.scrollLeft + EDGE_INSET_PX : -Infinity;
+      const visibleRight = scroller
+        ? scroller.scrollLeft + scroller.clientWidth - EDGE_INSET_PX
+        : Infinity;
+
+      const above = anchorTop - PILL_HEIGHT_PX - PILL_GAP_PX;
+      const below = anchorTop + anchorHeight + PILL_GAP_PX;
+      // Above unless it would be off the top; below unless that is off the
+      // bottom too, which only happens on a chart shorter than about a hundred
+      // pixels — and there the pill is pushed inside the band rather than
+      // being left outside it.
+      const top =
+        above >= visibleTop
+          ? above
+          : below + PILL_HEIGHT_PX <= visibleBottom
+            ? below
+            : clamp(above, visibleTop, Math.max(visibleTop, visibleBottom - PILL_HEIGHT_PX));
+
+      // Horizontally there is no other side to flip to — the pill starts where
+      // the thing it describes starts — so it slides along instead, staying
+      // level with its anchor for as long as it can and then stopping at the
+      // edge. `Math.max` last, so a pill wider than the window loses its right
+      // end rather than its left, where the first date is.
+      const left = Math.max(visibleLeft, Math.min(anchorLeft, visibleRight - width));
+
+      pill.style.top = `${top}px`;
+      pill.style.left = `${left}px`;
+    };
+
+    place();
+    scroller?.addEventListener('scroll', place, { passive: true });
+    return () => scroller?.removeEventListener('scroll', place);
+  });
 
   return (
     <div
+      ref={pillRef}
       style={{
         position: 'absolute',
-        left,
-        top,
+        // `top` and `left` are the layout effect's, not React's: they are a
+        // measurement, and writing them here as well would mean two sources
+        // for one number.
         height: PILL_HEIGHT_PX,
         boxSizing: 'border-box',
         zIndex: 20,
