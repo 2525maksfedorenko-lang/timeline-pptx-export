@@ -52,6 +52,19 @@ interface GanttViewStore {
    * as a ref handed up through the tree. */
   todayNonce: number;
   requestToday: () => void;
+
+  /** Whether the task drawer is out, below the mobile breakpoint. Above it
+   * this is not read at all: the task list is a column there and cannot be
+   * put away.
+   *
+   * Here for the same reason `todayNonce` is: the button that opens the
+   * drawer is in the app header and the drawer is in the canvas, and the two
+   * are siblings rather than parent and child. Session-only, like everything
+   * else in this store bar `listWidth` — a drawer left open is where someone
+   * was a moment ago, not a setting. */
+  isTaskDrawerOpen: boolean;
+  setTaskDrawerOpen: (isOpen: boolean) => void;
+  toggleTaskDrawer: () => void;
 }
 
 export const useGanttViewStore = create<GanttViewStore>()(
@@ -82,6 +95,10 @@ export const useGanttViewStore = create<GanttViewStore>()(
 
       todayNonce: 0,
       requestToday: () => set((state) => ({ todayNonce: state.todayNonce + 1 })),
+
+      isTaskDrawerOpen: false,
+      setTaskDrawerOpen: (isTaskDrawerOpen) => set({ isTaskDrawerOpen }),
+      toggleTaskDrawer: () => set((state) => ({ isTaskDrawerOpen: !state.isTaskDrawerOpen })),
     }),
     {
       name: 'timeline-pptx-export-view',

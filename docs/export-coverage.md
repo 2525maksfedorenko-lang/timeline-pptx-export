@@ -223,11 +223,12 @@ every cell is measured for wrapping rather than assumed to be one line.
   that doesn't fit, measuring each against the same `tableRowHeightIn` both
   renderers draw with — a wrapped cell makes its whole row taller, so a count of
   rows was never the unit. What it cuts is announced as `+43 more delayed tasks
-  - scan for the full list`, drawn in the footer band by the same
-  `drawOmittedNote` the overview's own count uses, next to the QR code that
-  opens the full list on screen. Rows are kept in the plan's order rather than
-  re-sorted by severity, so the slide shows the top of the same list the app
-  shows — which is exactly why the count is not optional.
+  not shown`, drawn in the footer band by the same `drawOmittedNote` the
+  overview's own count uses. The note used to end `- scan for the full list`,
+  beside a QR code that opened that list on screen; both left with the Dashboard
+  tab, so the note now names the number and stops there. Rows are kept in the
+  plan's order rather than re-sorted by severity, so the slide shows the top of
+  the same list the app shows — which is exactly why the count is not optional.
 - **Comment mode** (`getCommentsForSlide`): `none` → 0, `pinned` → pinned only,
   `latest` → 1 of N. A deliberate user choice, but the file itself never said how
   many were left out. **Closed**: the section heading reads "Comments (1 of 4)"

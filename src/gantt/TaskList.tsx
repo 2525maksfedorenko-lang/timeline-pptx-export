@@ -146,6 +146,7 @@ export function TaskList({
               setAddText('');
             }}
             aria-label="New task name"
+            className="gantt-field"
             style={{
               flex: 1,
               minWidth: 0,
@@ -153,7 +154,6 @@ export function TaskList({
               boxSizing: 'border-box',
               border: '1px solid var(--gantt-edit-focus)',
               borderRadius: 6,
-              fontSize: 14,
               padding: '0 10px',
               outline: 'none',
               color: 'var(--gantt-text)',
@@ -166,9 +166,8 @@ export function TaskList({
               onClick={() => setIsAdding(true)}
               title="Add task"
               aria-label="Add task"
+              className="gantt-add-button"
               style={{
-                width: 26,
-                height: 26,
                 flex: 'none',
                 border: 'none',
                 borderRadius: 999,

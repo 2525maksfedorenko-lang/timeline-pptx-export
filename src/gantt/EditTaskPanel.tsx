@@ -2,9 +2,12 @@ import { useState } from 'react';
 import { Trash2, X } from 'lucide-react';
 import { buttonBaseClass, CHECKBOX_CLASS, INPUT_SHELL_CLASS } from '../components/systemUi';
 import { useTimelineStore } from '../store/timelineStore';
+import { useIsMobile } from '../utils/useIsMobile';
 import { getTaskStatus, TASK_STATUS_VALUES, type TaskStatus, type TimelineItem } from '../types/timeline';
 import { progressForStatus } from '../utils/progressForStatus';
 import { toHtml } from '../utils/renderMarkdown';
+import { DateField } from './DateField';
+import { withEnd, withStart } from './dateEdit';
 import { PANEL_WIDTH_PX, type Span } from './geometry';
 import { childrenOf } from './rollup';
 import { isoAtIndex } from './scale';
@@ -78,21 +81,14 @@ const SECTION_STYLE: React.CSSProperties = {
 };
 
 /** The panel's own field box: 44px tall at 15px type, on the design system's
- * input border and radius. */
-const PANEL_FIELD_CLASS = `${INPUT_SHELL_CLASS} h-11 text-[15px]`;
-
-const DATE_FIELD_STYLE: React.CSSProperties = {
-  width: '100%',
-  boxSizing: 'border-box',
-  height: 44,
-  border: '1px solid hsl(var(--input))',
-  borderRadius: 'calc(var(--radius) - 2px)',
-  fontSize: 15,
-  padding: '0 12px',
-  color: 'hsl(var(--foreground))',
-  background: 'transparent',
-  outline: 'none',
-};
+ * input border and radius.
+ *
+ * `max-md:text-base` is the iOS Safari zoom guard the input contract already
+ * carries (see INPUT_CLASS in systemUi.ts) and which this size override would
+ * otherwise have dropped: below 16px Safari zooms the page when the field
+ * takes focus, and on this screen that means the chart behind the panel
+ * arriving at a scale nobody chose. */
+const PANEL_FIELD_CLASS = `${INPUT_SHELL_CLASS} h-11 text-[15px] max-md:text-base`;
 
 /** Everything about one work item, in a column beside the plan.
  *
@@ -109,11 +105,24 @@ export function EditTaskPanel({ item, minDate, spans }: EditTaskPanelProps) {
   const deleteTaskCascade = useTimelineStore((state) => state.deleteTaskCascade);
   const toggleIncludeInExportCascade = useTimelineStore((state) => state.toggleIncludeInExportCascade);
   const select = useGanttViewStore((state) => state.select);
+  const isMobile = useIsMobile();
 
   const [commentDraft, setCommentDraft] = useState('');
 
   const isGroup = childrenOf(items, item.id).length > 0;
   const span = spans.get(item.id);
+
+  // The pair both date fields show: the drawn span, so a date being dragged on
+  // the chart reads here as it is dropped; off a drag it is the item's own two
+  // dates. With one exception — between a field's first keystroke and the end
+  // of that edit the task can hold a deadline before its start (see DateField),
+  // and previewSpans draws that clamped to one day. The clamp is what the plan
+  // can draw, not what the task says, so there the item's own dates win and
+  // each field goes on showing the date it holds.
+  const drawn = span
+    ? { start: isoAtIndex(minDate, span.start), end: isoAtIndex(minDate, span.start + span.len - 1) }
+    : null;
+  const shown = drawn && item.start <= item.end ? drawn : { start: item.start, end: item.end };
   const included = item.includeInExport !== false;
   const itemComments = comments.filter((comment) => comment.taskId === item.id);
 
@@ -145,12 +154,26 @@ export function EditTaskPanel({ item, minDate, spans }: EditTaskPanelProps) {
     <div
       className="bg-card text-card-foreground"
       style={{
-        width: PANEL_WIDTH_PX,
-        flex: 'none',
-        borderLeft: '1px solid hsl(var(--border))',
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
+        // A 348px column beside the plan, or the whole screen over it. There
+        // is no width between the two that works: at 375px the column would
+        // leave the chart 27px, which is not a chart. So below the breakpoint
+        // the panel stops being a column at all and becomes the screen — it
+        // already has a title and a close button of its own, which is
+        // everything a sheet needs to be one.
+        //
+        // `100dvh` rather than `100vh`: on iOS Safari the layout viewport runs
+        // on under the address bar, and a panel measured against it would put
+        // its last field and its Add Comment button behind that bar.
+        ...(isMobile
+          ? { position: 'fixed' as const, top: 0, left: 0, right: 0, height: '100dvh', zIndex: 50 }
+          : {
+              width: PANEL_WIDTH_PX,
+              flex: 'none',
+              borderLeft: '1px solid hsl(var(--border))',
+            }),
       }}
     >
       <div
@@ -221,32 +244,24 @@ export function EditTaskPanel({ item, minDate, spans }: EditTaskPanelProps) {
 
         <Band label="PLANNING" zIndex={5} topBorder />
         <div style={SECTION_STYLE}>
+          {/* Each field writes its own date as it is typed, and the rule that
+              ties the two together runs once the edit is over — with the date
+              the field settled on, so the pair is read fresh rather than off
+              this render. */}
           <Field label="Start Date" htmlFor={`panel-${item.id}-start`}>
-            <input
+            <DateField
               id={`panel-${item.id}-start`}
-              type="date"
-              // The drawn span, so a date being dragged on the chart reads
-              // here as it is dropped; off a drag it is the item's own pair.
-              value={span ? isoAtIndex(minDate, span.start) : item.start}
-              onChange={(event) => {
-                if (!event.target.value) return;
-                // Moving the start keeps the deadline where it is, so the
-                // task's length is what changes.
-                updateItem(item.id, { start: event.target.value });
-              }}
-              style={DATE_FIELD_STYLE}
+              value={shown.start}
+              onCommit={(start) => updateItem(item.id, { start })}
+              onSettle={(start) => updateItem(item.id, withStart(item, start))}
             />
           </Field>
           <Field label="Deadline" htmlFor={`panel-${item.id}-end`}>
-            <input
+            <DateField
               id={`panel-${item.id}-end`}
-              type="date"
-              value={span ? isoAtIndex(minDate, span.start + span.len - 1) : item.end}
-              onChange={(event) => {
-                if (!event.target.value) return;
-                updateItem(item.id, { end: event.target.value });
-              }}
-              style={DATE_FIELD_STYLE}
+              value={shown.end}
+              onCommit={(end) => updateItem(item.id, { end })}
+              onSettle={(end) => updateItem(item.id, withEnd(item, end))}
             />
           </Field>
 
@@ -298,7 +313,7 @@ export function EditTaskPanel({ item, minDate, spans }: EditTaskPanelProps) {
             value={commentDraft}
             onChange={(event) => setCommentDraft(event.target.value)}
             placeholder="Add a comment..."
-            className={`${INPUT_SHELL_CLASS} min-h-[92px] text-[15px]`}
+            className={`${INPUT_SHELL_CLASS} min-h-[92px] text-[15px] max-md:text-base`}
           />
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
             <button

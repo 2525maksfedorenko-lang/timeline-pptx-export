@@ -1,7 +1,6 @@
 import type { TimelineItem } from '../types/timeline';
 import { getDaysOverdue, getDelayedTasks } from '../utils/dashboardMetrics';
 import { formatShortDate } from './dateScale';
-import { dashboardDeepLink } from './qrCode';
 import {
   DASHBOARD_TABLE_MAX_HEIGHT_IN,
   DASHBOARD_TABLE_WIDTH_IN,
@@ -35,8 +34,6 @@ export interface DashboardTableSlideModel {
    * overview's own "+N tasks not shown" uses. */
   note: string | null;
   emptyMessage: string;
-  qrUrl: string;
-  qrDisplay: string;
 }
 
 export type DashboardSlideModel = DashboardTableSlideModel;
@@ -71,18 +68,22 @@ function fitTableRows(headers: string[], rows: string[][]): { rows: string[][]; 
   return { rows: fitted, omittedRowCount: rows.length - fitted.length };
 }
 
-/** "+7 more delayed tasks - scan for the full list". The QR code beside the
- * table opens exactly that list on screen, so the note points at it rather
- * than naming a number the reader can do nothing with. */
+/** "+7 more delayed tasks not shown".
+ *
+ * The note used to end "- scan for the full list", pointing at a QR code
+ * beside the table that opened the same list on screen. Both are gone, and
+ * with them any way to reach the rest from the slide — so the note now says
+ * only what is true: this many rows exist and are not here. Naming a number
+ * the reader can do nothing with is still worth it; a table that quietly
+ * stops at the bottom of the slide reads as the whole list. */
 function overflowNote(omittedRowCount: number, noun: string): string | null {
   if (omittedRowCount === 0) return null;
   const plural = omittedRowCount === 1 ? '' : 's';
-  return `+${omittedRowCount} more ${noun}${plural} - scan for the full list`;
+  return `+${omittedRowCount} more ${noun}${plural} not shown`;
 }
 
 interface TableSlideSpec {
   title: string;
-  view: 'delayed';
   /** Singular noun for the overflow note ("delayed task" -> "+7 more delayed tasks"). */
   noun: string;
   emptyMessage: string;
@@ -92,7 +93,6 @@ interface TableSlideSpec {
 }
 
 function buildTableSlide(spec: TableSlideSpec): DashboardTableSlideModel {
-  const link = dashboardDeepLink(spec.view);
   const { rows, omittedRowCount } = fitTableRows(spec.headers, spec.rows);
 
   return {
@@ -105,19 +105,16 @@ function buildTableSlide(spec: TableSlideSpec): DashboardTableSlideModel {
     omittedRowCount,
     note: overflowNote(omittedRowCount, spec.noun),
     emptyMessage: spec.emptyMessage,
-    qrUrl: link.url,
-    qrDisplay: link.display,
   };
 }
 
 /** Builds the dashboard table slide (delayed tasks), which sits directly
  * after the overview slide(s) — see slideOrder.ts for the full deck order.
  * There's deliberately no status-breakdown slide here: the summary slide
- * already shows the same segments, and links to the on-screen status view via
- * its own QR code. Reuses the exact same delayed logic as the on-screen
- * Dashboard (src/components/Dashboard.tsx) via utils/dashboardMetrics.ts, and
- * is scoped to exportable items just like the rest of the export pipeline
- * (buildExportSlides).
+ * already shows the same segments. Reuses the exact same delayed logic as the
+ * on-screen Dashboard (src/components/Dashboard.tsx) via
+ * utils/dashboardMetrics.ts, and is scoped to exportable items just like the
+ * rest of the export pipeline (buildExportSlides).
  *
  * An "At risk tasks" slide used to lead this group. Its rows were the blocked
  * tasks and nothing else, so it left with that status. */
@@ -126,7 +123,6 @@ export function buildDashboardSlides(items: TimelineItem[], today: Date): Dashbo
 
   const delayedSlide = buildTableSlide({
     title: 'Delayed tasks',
-    view: 'delayed',
     noun: 'delayed task',
     emptyMessage: 'No delayed tasks.',
     headers: ['Task', 'End date', 'Days overdue'],

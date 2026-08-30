@@ -15,11 +15,9 @@ import {
 } from './timelineExportModel';
 import {
   buildDashboardSlides,
-  type DashboardSlideModel,
   type DashboardTable,
   type DashboardTableSlideModel,
 } from './dashboardSlides';
-import { getQrCodeDataUrl, getSummaryQrCodes, type QrCodeModel } from './qrCode';
 import { buildSlideLinks, type SlideLinks } from './slideLinks';
 import { orderExportSlides } from './slideOrder';
 import { COLORS, EXPORT_MARK_TEXT, PDF_FONT_FACE, PDF_MONO_FONT_FACE, withHash } from './theme';
@@ -52,9 +50,6 @@ import {
   CONTENT_TOP_IN,
   CONTENT_WIDTH_IN,
   CONTENT_X_IN,
-  DASHBOARD_TABLE_GAP_IN,
-  DASHBOARD_TABLE_QR_COLUMN_WIDTH_IN,
-  DASHBOARD_TABLE_QR_SIZE_IN,
   DASHBOARD_TABLE_TOP_IN,
   DASHBOARD_TABLE_WIDTH_IN,
   DATE_LETTER_SPACING_EM,
@@ -691,12 +686,6 @@ const SUMMARY_BAR_HEIGHT_IN = 0.45;
 const SUMMARY_LEGEND_GAP_IN = 0.25;
 const SUMMARY_CHIP_SIZE_IN = 0.14;
 const SUMMARY_STATS_GAP_IN = 0.55;
-const SUMMARY_QR_GAP_ABOVE_IN = 0.9;
-const SUMMARY_QR_SIZE_IN = 1.3;
-// Each summary QR gets a fixed-width cell (wide enough for its caption on
-// one line); the cells are then centered as a block, so the pair sits
-// symmetrically either side of the slide's center line.
-const SUMMARY_QR_CELL_WIDTH_IN = 3.0;
 
 /** Draws the status-breakdown stacked bar + legend at an arbitrary
  * position/width, returning the Y just below the legend — jsPDF has no
@@ -756,20 +745,7 @@ function drawStatusBreakdown(doc: jsPDF, segments: SummarySlideModel['segments']
   return legendY;
 }
 
-/** Draws a QR code image with a link caption beneath, centered within a
- * column — shared by the summary slide and the dashboard slides, each
- * pointing at a different deep link. */
-function drawQrWithLink(doc: jsPDF, qrCodeDataUrl: string, linkDisplay: string, x: number, width: number, y: number, size: number) {
-  const imageX = x + (width - size) / 2;
-  doc.addImage(qrCodeDataUrl, 'PNG', imageX, y, size, size);
-
-  doc.setFont(PDF_FONT_FACE, 'normal');
-  doc.setFontSize(9);
-  doc.setTextColor(withHash(COLORS.footerText));
-  drawText(doc, linkDisplay, x + width / 2, y + size + 0.15, { align: 'center', baseline: 'top', maxWidth: width });
-}
-
-function drawSummarySlide(doc: jsPDF, model: SummarySlideModel, qrCodes: QrCodeModel[]) {
+function drawSummarySlide(doc: jsPDF, model: SummarySlideModel) {
   drawChrome(doc, model.title);
 
   const legendY = drawStatusBreakdown(doc, model.segments, CONTENT_X_IN, CONTENT_TOP_IN, CONTENT_WIDTH_IN);
@@ -790,26 +766,9 @@ function drawSummarySlide(doc: jsPDF, model: SummarySlideModel, qrCodes: QrCodeM
     drawText(doc, stat.value, x, statsY + 0.3, { baseline: 'top' });
   });
 
-  // Both QR codes sit side by side below the stats — the export link, plus a
-  // deep link to the status view that used to have its own slide.
-  const qrY = statsY + SUMMARY_QR_GAP_ABOVE_IN;
-  const qrBlockWidth = qrCodes.length * SUMMARY_QR_CELL_WIDTH_IN;
-  const qrBlockX = CONTENT_X_IN + (CONTENT_WIDTH_IN - qrBlockWidth) / 2;
-
-  qrCodes.forEach((qr, index) => {
-    drawQrWithLink(
-      doc,
-      qr.dataUrl,
-      qr.display,
-      qrBlockX + index * SUMMARY_QR_CELL_WIDTH_IN,
-      SUMMARY_QR_CELL_WIDTH_IN,
-      qrY,
-      SUMMARY_QR_SIZE_IN,
-    );
-  });
 }
 
-function drawDashboardTableSlide(doc: jsPDF, model: DashboardTableSlideModel, qrCodeDataUrl: string) {
+function drawDashboardTableSlide(doc: jsPDF, model: DashboardTableSlideModel) {
   drawChrome(doc, model.title);
   // The model cut this table to the rows that fit the slide; the note is how
   // the slide says so — the same footer line the overview announces its own
@@ -834,16 +793,6 @@ function drawDashboardTableSlide(doc: jsPDF, model: DashboardTableSlideModel, qr
     drawText(doc, model.emptyMessage, CONTENT_X_IN, DASHBOARD_TABLE_TOP_IN, { baseline: 'top' });
   }
 
-  const qrX = CONTENT_X_IN + tableWidth + DASHBOARD_TABLE_GAP_IN;
-  drawQrWithLink(
-    doc,
-    qrCodeDataUrl,
-    model.qrDisplay,
-    qrX,
-    DASHBOARD_TABLE_QR_COLUMN_WIDTH_IN,
-    DASHBOARD_TABLE_TOP_IN,
-    DASHBOARD_TABLE_QR_SIZE_IN,
-  );
 }
 
 export async function exportTimelineToPdf(
@@ -866,17 +815,6 @@ export async function exportTimelineToPdf(
     now,
   );
   const dashboardSlides = buildDashboardSlides(sortedItems, now);
-  const summaryQrCodes = await getSummaryQrCodes();
-  // Keyed by the slide model itself rather than by position, so the deck
-  // order (see slideOrder.ts) can change without silently pairing a slide
-  // with another slide's QR code.
-  const dashboardQrCodeDataUrls = new Map<DashboardSlideModel, string>(
-    await Promise.all(
-      dashboardSlides.map(
-        async (slideModel) => [slideModel, await getQrCodeDataUrl(slideModel.qrUrl)] as const,
-      ),
-    ),
-  );
 
   const doc = new jsPDF({
     orientation: 'landscape',
@@ -897,9 +835,9 @@ export async function exportTimelineToPdf(
     } else if (slideModel.kind === 'detail') {
       drawDetailSlide(doc, slideModel, links);
     } else if (slideModel.kind === 'summary') {
-      drawSummarySlide(doc, slideModel, summaryQrCodes);
+      drawSummarySlide(doc, slideModel);
     } else {
-      drawDashboardTableSlide(doc, slideModel, dashboardQrCodeDataUrls.get(slideModel)!);
+      drawDashboardTableSlide(doc, slideModel);
     }
   });
 

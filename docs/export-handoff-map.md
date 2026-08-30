@@ -210,7 +210,7 @@ Our deck today is 10 × 5.625 in (`slideLayout.ts:21`), a third smaller again.
 | Today line, 2 px `--destructive`, 80 % | today is a grid line among the date grid levels | `dateGrid.ts` |
 | Uniform hairline per column boundary | four grid levels (day/week/month/year) at four greys and widths | `theme.ts:63–70`, `dateGrid.ts` |
 | Zoom levels + rollup | density tier chosen from the widest window; no rollup | `buildOverviewAxes` |
-| — | dashboard table slides (Delayed / At risk) + QR | `dashboardSlides.ts` |
+| — | dashboard table slide (Delayed) | `dashboardSlides.ts` |
 | — | summary slide (status segments + stats) | `timelineExportModel.ts:334` |
 | — | appendix: Subtasks & Comments, markdown-rendered | `timelineExportModel.ts:1412` |
 | — | footer "Exported from aicoo", internal hyperlinks, back-links | `theme.ts:93`, `slideLinks.ts`, `slideLayout.ts:87` |
@@ -240,7 +240,7 @@ Our deck today is 10 × 5.625 in (`slideLayout.ts:21`), a third smaller again.
 ## 8. Gap B — ours, and the handoff is silent
 
 The handoff describes exactly one slide type. It says nothing about: the dashboard table slides, the
-summary slide, the Subtasks & Comments appendix (markdown, tables, pins), QR codes, internal
+summary slide, the Subtasks & Comments appendix (markdown, tables, pins), internal
 hyperlinks and back-links, the footer, the export filename, the "+N tasks not shown" note, the
 timeframe-clipping chevrons, Compact/Full overflow, the monospace date face, or the sort order.
 
@@ -561,3 +561,48 @@ which is why none of the geometry above moved.
 Appendix slides are the one exception to the mark: "Back to overview" already
 owns the right of their title line, so `drawChrome` is called with
 `markRight: false` there. One slot, one occupant.
+
+---
+
+# Phase 6 — the QR codes left with the Dashboard tab
+
+The Dashboard tab is no longer part of the app, and the deck's QR codes pointed
+at it: three codes, all encoding a URL into a screen a reader could not reach.
+A code that scans to a dead end is worse than no code, so they are gone, along
+with everything that existed only to build them.
+
+## What went with them
+
+| Gone | Where it was | What it did |
+|---|---|---|
+| Two QR codes on the summary slide | both exporters | The export origin, and a deep link to the on-screen status view |
+| The QR column beside the Delayed table | both exporters, `slideLayout.ts` | A deep link to the same list on screen |
+| `qrCode.ts` in full | `src/export/` | The generator, its per-URL cache, `dashboardDeepLink`, and `HEADLESS_FALLBACK_ORIGIN` — the one place a public host was written down |
+| `qrcode` and `@types/qrcode` | `package.json` | The only user was the file above |
+| `qrUrl` / `qrDisplay` on the table slide model | `dashboardSlides.ts` | Carried the link from the model to the renderers |
+
+## What moved because they left
+
+- **The Delayed table is the full content width.** `DASHBOARD_TABLE_WIDTH_IN`
+  was `CONTENT_WIDTH_IN` minus a 2.0in QR column and a 0.4in gap; it is now
+  `CONTENT_WIDTH_IN`. Wider columns wrap fewer cells, so the same rows draw
+  shorter — the coverage fixture's table ends at 6.78in where it ended at
+  6.92in — and the row count `fitTableRows` reaches can only go up, never down.
+  On that fixture it did not move: 19 rows drawn, 22 cut, either way.
+- **The summary slide's stats box is wide again.** It had been narrowed to
+  2.2in purely to free room for the second QR; the text is left-aligned and
+  never wrapped at either width, so the figures did not move.
+- **The overflow note no longer promises a way out.** `+43 more delayed tasks
+  - scan for the full list` is now `+43 more delayed tasks not shown`.
+
+## What did not move
+
+The deck's internal hyperlinks — an overview bar jumping to its Subtasks &
+Comments slide, and "Back to overview" coming back — are a different mechanism
+entirely: slide numbers resolved by `slideLinks.ts` and handed to
+`hyperlink: { slide }` / `link(..., { pageNumber })`. Nothing in that path ever
+touched a URL.
+
+`?dashboardView=` still works in `App.tsx`, and the Dashboard screen is still
+built and still exported as slides. Nothing points at the URL any more, which
+is a question for the product rather than for this file.

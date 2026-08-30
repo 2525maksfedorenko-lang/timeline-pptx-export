@@ -228,3 +228,172 @@
 .gantt-create-lane:hover {
   background: var(--gantt-name-hover);
 }
+
+/* ── Below the mobile breakpoint ───────────────────────────────────────────
+ *
+ * The task column stops being a column. It becomes a drawer that lies over
+ * the chart, and everything here is what that costs: the drawer's own motion,
+ * the scrim under it, the row furniture that has to survive without a hover,
+ * and the field sizes that keep iOS Safari from zooming the page.
+ *
+ * The one breakpoint is 767px — the same number as MOBILE_MEDIA_QUERY in
+ * src/utils/useIsMobile.ts and as Tailwind's `max-md:`, so the CSS and the JS
+ * cannot drift about what "mobile" means. Nothing in this block applies above
+ * it; the desktop plan screen is untouched. */
+
+:root {
+  /* The drawer's width. Wide enough for a name (the column's own floor is
+     MIN_LIST_WIDTH_PX = 240), narrow enough to leave a strip of chart and its
+     scrim showing, which is what says the drawer is lying over something
+     rather than having replaced it. */
+  --gantt-drawer-width: min(300px, 82vw);
+}
+
+/* The drawer itself. It is the list pane, absolutely placed over the canvas
+   instead of holding a grid column, and it comes from the left edge because
+   that is where the column lives above the breakpoint — the names stay on the
+   same side of their bars at every width.
+
+   200ms ease-out is the design system's `--duration` / `--ease-out`, the pair
+   it gives sheets and collapses. This is the one thing on the plan screen that
+   moves, and it moves because where it came from is the point. */
+.gantt-drawer {
+  transform: translateX(-100%);
+  visibility: hidden;
+  box-shadow: var(--shadow-lg);
+  transition:
+    transform var(--duration) var(--ease-out),
+    visibility 0s linear var(--duration);
+}
+
+.gantt-drawer[data-open='true'] {
+  transform: none;
+  visibility: visible;
+  transition:
+    transform var(--duration) var(--ease-out),
+    visibility 0s;
+}
+
+/* While a swipe is in flight the transform is written frame by frame from the
+   finger's position, so the transition has to be out of the way — otherwise
+   the drawer chases the finger 200ms behind it. */
+.gantt-drawer[data-swiping='true'] {
+  transition: none;
+}
+
+/* The scrim. `--overlay-scrim` is the design system's one scrim value and the
+   readme says so in as many words ("Modal scrims are flat black/80"); the
+   drawer is modal — the chart under it takes no press — so it wears the
+   system's scrim rather than a lighter one invented here. */
+.gantt-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 25;
+  background: var(--overlay-scrim);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--duration) var(--ease-out);
+}
+
+.gantt-scrim[data-open='true'] {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gantt-drawer,
+  .gantt-scrim {
+    transition: none;
+  }
+}
+
+/* The two inline fields the plan screen collects text in — a row's rename and
+   the add row's new name — plus the create lane's. Their size is here rather
+   than inline because it is the one property that has to change below the
+   breakpoint: Safari zooms the whole page when a focused field is under 16px,
+   which on this screen means the chart jumping to a scale nobody asked for. */
+.gantt-field {
+  font-size: 14px;
+}
+
+/* The Edit Task panel's date fields, whose 15px is the handoff's. */
+.gantt-date-field {
+  font-size: 15px;
+}
+
+/* The drag grip. Its `display` is here rather than inline so that the media
+   query below can take it off the row — an inline style would outrank it. */
+.gantt-row-grip {
+  display: grid;
+}
+
+/* The row's fixed furniture, sized here rather than inline because every one
+   of these boxes grows below the breakpoint: a finger is not a pointer, and a
+   16px caret is not a target. The glyphs inside them keep their own size —
+   only the box around them changes, so the column reads as it always did and
+   still answers a thumb. The "+" and the empty slot a sub-task keeps in its
+   place are written together so the two can never disagree about the width
+   they reserve. */
+.gantt-row-caret {
+  width: 16px;
+  height: 16px;
+}
+
+.gantt-row-status {
+  width: 20px;
+  height: 20px;
+}
+
+.gantt-row-add,
+.gantt-row-add-slot {
+  width: 18px;
+  height: 18px;
+}
+
+/* The add row's own "+", at the foot of the column. */
+.gantt-add-button {
+  width: 26px;
+  height: 26px;
+}
+
+@media (max-width: 767px) {
+  /* No hover on a touch screen, so a control that is invisible until hovered
+     is a control that is not there. The "+" is present at rest instead, and
+     large enough to hit. */
+  .gantt-row-add {
+    opacity: 1;
+  }
+
+  .gantt-row-add,
+  .gantt-row-add-slot,
+  .gantt-row-caret,
+  .gantt-row-status {
+    width: 32px;
+    height: 32px;
+  }
+
+  .gantt-add-button {
+    width: 34px;
+    height: 34px;
+  }
+
+  /* The drag grip is drawn and not wired — the handoff's own README lists row
+     reordering as one of its gaps. On a phone the row has no width to spend
+     advertising a gesture that does nothing, so it goes. */
+  .gantt-row-grip {
+    display: none;
+  }
+
+  .gantt-field,
+  .gantt-date-field {
+    font-size: 16px;
+  }
+
+  /* The canvas's own scrollbars. A standing 12px bar is a reading of how much
+     plan lies either side of the view, which is worth a twentieth of a desktop
+     window and not worth a twelfth of a phone's. Touch scrolling says the same
+     thing by moving. */
+  .gantt-scroll::-webkit-scrollbar {
+    display: none;
+  }
+}

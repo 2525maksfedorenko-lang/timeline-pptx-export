@@ -69,7 +69,10 @@ export function ExportMenu({ onExport, hasSavedPlan }: ExportMenuProps) {
         onClick={() => setIsOpen(!isOpen)}
         aria-expanded={isOpen}
         aria-haspopup="menu"
-        className={buttonBaseClass('default', 'h-8 whitespace-nowrap px-3 text-xs font-semibold')}
+        className={buttonBaseClass(
+          'default',
+          'h-8 whitespace-nowrap px-3 text-xs font-semibold max-md:h-10 max-md:px-2.5',
+        )}
       >
         Export
         <ChevronDown size={13} strokeWidth={2.4} aria-hidden="true" />

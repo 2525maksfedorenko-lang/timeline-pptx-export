@@ -32,12 +32,17 @@ interface TaskListRowProps {
  * "row reordering by the drag-dots handle is drawn but not wired" as one of
  * its three known gaps. It keeps the row's spacing and the affordance the
  * design shows; what it does when dragged is a question the handoff leaves
- * open rather than one to answer here. */
+ * open rather than one to answer here. It is also the first thing to go below
+ * the mobile breakpoint (see .gantt-row-grip): a row 300px wide has no space
+ * to spend advertising a gesture that does nothing. */
 function DragGrip() {
   return (
     <span
+      className="gantt-row-grip"
       title="Drag to reorder"
-      style={{ display: 'grid', gridTemplateColumns: '3px 3px', gap: 3, flex: 'none', cursor: 'grab', opacity: 0.85 }}
+      // `display` is in the stylesheet, not here: an inline one would outrank
+      // the media query that takes this off the row below the breakpoint.
+      style={{ gridTemplateColumns: '3px 3px', gap: 3, flex: 'none', cursor: 'grab', opacity: 0.85 }}
     >
       {Array.from({ length: 6 }, (_, index) => (
         <span
@@ -143,9 +148,8 @@ export function TaskListRow({
         title="Show / hide sub-tasks"
         aria-label="Show / hide sub-tasks"
         aria-expanded={!isCollapsed}
+        className="gantt-row-caret"
         style={{
-          width: 16,
-          height: 16,
           flex: 'none',
           border: 'none',
           background: 'transparent',
@@ -175,9 +179,8 @@ export function TaskListRow({
         // change; the title says so instead of the control lying about it.
         title={`${STATUS_LABEL[status]}${isGroup ? ' (rolled up)' : ' — click to change'}`}
         aria-label={`${item.label}: ${STATUS_LABEL[status]}`}
+        className="gantt-row-status"
         style={{
-          width: 20,
-          height: 20,
           flex: 'none',
           border: 'none',
           background: 'transparent',
@@ -209,6 +212,7 @@ export function TaskListRow({
           }}
           onBlur={onCommitEdit}
           aria-label="Task name"
+          className="gantt-field"
           style={{
             flex: 1,
             minWidth: 0,
@@ -216,7 +220,6 @@ export function TaskListRow({
             boxSizing: 'border-box',
             border: '1px solid var(--gantt-edit-focus)',
             borderRadius: 6,
-            fontSize: 14,
             padding: '0 10px',
             outline: 'none',
             background: 'var(--gantt-edit-bg)',
@@ -292,7 +295,7 @@ export function TaskListRow({
           widen a sub-task's name pill past its parent's and leave the column
           with two right edges — for a control the eye never sees anyway. */}
       {isSubtask ? (
-        <span aria-hidden="true" style={{ width: 18, height: 18, flex: 'none' }} />
+        <span aria-hidden="true" className="gantt-row-add-slot" style={{ flex: 'none' }} />
       ) : (
         <button
           type="button"
@@ -304,8 +307,6 @@ export function TaskListRow({
           title="Add sub-task"
           aria-label={`Add a sub-task under ${item.label}`}
           style={{
-            width: 18,
-            height: 18,
             flex: 'none',
             border: 'none',
             borderRadius: 4,

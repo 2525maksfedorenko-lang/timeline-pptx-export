@@ -36,6 +36,12 @@ interface TimelineBodyProps {
   onSelectBar: (id: string) => void;
   /** Columns drawn on the canvas — what a drawn edge is clamped to. */
   dayCount: number;
+  /** Whether the task column is a drawer rather than a column at this width.
+   * The bars care because a drawer is usually shut: a bar too narrow to hold
+   * its own name has to put it somewhere, and there is no column to fall back
+   * on. Passed down rather than read here, so one media query answers for the
+   * whole screen. */
+  isMobile: boolean;
   /** "Aug 17" for a column index. */
   formatDay: (index: number) => string;
   /** A task drawn on the create lane, named and confirmed. */
@@ -84,6 +90,7 @@ export function TimelineBody({
   onContextMenuBar,
   onSelectBar,
   dayCount,
+  isMobile,
   formatDay,
   onCreateTask,
 }: TimelineBodyProps) {
@@ -163,6 +170,7 @@ export function TimelineBody({
             barStyle={barStyleById.get(row.item.id) ?? FALLBACK_BAR_STYLE}
             dateRange={dateRangeById.get(row.item.id) ?? ''}
             statusLabel={statusLabelById.get(row.item.id) ?? ''}
+            isMobile={isMobile}
             onPointerDownBar={(event, mode) => onPointerDownBar(row.item.id, event, mode)}
             onSelect={() => onSelectBar(row.item.id)}
             onContextMenu={(event) => onContextMenuBar(row.item.id, event)}

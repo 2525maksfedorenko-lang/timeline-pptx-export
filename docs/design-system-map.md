@@ -842,3 +842,92 @@ and exports every task (`check:export --plan` on a 5-level fixture: 93 of 93 in
 the deck). A deep row simply has no "+" — the 18px slot stays behind it, since
 the button is invisible at rest and taking its width away too would leave the
 task column with two right edges.
+
+## Where a date field stopped committing every keystroke
+
+Every control in the Edit Task panel commits as it is changed — there is no Save
+— and the two date fields did the same, guarded only against an empty value.
+That guard reads the wrong failure. `<input type="date">` does report `''` while
+a date is incomplete, but a **year** being retyped does not go through `''`: it
+goes through complete, parseable dates with a partial year. Select the year in
+`2026-05-10`, erase it and type it back, and the field says `0002-05-10`,
+`0020-05-10`, `0202-05-10` before it says what was meant. Each of those was
+written straight onto the task, and `planRange` widened the canvas to hold it:
+a plan of 192 columns became one of 45,483, each column a `Date` and a
+`toLocaleString`, and the tab stopped answering on the first digit. (45,483 and
+not the 739,000 days back to the year 2, because `Date.UTC` maps a two-digit
+year into the 1900s — so the canvas was wrong as well as enormous.)
+
+So the panel's date fields now hold a draft, as its name and comment fields
+already do (`DateField` in `src/gantt/DateField.tsx`): the field shows what is
+being typed, the task keeps the date it had, and the write happens on the first
+value that is a date — four digits of year between 1900 and 2100, and a day the
+calendar actually has (`isCommittableDate` in `src/gantt/dateEdit.ts`; the
+round-trip through `toISOString` is what catches 31 February, which `Date` rolls
+forward rather than rejecting). A field left half-typed drops its draft on blur
+and goes back to showing the task.
+
+The same module carries the other rule a committed date needs, because a task's
+two dates are one pair: **the edited field wins and the other end follows**
+(`withStart` / `withEnd`). A deadline set before the start pulls the start back
+to it, a start pushed past the deadline carries the deadline with it, and either
+way the task is one day long. That is the bargain a resize on the chart already
+strikes — `previewSpans` clamps a span to `Math.max(1, …)` — but clamping only
+the *drawing* left an inverted pair stored and the panel showing a deadline the
+task did not have. Writing the pair keeps the field, the bar and the deck saying
+the same thing.
+
+`npm run check:dates` (`scripts/checkDateCommit.ts`) holds both rules: it walks
+the keystrokes a year edit actually produces and asserts only the last one
+commits, and it measures the canvas the held-back values would have asked for.
+
+## Where the task column becomes a drawer
+
+Below `MOBILE_MEDIA_QUERY` — 767px, the one breakpoint this app has — the plan
+screen's 2×2 frame becomes 1×2. The task column leaves the grid, the chart takes
+the whole width, and the same pane comes back as a drawer lying over the canvas
+from the left edge. Nothing above the breakpoint changes: verified by screenshot
+against the branch point at 768, 1024, 1280 and 1440, with the Edit Task panel
+both shut and open, and the eight files are byte-identical.
+
+Three things about it are worth recording rather than reading off the code.
+
+**It comes from the left, not the right.** The brief said the panel should "fly
+out to the right", which reads two ways — a panel anchored left whose leading
+edge travels right as it opens, or a panel that lives off the right edge and
+retreats there. The first is what is built. The column is on the left at every
+other width, and a name that changed which side of its bar it was read from
+would be a different screen rather than a narrower one; the right edge is also
+where the Edit Task panel comes from on the desktop, and two panels sharing one
+edge is a coin toss the user has to remember the outcome of. The drawer's own
+head is 56px — exactly `HEADER_HEIGHT_PX`, the corner block's height — so the
+first name still sits level with the first bar.
+
+**It is opened by a button and never by an edge swipe.** A swipe from the left
+edge is the browser's own "back" gesture on iOS Safari and on Chrome for Android,
+and a drawer that sometimes leaves the app instead of opening is worse than no
+drawer. A tab hanging off the edge was rejected for the same reason plus one
+more: it would sit over the chart, in that same strip. It closes four ways —
+the header button again, the drawer's own X, a tap on the scrim, and a leftward
+swipe on the drawer itself.
+
+**It is the one thing on this screen that moves.** The design system's rule is
+that hover changes colour only and nothing slides for decoration; a drawer
+sliding is not decoration, it is the drawer saying where it came from and where
+it will go, which is the whole reason the customer asked for a drawer rather
+than a second screen. The values are the system's own — `--duration` 200ms on
+`--ease-out`, the pair it gives sheets and collapses — the shadow is
+`--shadow-lg` (its dialogs-and-sheets step) and the scrim is `--overlay-scrim`
+unaltered, the flat black/80 the readme names. A `prefers-reduced-motion` query
+takes the transition off. Recorded here as a deviation from "colour only"
+rather than smuggled in.
+
+Two gestures had to give way to the finger, and both are recorded in the code
+that gives them up. A **bar is not dragged below the breakpoint** — no move, no
+resize strips: the way through a plan on a phone is to drag the canvas, bars
+cover a large share of it, and with no hover to say which pixels are a bar, a
+drag that started on one moved the task by a week instead of scrolling. Dates
+are edited in the panel a tap opens. And the **drawer scrolls itself** there,
+writing its offset back to the body, because the body is underneath it and out
+of reach; it is still one offset, and both writes are guarded on the value
+actually changing so the two panes cannot bounce off each other.
