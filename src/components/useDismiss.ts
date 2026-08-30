@@ -104,6 +104,20 @@ export function useMenuDismiss({
   }, [isOpen, rootRef, triggerRef]);
 }
 
+/** Controls that own Escape while they hold focus.
+ *
+ * A key press belongs to the innermost thing that has something to do with it,
+ * and a field with an edit in it does: Escape puts the edit back. Only after
+ * that — with focus given up and the press landing on nothing in particular —
+ * does it mean "put this layer away". So the first Escape restores the field
+ * and the second closes the panel, which is one key doing one thing at a time
+ * rather than two things at once.
+ *
+ * Checkboxes and radios are deliberately not here. They hold no edit to
+ * restore, so Escape on one has nothing to be about and may as well close. */
+const OWNS_ESCAPE =
+  'input:not([type="checkbox"]):not([type="radio"]),textarea,select,[contenteditable="true"]';
+
 /** How far the pointer may travel between down and up and still be a click
  * rather than a drag. The same 3px the canvas's own grab-pan uses to tell a
  * press from a pan, so the two agree about what a click is. */
@@ -118,7 +132,8 @@ interface PanelDismissOptions {
    * any of them leave the panel alone.
    *
    * It also gates the key: inside these, Escape already means "cancel what I
-   * am typing here", and one press should not mean two things. */
+   * am typing here", and one press should not mean two things. Fields that
+   * hold an edit are gated as well, wherever they are — see OWNS_ESCAPE. */
   ignoreSelector: string;
   /** Called for a press outside, and for Escape. The caller decides what
    * closing means — the panel commits its half-finished fields first. */
@@ -179,6 +194,7 @@ export function usePanelDismiss({ panelRef, ignoreSelector, onDismiss }: PanelDi
       if (event.key !== 'Escape') return;
       const element = event.target instanceof Element ? event.target : null;
       if (element?.closest(ignoreSelector)) return;
+      if (element?.closest(OWNS_ESCAPE)) return;
       latest.current();
     };
 

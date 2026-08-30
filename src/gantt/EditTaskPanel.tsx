@@ -141,6 +141,32 @@ export function EditTaskPanel({ item, minDate, spans }: EditTaskPanelProps) {
   const dropCommentDrafts = useGanttViewStore((state) => state.dropCommentDrafts);
   const panelRef = useRef<HTMLDivElement | null>(null);
 
+  /* Enter and Escape, in the one place the panel's three editable fields can
+   * agree about them.
+   *
+   * **Enter finishes the edit it is pressed in** — and finishing is not saving,
+   * because every control here already writes to the plan as it is changed.
+   * What it means is: this edit is over. The field gives up focus, the dates
+   * run the rule that ties the pair together, and the comment — the one thing
+   * the plan has *not* been told about, since posting one is an explicit act —
+   * is posted.
+   *
+   * **Escape puts back what the field held when the edit began.** That needs a
+   * snapshot, because there is no draft to throw away: the name is written on
+   * every keystroke and so is a date once it is a whole date. The snapshot is
+   * taken on focus, which is where an edit begins, and it covers the pair
+   * rather than one date — the calendar picker settles mid-edit, so a start
+   * date can have moved by the time Escape is pressed on the deadline.
+   *
+   * Escape also stops there. It does not close the panel as well: a control
+   * with an edit in it owns the key while it has focus (see useDismiss), so
+   * the first press puts the field back and drops focus, and a second one —
+   * now landing on nothing in particular — closes the panel. */
+  const beforeEdit = useRef<{ label: string; start: string; end: string; comment: string } | null>(null);
+  const rememberBeforeEdit = () => {
+    beforeEdit.current = { label: item.label, start: item.start, end: item.end, comment: commentDraft };
+  };
+
   /** Closing, from wherever it is asked for — the X, a press outside, Escape.
    *
    * Every control here writes as it is changed, with one exception that makes
@@ -269,7 +295,23 @@ export function EditTaskPanel({ item, minDate, spans }: EditTaskPanelProps) {
             <input
               id={`panel-${item.id}-name`}
               value={item.label}
+              onFocus={rememberBeforeEdit}
               onChange={(event) => updateItem(item.id, { label: event.target.value })}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  // Nothing to commit — the name is already on the task — so
+                  // Enter's whole job is to say the edit is over.
+                  // `preventDefault` because a lone Enter in a text input is
+                  // an implicit submit anywhere a form ever appears above it.
+                  event.preventDefault();
+                  event.currentTarget.blur();
+                }
+                if (event.key === 'Escape') {
+                  const before = beforeEdit.current;
+                  if (before) updateItem(item.id, { label: before.label });
+                  event.currentTarget.blur();
+                }
+              }}
               className={PANEL_FIELD_CLASS}
             />
           </Field>
@@ -311,6 +353,11 @@ export function EditTaskPanel({ item, minDate, spans }: EditTaskPanelProps) {
               value={shown.start}
               onCommit={(start) => updateItem(item.id, { start })}
               onSettle={(start) => updateItem(item.id, withStart(item, start))}
+              onEditStart={rememberBeforeEdit}
+              onCancel={() => {
+                const before = beforeEdit.current;
+                if (before) updateItem(item.id, { start: before.start, end: before.end });
+              }}
             />
           </Field>
           <Field label="Deadline" htmlFor={`panel-${item.id}-end`}>
@@ -319,6 +366,11 @@ export function EditTaskPanel({ item, minDate, spans }: EditTaskPanelProps) {
               value={shown.end}
               onCommit={(end) => updateItem(item.id, { end })}
               onSettle={(end) => updateItem(item.id, withEnd(item, end))}
+              onEditStart={rememberBeforeEdit}
+              onCancel={() => {
+                const before = beforeEdit.current;
+                if (before) updateItem(item.id, { start: before.start, end: before.end });
+              }}
             />
           </Field>
 
@@ -365,10 +417,33 @@ export function EditTaskPanel({ item, minDate, spans }: EditTaskPanelProps) {
           <label htmlFor={`panel-${item.id}-comment`} style={{ fontSize: 16, fontWeight: 500 }}>
             Comments
           </label>
+          {/* Enter posts, Shift+Enter breaks the line.
+              
+              That way round because Enter means the same thing in all three of
+              this panel's fields, and a comment box that alone read it as "new
+              line" would be the exception nobody remembers. Shift+Enter is the
+              escape hatch every chat window has trained people to reach for,
+              and the "+ Add Comment" button is still there for anyone who does
+              not. The cost is real and worth stating: a comment is rendered as
+              markdown, tables included, so multi-line ones are ordinary here —
+              see the note in the report. */}
           <textarea
             id={`panel-${item.id}-comment`}
             value={commentDraft}
+            onFocus={rememberBeforeEdit}
             onChange={(event) => setCommentDraft(item.id, event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                handleAddComment();
+                return;
+              }
+              if (event.key === 'Escape') {
+                const before = beforeEdit.current;
+                setCommentDraft(item.id, before ? before.comment : '');
+                event.currentTarget.blur();
+              }
+            }}
             placeholder="Add a comment..."
             className={`${INPUT_SHELL_CLASS} min-h-[92px] text-[15px] max-md:text-base`}
           />

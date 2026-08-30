@@ -23,6 +23,13 @@ interface DateFieldProps {
    * over — for the rule that ties the task's two dates together. Not called
    * for a field nobody changed. */
   onSettle: (iso: string) => void;
+  /** A fresh edit is starting. The panel takes the snapshot Escape puts back;
+   * this field cannot take it itself, because what has to be restored is the
+   * task's *pair* of dates and this field only holds one of them. */
+  onEditStart: () => void;
+  /** Escape. The field drops whatever it was holding; putting the pair back is
+   * the panel's, for the same reason. */
+  onCancel: () => void;
 }
 
 /** A date input that keeps its half-typed states to itself.
@@ -56,8 +63,11 @@ interface DateFieldProps {
  * The end of an edit is a blur, or Enter — which a date field does nothing
  * with otherwise — or a whole date arriving without a keystroke, which is the
  * calendar picker: it hands over the date in one go and leaves the field
- * focused, so nothing else would mark that edit finished. */
-export function DateField({ id, value, onCommit, onSettle }: DateFieldProps) {
+ * focused, so nothing else would mark that edit finished.
+ *
+ * Escape is the other way out, and it is not the same as a blur: a blur keeps
+ * what was typed and settles it, Escape keeps nothing. See `onCancel`. */
+export function DateField({ id, value, onCommit, onSettle, onEditStart, onCancel }: DateFieldProps) {
   const [draft, setDraft] = useState<string | null>(null);
   // What has happened here since the last settle: the date this field wrote,
   // if any, and whether the value now arriving was typed.
@@ -76,9 +86,26 @@ export function DateField({ id, value, onCommit, onSettle }: DateFieldProps) {
       id={id}
       type="date"
       value={draft ?? value}
+      onFocus={onEditStart}
       onKeyDown={(event) => {
         edit.current.typed = true;
-        if (event.key === 'Enter') settle();
+        // Enter finishes the edit — the pair rule runs — and gives up the
+        // field, which is what it does in the panel's other two. `onBlur`
+        // settles again on the way out and finds nothing left to do.
+        if (event.key === 'Enter') {
+          settle();
+          event.currentTarget.blur();
+        }
+        // Escape throws the edit away instead: the half-typed value goes, the
+        // date this field wrote during the edit is *not* settled — clearing
+        // `committed` is what stops the blur below from doing it — and the
+        // panel puts the pair back where it was.
+        if (event.key === 'Escape') {
+          setDraft(null);
+          edit.current.committed = null;
+          onCancel();
+          event.currentTarget.blur();
+        }
       }}
       onChange={(event) => {
         const typed = edit.current.typed;
