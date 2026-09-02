@@ -17,11 +17,9 @@ interface DateFieldProps {
   id: string;
   /** The committed date — what the task stores, or what a drag is drawing. */
   value: string;
-  /** Called with every date worth storing, as it is typed; see isCommittableDate. */
-  onCommit: (iso: string) => void;
-  /** Called once, with the last date this field committed, when that edit is
-   * over — for the rule that ties the task's two dates together. Not called
-   * for a field nobody changed. */
+  /** The one write this field makes: the date it is holding when the edit
+   * ends, if that is a date at all and not the one it started from. Not called
+   * for a field nobody changed, nor for anything half-typed. */
   onSettle: (iso: string) => void;
   /** A fresh edit is starting. The panel takes the snapshot Escape puts back;
    * this field cannot take it itself, because what has to be restored is the
@@ -32,33 +30,33 @@ interface DateFieldProps {
   onCancel: () => void;
 }
 
-/** A date input that keeps its half-typed states to itself.
+/** A date input that keeps every state but the finished one to itself.
  *
- * Every other control in the panel commits as it is changed, and this one
- * still does — but a date is typed a segment at a time, and the values a
+ * The panel's other controls commit as they are changed, and this one does
+ * not, because a date is typed a segment at a time and the values a
  * `<input type="date">` reports along the way are not the date anyone means.
  * Selecting the year and typing 2026 walks through the years 2, 20 and 202,
- * each of them a complete date the plan would dutifully draw a canvas for.
+ * each of them a complete date the plan would dutifully draw a canvas for; and
+ * typing 11 into a September deadline passes through January on the way, which
+ * `isCommittableDate` cannot tell from a January somebody meant.
  *
- * So the unfinished ones stay here, in the same way the name and comment
- * fields hold a draft: the field shows what is being typed, the task keeps the
- * date it had, and the commit happens on the first value that is a date. The
- * draft is dropped on blur, so a field left half-typed goes back to showing
- * the task rather than sitting on a value nothing stored — and dropped on
- * commit, so a drag on the chart reaches the field again.
+ * So nothing is written until the edit ends. In between, the field holds a
+ * draft in the same way the name and comment fields do: the field shows what
+ * is being typed, and the task keeps the date it had. Type a year badly and
+ * click away and the plan never hears about it — the draft is dropped and the
+ * field goes back to showing the task, rather than the task being left on a
+ * value nobody chose.
+ *
+ * That is a change of degree, not of kind: the *pair* rule (`withStart` /
+ * `withEnd`) already waited for the end of an edit rather than trusting every
+ * value that passed the guard, for exactly this reason. The write it runs on
+ * now waits with it, so a date reaches the task once, at the moment the person
+ * typing it is done — one write, one canvas re-measure, one undoable step.
  *
  * Rendering the draft as the value is also what stops the browser clearing the
  * other segments underneath the one being typed: mid-edit the input reports
  * `''`, and handing `''` straight back is the one thing React does *not*
  * write to the DOM, because it is already what the node says.
- *
- * A month and a day cannot be held back the same way — the first digit of a
- * two-digit one is already a whole date, and January the 3rd is not a value a
- * guard can tell apart from a date somebody meant. So this field writes its
- * own date as it goes, and says separately when the edit is over: `onSettle`,
- * which is where the rule about the *pair* of dates belongs. Typing 11 into a
- * September deadline passes through January on the way, and only the November
- * it lands on is a deadline the start date has to answer to.
  *
  * The end of an edit is a blur, or Enter — which a date field does nothing
  * with otherwise — or a whole date arriving without a keystroke, which is the
@@ -66,19 +64,35 @@ interface DateFieldProps {
  * focused, so nothing else would mark that edit finished.
  *
  * Escape is the other way out, and it is not the same as a blur: a blur keeps
- * what was typed and settles it, Escape keeps nothing. See `onCancel`. */
-export function DateField({ id, value, onCommit, onSettle, onEditStart, onCancel }: DateFieldProps) {
+ * what was typed and settles it if it is a date, Escape keeps nothing. It
+ * still tells the panel (`onCancel`), because the picker can have settled a
+ * date earlier in the same visit to the field. */
+export function DateField({ id, value, onSettle, onEditStart, onCancel }: DateFieldProps) {
   const [draft, setDraft] = useState<string | null>(null);
-  // What has happened here since the last settle: the date this field wrote,
-  // if any, and whether the value now arriving was typed.
-  const edit = useRef<{ committed: string | null; typed: boolean }>({ committed: null, typed: false });
+  // Whether the value now arriving was typed. A change that was not is the
+  // calendar picker handing over a whole date.
+  const edit = useRef<{ typed: boolean }>({ typed: false });
 
+  /* The draft again, as a ref, because two of the three things that end an
+   * edit end it from inside another event: Enter and Escape both call `blur()`
+   * on the spot, and the blur handler runs before React has re-rendered with
+   * whatever they just set. Read from state, Escape's own settle would still
+   * see the draft Escape had just thrown away and write it — which is the one
+   * thing Escape exists not to do. The ref is the synchronous truth; the state
+   * is what the input renders. */
+  const draftRef = useRef<string | null>(null);
+  const holdDraft = (next: string | null) => {
+    draftRef.current = next;
+    setDraft(next);
+  };
+
+  /** The edit is over: write the draft if it is a date this field may store
+   * and is not simply the date it started from, and drop it either way. */
   const settle = () => {
-    setDraft(null);
-    const committed = edit.current.committed;
-    if (committed === null) return;
-    edit.current.committed = null;
-    onSettle(committed);
+    const held = draftRef.current;
+    holdDraft(null);
+    if (held === null || held === value || !isCommittableDate(held)) return;
+    onSettle(held);
   };
 
   return (
@@ -96,13 +110,12 @@ export function DateField({ id, value, onCommit, onSettle, onEditStart, onCancel
           settle();
           event.currentTarget.blur();
         }
-        // Escape throws the edit away instead: the half-typed value goes, the
-        // date this field wrote during the edit is *not* settled — clearing
-        // `committed` is what stops the blur below from doing it — and the
-        // panel puts the pair back where it was.
+        // Escape throws the edit away instead: the draft goes unwritten —
+        // dropping it is what stops the blur below from settling it — and the
+        // panel puts the pair back where it was, in case the picker settled a
+        // date earlier in this same visit to the field.
         if (event.key === 'Escape') {
-          setDraft(null);
-          edit.current.committed = null;
+          holdDraft(null);
           onCancel();
           event.currentTarget.blur();
         }
@@ -112,14 +125,16 @@ export function DateField({ id, value, onCommit, onSettle, onEditStart, onCancel
         edit.current.typed = false;
 
         const next = event.target.value;
-        if (!isCommittableDate(next)) {
-          setDraft(next);
-          return;
+        holdDraft(next);
+        // A whole date arriving without a keystroke is the calendar picker,
+        // which has nothing more to add and leaves the field focused — so this
+        // change is also the end of the edit. Written from `next` in as many
+        // words rather than through `settle`, because there is nothing here to
+        // decide: the picker only ever hands over whole dates.
+        if (!typed && next !== value && isCommittableDate(next)) {
+          holdDraft(null);
+          onSettle(next);
         }
-        setDraft(null);
-        edit.current.committed = next;
-        onCommit(next);
-        if (!typed) settle();
       }}
       onBlur={settle}
       // The 15px this field is set in lives in the stylesheet rather than

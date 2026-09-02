@@ -33,8 +33,10 @@ const MAX_YEAR = 2100;
  *
  * Only the year can be guarded this way. A half-typed month or day is an
  * ordinary date — the first digit of 11 is January — and nothing here can tell
- * it from a date somebody meant, which is why the pair rules below wait for
- * the end of an edit instead of trusting every value that passes this. */
+ * it from a date somebody meant. That is why passing this test is a necessary
+ * condition for storing a value and not a sufficient one: the field waits for
+ * the end of the edit and then asks this about the value it is left holding,
+ * rather than about every value that goes past. See DateField. */
 export function isCommittableDate(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
 
@@ -60,14 +62,17 @@ export interface DatePair {
  * bar past one day, it stops.
  *
  * Both run when an edit finishes — a blur, Enter, or a date picked from the
- * calendar — and not on every keystroke, because a keystroke is not a date
- * somebody chose. Type 11 into a September deadline and the field passes
- * through January on the way; carrying the start date off to January is a move
- * the second keystroke cannot undo, since by then the start is simply where it
- * is. Waiting means the task holds a deadline before its start for as long as
- * the edit lasts: the plan draws that clamped to one day (previewSpans), the
- * panel goes on showing the two dates as they are, and settling puts them back
- * in order. */
+ * calendar — because a keystroke is not a date somebody chose. Type 11 into a
+ * September deadline and the field passes through January on the way;
+ * carrying the start date off to January is a move the second keystroke cannot
+ * undo, since by then the start is simply where it is.
+ *
+ * The date itself is written at that same moment and not before, so an edit in
+ * flight leaves no trace on the plan at all: the pair a task holds is always
+ * one somebody finished typing, and always in order, because these two are the
+ * only things that write one. A task can still hold a deadline before its
+ * start if a file arrived carrying one — the plan draws that clamped to one
+ * day (previewSpans) and the panel shows the two dates as they are. */
 
 /** The pair after Start Date is set to `start`. Moving the start keeps the
  * deadline where it is, so the task's length is what changes — until the start
