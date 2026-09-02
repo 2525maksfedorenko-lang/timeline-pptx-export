@@ -49,3 +49,17 @@ design-system/components/overlays/DropdownMenu.jsx -export-ignore
 
 # --- kept: one page saying what the other 155 files were --------------------
 design-system/readme.md -export-ignore
+
+# --- and our standalone copy of the mark does not travel either -------------
+#
+# `public/aicoo_logo.svg` exists so this project has a logo when it runs on its
+# own. Vendored into the website it would be a second file of that name in a
+# repository that already has the real one at `public/aicoo_logo.svg` — and
+# "replace the logo" finding two files is precisely what the site's owner asked
+# us to prevent. The served bundle never contains it either (`build:embed`
+# deletes it), so a vendored checkout has one mark, the site's.
+#
+# The consequence, stated so it is not a surprise: `npm run dev` inside a
+# vendored checkout shows no mark, because there is no site at that origin to
+# supply one. Develop this project in its own repository, where the file is.
+public/aicoo_logo.svg export-ignore
