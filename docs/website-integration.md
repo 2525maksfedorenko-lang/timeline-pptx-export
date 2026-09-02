@@ -120,6 +120,37 @@ words. `ImageCard` already had the `titleContent` prop this uses.
 is not about the card, and the one that is easiest to delete by accident; the
 comment in the file says what breaks if it goes.
 
+## Settled: no subdomain, no separate service
+
+This tool is served from the website's own domain, under `/tools/…`, and that
+is closed rather than pending. It was worth asking, because the other free
+tools on that page are **not** served this way — they are separate services,
+each with its own container and its own database, and a couple of them sit on
+their own hosts. Read from the outside, the obvious inference is that this one
+should follow.
+
+It should not, and the reason is that the resemblance is only on the Tools
+page. Those tools have a backend because they need one: something to run, and
+somewhere to keep what it produced. This one has neither. It is a frontend and
+nothing else — no server, no API calls, no accounts. Plans live in the
+visitor's own IndexedDB (`store/planStorage.ts`), and the `.pptx` and `.pdf`
+are generated in the page, by `pptxgenjs` and `jspdf`, on the visitor's
+machine. Nothing it does needs a process of its own to be alive.
+
+So a subdomain would buy nothing and cost the usual: a host or a container to
+keep running, a certificate, a deploy of its own, DNS, and one more thing that
+can be down while the rest of the site is up. Static files under `public/` have
+none of that — they go out with the site, they are up exactly when the site is
+up, and there is nothing to operate.
+
+**Do not reopen this on the grounds that "the other tools are separate
+services."** That is the argument that was already weighed, and the answer is
+that those tools have servers because they have server-side work. The day this
+one grows a backend — accounts, plans stored for a team, anything a browser
+cannot do alone — the question becomes a real one again and should be asked
+afresh. Until then it is a static bundle, and static bundles belong with the
+site.
+
 ## What is deliberately not here
 
 - **No route, no page component.** The app is static. Giving it an
