@@ -1,0 +1,42 @@
+# What `git archive` leaves behind when this project is vendored somewhere else.
+#
+# The aicoo website checks this project out as one folder under
+# `tools/timeline-pptx-export/` (see docs/website-integration.md). It does not
+# need the whole workshop, and it particularly does not need a second copy of
+# the design system: the website already carries that in `.ds-sync/`, and two
+# copies of a design system on one repository is exactly the thing that drifts.
+#
+# So `design-system/` is dropped from the archive — except the files this app
+# genuinely compiles and verifies against, which are named back in below.
+# `git archive HEAD | tar -x -C <dest>` therefore produces a folder that
+# builds, and 155 files smaller.
+#
+# Nothing here affects this repository itself. The full design system stays
+# checked in and is what `design-system/readme.md` calls the ground truth for
+# the brand.
+
+design-system/** export-ignore
+
+# --- kept: the stylesheet the app is actually built from -------------------
+#
+# `src/index.css` does `@import "../design-system/styles.css"`, which pulls the
+# nine token files below. This is a build input, not reference material: remove
+# it and `vite build` fails on a missing import, and every colour, radius,
+# shadow and type step the app draws with goes with it.
+design-system/styles.css -export-ignore
+design-system/tokens/** -export-ignore
+
+# --- kept: the four primitives `npm run check:design` reads -----------------
+#
+# `src/components/systemUi.ts` is a hand-made transcription of these into
+# Tailwind classes, and checkDesignSystem.ts reads the originals at run time to
+# prove the transcription has not drifted. Without them that check cannot run
+# at all — and a check that cannot run is worse than one that fails, because
+# nobody notices.
+design-system/components/core/Button.jsx -export-ignore
+design-system/components/forms/Input.jsx -export-ignore
+design-system/components/forms/Checkbox.jsx -export-ignore
+design-system/components/overlays/DropdownMenu.jsx -export-ignore
+
+# --- kept: one page saying what the other 155 files were --------------------
+design-system/readme.md -export-ignore

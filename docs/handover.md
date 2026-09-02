@@ -40,8 +40,14 @@ npm run preview      # serve the build
 npm run lint         # oxlint
 ```
 
-`build:embed` is the one the website needs: the site serves this app from a
-sub-path, so every asset URL has to carry that prefix. A plain `npm run build`
+`build:embed` is the one the website needs. It does two things a plain build
+does not: it sets the sub-path the site serves this app from as the asset base,
+and it drops `dist/aicoo_logo.svg`, because on the website the mark comes from
+the site's own file and ours would be a second copy of it on one domain. The
+header asks for `/aicoo_logo.svg` absolutely; `public/` carries the same file
+under the same name so the mark is still there when this runs on its own.
+
+A plain `npm run build`
 produces a bundle whose assets are rooted at `/`, which 404s a level up when
 it is served from `public/tools/timeline-pptx-export/`.
 
