@@ -60,9 +60,11 @@ export function buildTaskHierarchy(items: TimelineItem[]): TaskHierarchy {
  *
  * Deliberately ignores `dependencies`: those are task *sequencing* ("what
  * this comes after"), a different relation from the parent/child
- * *composition* this walks, exactly as HierarchyConnectors is kept separate
- * from DependencyConnectors. Empty when `id` isn't in `items`, which callers
- * should treat as "no branch" rather than "an empty branch". */
+ * *composition* this walks. Nothing draws them any more — the field is still
+ * on `TimelineItem` and still survives an import — so the distinction is now
+ * only kept here, which is the reason to keep saying it. Empty when `id` isn't
+ * in `items`, which callers should treat as "no branch" rather than "an empty
+ * branch". */
 export function getRelatedTreeIds(items: TimelineItem[], id: string): Set<string> {
   const itemById = new Map(items.map((item) => [item.id, item]));
   if (!itemById.has(id)) return new Set();

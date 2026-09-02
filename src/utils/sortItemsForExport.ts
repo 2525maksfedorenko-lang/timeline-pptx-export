@@ -4,9 +4,11 @@ import { buildTaskHierarchy, type TaskNode } from './taskHierarchy';
 /** Top-to-bottom status order on the exported slides. Change this one line to
  * reorder them; nothing about the slide layout depends on it.
  *
- * Deliberately not the on-screen order (see sortItems.ts, which runs
- * todo-first): a deck is read as a report of what is finished, so it leads with
- * `done`, while the app is a working view that leads with what is still open. */
+ * Deliberately not the on-screen order, which is no order at all: the plan
+ * screen draws the plan's own sequence, parent then children (`visibleRows`),
+ * because that sequence is the plan. A deck is read instead as a report of
+ * what is finished, so it groups by status and leads with `done`. The two
+ * surfaces disagree on purpose, and only this file decides the deck's half. */
 export const STATUS_SORT_ORDER: TaskStatus[] = ['done', 'in_progress', 'todo'];
 
 const statusRank = (item: TimelineItem): number => {

@@ -12,11 +12,13 @@ interface SettingsFlyoutProps {
 /** The export settings, as a panel that slides in from the right over the
  * chart instead of a block sitting under it.
  *
- * Same overlay+backdrop pattern as ExportOverflowModal and TaskDetailsModal
- * — a fixed inset-0 scrim with the surface inside it — just anchored to one
- * edge and full height rather than centered. Closing is unconditional here
- * (backdrop, Escape, the ✕): unlike the task modal there's no draft to
- * lose, since every control inside writes to the store as it's touched.
+ * Same overlay+backdrop pattern as ExportOverflowModal and ImportModal — a
+ * fixed inset-0 scrim with the surface inside it — just anchored to one edge
+ * and full height rather than centered. Closing is unconditional here
+ * (backdrop, Escape, the ✕): there is no draft in this panel to lose, since
+ * every control inside writes to the store as it's touched. The Gantt's Edit
+ * Task panel is the one that has to be more careful, and it is not built on
+ * this pattern.
  *
  * Focus is trapped the way the import dialog's is, and for the same reason:
  * this says `aria-modal`, and without the trap Tab walks straight out of it
