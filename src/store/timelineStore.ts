@@ -141,9 +141,60 @@ export function flushedActivePlan(state: TimelineStore): SavedPlan | null {
   return {
     ...outgoing,
     items: state.items,
+    // The working copy of the comments too: they are part of the plan, so a
+    // flush that left them behind would write a plan that had lost them.
+    comments: state.comments,
     exportOptions: state.exportOptions,
     updatedAt: new Date().toISOString(),
   };
+}
+
+/** Gives the comments written before this field existed to the plans they
+ * were always about.
+ *
+ * Comments used to be one flat list belonging to the browser, keyed by task
+ * id and persisted only through the localStorage mirror. Everything that list
+ * holds is therefore sitting in `state.comments` on the first load after the
+ * change, no matter which plan it was written in — and every plan record in
+ * IndexedDB predates the field and has none.
+ *
+ * Handing that whole list to the active plan would be the bug this change
+ * exists to fix, written down permanently: one plan would end up owning
+ * comments about tasks it has never heard of, and every other plan would come
+ * back empty. So the list is partitioned instead, by the only thing that can
+ * decide it — a comment names a task, and a task is in exactly one plan.
+ *
+ * Comments naming no task in any plan are dropped. They are already invisible
+ * (the panel lists a task's own) and there is no plan they could be about.
+ *
+ * Runs once. It touches only records that arrived without the field, and it
+ * writes them back with one, so the next load finds nothing to do. A plan the
+ * old list had nothing for is still written back, with an empty array: that
+ * is what takes it out of this path for good.
+ */
+async function adoptLooseComments(
+  plans: SavedPlan[],
+  planIdsMissingComments: Set<string>,
+  loose: TaskComment[],
+): Promise<{ plans: SavedPlan[]; migrated: boolean }> {
+  if (planIdsMissingComments.size === 0) return { plans, migrated: false };
+
+  const adopted = plans.map((plan) => {
+    if (!planIdsMissingComments.has(plan.id)) return plan;
+    const taskIds = new Set(plan.items.map((item) => item.id));
+    return { ...plan, comments: loose.filter((comment) => taskIds.has(comment.taskId)) };
+  });
+
+  // Written back rather than left to the autosave, which only ever writes the
+  // plan on screen — the others would keep arriving without the field and keep
+  // being handed a list that no longer exists.
+  await Promise.all(
+    adopted
+      .filter((plan) => planIdsMissingComments.has(plan.id))
+      .map((plan) => persistPlan(plan)),
+  );
+
+  return { plans: adopted, migrated: true };
 }
 
 /** Serialises `loadPlans` against itself.
@@ -186,6 +237,7 @@ let planLoadQueue: Promise<void> = Promise.resolve();
 export async function initializeStore(seed: {
   title: string;
   items: TimelineItem[];
+  comments: TaskComment[];
   exportOptions: ExportOptions;
 }): Promise<SavedPlan> {
   const now = new Date().toISOString();
@@ -193,6 +245,7 @@ export async function initializeStore(seed: {
     id: crypto.randomUUID(),
     name: seed.title || DEFAULT_PLAN_NAME,
     items: seed.items,
+    comments: seed.comments,
     exportOptions: seed.exportOptions,
     createdAt: now,
     updatedAt: now,
@@ -278,7 +331,24 @@ export const useTimelineStore = create<TimelineStore>()(
 
       loadPlans: () => {
         const run = async () => {
-          const { plans, noticesByPlanId } = await getAllPlans();
+          const { plans: stored, noticesByPlanId, planIdsMissingComments } = await getAllPlans();
+          const { plans, migrated } = await adoptLooseComments(
+            stored,
+            planIdsMissingComments,
+            get().comments,
+          );
+
+          // The working copy has to be cut down to the active plan's share as
+          // well, and this is the half that is easy to forget: the old flat
+          // list is what localStorage restored into `comments` a moment ago,
+          // and it is still the whole of it. Left alone, the drift check below
+          // would find the plan's adopted share differing from that list and
+          // faithfully write the whole list back — handing the active plan
+          // every comment again, which is the bug, one load later.
+          if (migrated) {
+            const active = plans.find((plan) => plan.id === get().activePlanId);
+            if (active) set({ comments: active.comments });
+          }
 
           // Merged rather than assigned, and deduplicated: the active plan
           // usually arrives twice in one load — once through the localStorage
@@ -291,6 +361,7 @@ export const useTimelineStore = create<TimelineStore>()(
             const defaultPlan = await initializeStore({
               title: state.title,
               items: state.items,
+              comments: state.comments,
               exportOptions: state.exportOptions,
             });
             set((current) => ({
@@ -314,6 +385,7 @@ export const useTimelineStore = create<TimelineStore>()(
             // IndexedDB, instead of overwriting current state with a stale snapshot.
             const hasDrift =
               JSON.stringify(persistedActivePlan.items) !== JSON.stringify(state.items) ||
+              JSON.stringify(persistedActivePlan.comments) !== JSON.stringify(state.comments) ||
               JSON.stringify(persistedActivePlan.exportOptions) !== JSON.stringify(state.exportOptions);
 
             if (!hasDrift) {
@@ -324,6 +396,7 @@ export const useTimelineStore = create<TimelineStore>()(
             const refreshedPlan: SavedPlan = {
               ...persistedActivePlan,
               items: state.items,
+              comments: state.comments,
               exportOptions: state.exportOptions,
               updatedAt: new Date().toISOString(),
             };
@@ -340,6 +413,7 @@ export const useTimelineStore = create<TimelineStore>()(
             activePlanId: fallbackPlan.id,
             title: fallbackPlan.name,
             items: fallbackPlan.items,
+            comments: fallbackPlan.comments,
             exportOptions: fallbackPlan.exportOptions,
           });
         };
@@ -364,6 +438,8 @@ export const useTimelineStore = create<TimelineStore>()(
           id: crypto.randomUUID(),
           name: unique,
           items: [],
+          // Nothing has been said about a plan with nothing in it.
+          comments: [],
           // The one thing a new plan does inherit. Theme, scale, order, window
           // and comment mode are facts about how a deck is read rather than
           // about which tasks are in one — the same reason a plan made from a
@@ -390,6 +466,7 @@ export const useTimelineStore = create<TimelineStore>()(
           activePlanId: plan.id,
           title: plan.name,
           items: plan.items,
+          comments: plan.comments,
           exportOptions: plan.exportOptions,
         }));
       },
@@ -440,6 +517,12 @@ export const useTimelineStore = create<TimelineStore>()(
           activePlanId: targetPlan.id,
           title: targetPlan.name,
           items: targetPlan.items,
+          // The plan being opened brings its own. This is the whole of the
+          // bug that made comments part of a plan: they used to be left
+          // exactly as they were, so every comment written anywhere followed
+          // the person from plan to plan and sat on tasks that had never been
+          // commented on.
+          comments: targetPlan.comments,
           exportOptions: targetPlan.exportOptions,
         }));
       },
@@ -460,6 +543,10 @@ export const useTimelineStore = create<TimelineStore>()(
             state.savedPlans.map((saved) => saved.name),
           ),
           items: branch.items,
+          // Copied with the tasks they are about, re-pointed at the copies'
+          // new ids by copyBranch. The originals stay on the original tasks,
+          // in the plan those are still in.
+          comments: branch.comments,
           // The settings the branch was already going to be exported under:
           // theme, scale, order, window and comment mode are facts about how a
           // deck is read, not about which tasks are in one.
@@ -488,10 +575,10 @@ export const useTimelineStore = create<TimelineStore>()(
           title: plan.name,
           items: plan.items,
           exportOptions: plan.exportOptions,
-          // Comments belong to the app rather than to one plan — they are kept
-          // in one list, keyed by task id — so the copies simply join them,
-          // and the ones on the original tasks stay where they were.
-          comments: [...current.comments, ...branch.comments],
+          // The new plan's own, which is the copies and nothing else: the
+          // plan being left keeps the originals, and they went to the database
+          // with it in the flush above.
+          comments: plan.comments,
           planNotices: notice
             ? mergePlanNotices(current.planNotices, { [plan.id]: notice })
             : current.planNotices,
@@ -514,6 +601,7 @@ export const useTimelineStore = create<TimelineStore>()(
           activePlanId: next?.id ?? null,
           title: next?.name ?? '',
           items: next?.items ?? [],
+          comments: next?.comments ?? [],
           exportOptions: next?.exportOptions ?? DEFAULT_EXPORT_OPTIONS,
         });
       },
@@ -534,11 +622,10 @@ export const useTimelineStore = create<TimelineStore>()(
       // boundary behind it. `loadPlans()` still reconciles them on startup,
       // because a session can end without either event firing.
       //
-      // One thing localStorage carries that IndexedDB does not: `comments`.
-      // They are in `partialize` and not in `SavedPlan`, so they belong to the
-      // browser rather than to a plan, and switching plans does not change
-      // them. That is a gap, not a design — but it is the same gap it was
-      // before the autosave, which writes exactly what a SavedPlan holds.
+      // `comments` are in both, and mean the same thing in both: they are part
+      // of a `SavedPlan` now, and what `partialize` keeps here is the active
+      // plan's working copy of them, exactly as it keeps the active plan's
+      // items.
       //
       // If a product integration doesn't need multiple named plans, IndexedDB
       // can be dropped and this `persist` config becomes the only storage
@@ -664,7 +751,13 @@ function startAutosave(): void {
     // Only what a SavedPlan carries. Identity comparison, because every action
     // in this store replaces the array or the object rather than mutating it —
     // and it is what keeps the `setState` above from re-triggering this.
-    if (state.items === previous.items && state.exportOptions === previous.exportOptions) return;
+    if (
+      state.items === previous.items &&
+      state.comments === previous.comments &&
+      state.exportOptions === previous.exportOptions
+    ) {
+      return;
+    }
 
     pending = true;
     window.clearTimeout(timer);
