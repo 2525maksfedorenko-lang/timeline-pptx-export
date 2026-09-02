@@ -111,10 +111,12 @@ function buildTableSlide(spec: TableSlideSpec): DashboardTableSlideModel {
 /** Builds the dashboard table slide (delayed tasks), which sits directly
  * after the overview slide(s) — see slideOrder.ts for the full deck order.
  * There's deliberately no status-breakdown slide here: the summary slide
- * already shows the same segments. Reuses the exact same delayed logic as the
- * on-screen Dashboard (src/components/Dashboard.tsx) via
- * utils/dashboardMetrics.ts, and is scoped to exportable items just like the
- * rest of the export pipeline (buildExportSlides).
+ * already shows the same segments. What counts as delayed is
+ * `utils/dashboardMetrics.ts` and nothing else; the on-screen Dashboard this
+ * once shared that module with is gone, so the module now has one caller and
+ * is kept where it is rather than folded in here, because it is the plan's
+ * rule about lateness and not this slide's. Scoped to exportable items just
+ * like the rest of the export pipeline (buildExportSlides).
  *
  * An "At risk tasks" slide used to lead this group. Its rows were the blocked
  * tasks and nothing else, so it left with that status. */
