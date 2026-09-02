@@ -11,7 +11,7 @@ that look lazy can be read as decisions instead.
 
 | Where | What |
 | --- | --- |
-| `tools/timeline-pptx-export/` | this project, whole — source, docs, checks, its own `package.json` |
+| `tools/timeline-pptx-export/` | this project — source, docs, checks, its own `package.json`; see *What is vendored and what is not* |
 | `public/tools/timeline-pptx-export/` | the built bundle, which is what is actually served |
 | `next.config.ts` | one rewrite, so the bare path resolves to `index.html` |
 | `middleware.ts` | one matcher exclusion, so next-intl does not claim the path |
@@ -21,6 +21,28 @@ that look lazy can be read as decisions instead.
 Two copies of the same app therefore live in the website repository: the source
 in `tools/`, and the compiled bundle in `public/`. That is the cost of the
 decision below, and it is stated here rather than discovered later.
+
+## What is vendored and what is not
+
+The website does not need the whole workshop, and it must not carry a second
+design system — it already has one in `.ds-sync/`, and two copies of a design
+system in one repository is precisely the thing that drifts.
+
+So the vendoring is filtered, by `.gitattributes` in this project rather than
+by whoever runs the copy: `git archive` honours `export-ignore`, so
+`design-system/**` is dropped and the files the app genuinely needs are named
+back in. **Fourteen files stay out of 169:**
+
+| Kept | Why |
+| --- | --- |
+| `design-system/styles.css` + `design-system/tokens/*.css` (10) | a **build input**, not reference. `src/index.css` does `@import "../design-system/styles.css"`, which pulls the nine token files. Remove them and `vite build` fails on a missing import, and every colour, radius, shadow and type step goes with it |
+| `components/core/Button.jsx`, `forms/Input.jsx`, `forms/Checkbox.jsx`, `overlays/DropdownMenu.jsx` (4) | `npm run check:design` reads these four at run time to prove that `src/components/systemUi.ts` — a hand transcription of them into Tailwind — has not drifted. Without them that check cannot run, and a check that cannot run is worse than one that fails |
+| `design-system/readme.md` | one page saying what the other 155 files were, and where the real copy lives |
+
+Dropped: the 104 remaining primitives and their `.d.ts`/`.prompt.md`, the 19
+guideline specimens, the coordinator UI kit, the brand assets, the rebuilt
+`_ds_bundle.js` and its manifest, and the skill/thumbnail files. None of it is
+read by the app, by the build, or by any of the six checks.
 
 ## The decision: the built bundle is committed
 
@@ -86,7 +108,7 @@ From `tools/timeline-pptx-export/`:
 
 ```bash
 npm install
-npm run build:embed          # tsc -b && vite build --base=/tools/timeline-pptx-export/
+npm run build:embed          # vite build --base=/tools/… , then drop our logo
 rm -rf ../../public/tools/timeline-pptx-export
 mkdir -p ../../public/tools/timeline-pptx-export
 cp -r dist/. ../../public/tools/timeline-pptx-export/
@@ -96,6 +118,50 @@ cp -r dist/. ../../public/tools/timeline-pptx-export/
 is why it is a named script rather than a flag anyone has to remember. Without
 it every asset URL comes out rooted at `/` and 404s a level above where the
 app is served.
+
+The script's second half deletes `dist/aicoo_logo.svg`. That file exists so the
+app has a mark when it runs standalone; on this domain the site already has one
+and the app asks for that instead, so shipping ours would put a second
+`aicoo_logo.svg` on the site — see below.
+
+To refresh the **source** copy, from this project's own repository:
+
+```bash
+git archive HEAD | tar -x -C <website>/tools/timeline-pptx-export
+```
+
+`.gitattributes` does the filtering, so there is nothing to remember and
+nothing to clean up afterwards.
+
+## The logo: one file per domain, and it is the site's
+
+The plan screen's header carries the aicoo mark. It asks for it at
+`/aicoo_logo.svg` — an absolute URL, so it resolves against the root of
+whatever origin serves the app. Embedded in the website that is the site's own
+`public/aicoo_logo.svg`, the very file the site header uses, so replacing the
+logo there replaces it here too. The customer's requirement, and the right one:
+a mark with two copies on one domain is a mark that will be replaced in one
+place and not the other.
+
+Three things make that work, and each is a place it could have gone wrong:
+
+- **The path escapes the base.** The embed build is based at
+  `/tools/timeline-pptx-export/`, and Vite rewrites `index.html`'s asset URLs
+  with that prefix — but not a string inside a component. So `/aicoo_logo.svg`
+  stays rooted at `/`, which is what reaches the site's file rather than a
+  404 inside our own folder. The favicon, which *is* in `index.html`, is
+  prefixed and stays ours.
+- **Standalone still has a logo.** `public/aicoo_logo.svg` is a copy of the
+  site's file under the same name, so `npm run dev` shows the same mark from
+  our own `public/`. It is the site's variant and not a different one, so the
+  screen looks in development exactly as it looks embedded.
+- **That copy does not travel.** `build:embed` deletes it from `dist/`, so the
+  website receives no `aicoo_logo.svg` of ours.
+
+The mark is nearly square (155×152), so the header sizes it by height with the
+width left to the file. This is a visible change from what the tool used to
+show: the old file was the orbit-plus-wordmark lockup from
+`design-system/assets/`, and the site's file is the mark alone.
 
 ## The four site edits
 

@@ -242,30 +242,42 @@ export function GanttToolbar({ actions }: GanttToolbarProps) {
               identities and the rule between them says so: aicoo is what this
               is, and the name beside it is what is open in it.
 
-              `design-system/assets/` holds ten variants; this is the orbit mark
-              with the wordmark in the brand's deep navy, which is the one for a
-              light surface — the design system's own sidebar uses the pale twin
-              because that sidebar is navy. Copied into `public/` rather than
-              imported from `design-system/`, which is reference material and not
-              app source. */}
+              **One file per domain, and it is not ours.** `/aicoo_logo.svg` is
+              an absolute URL, so wherever this app is served it asks the site
+              at the root of that origin for the mark. Embedded in the aicoo
+              website that is the site's own `public/aicoo_logo.svg` — the file
+              its header already uses — so replacing the logo there replaces it
+              here too, which is the whole point: the mark must not have two
+              copies on one domain that can drift apart.
+
+              The path deliberately does *not* go through Vite's `base`. Only
+              `index.html` gets the base prefix applied; a string in a component
+              is left alone, so this stays rooted at `/` in the embed build
+              (base `/tools/timeline-pptx-export/`) rather than being rewritten
+              into our own folder. See `build:embed`, which also drops our copy
+              from the bundle so the website receives none.
+
+              Running standalone there is no site to ask, so `public/` carries
+              the same file under the same name — the site's mark, not a
+              different variant, so what the plan screen looks like in
+              development is what it looks like embedded. */}
           {/* Gone below the breakpoint — see this component's own note. */}
           {!isMobile && (
           <>
-          {/* Both axes are given, and neither is `auto`, because the file's
-              `width`/`height` (1260×684) disagree with its `viewBox`
-              (2200×684): sizing by one axis letterboxes the mark inside a box
-              the wrong shape instead of filling it. 71×22 is the viewBox's own
-              3.22:1 at a height that sits comfortably in a 50px row. The file
-              is left byte-identical to the design system's copy. */}
+          {/* Sized by height, with the width left to the file. The site's
+              mark is very nearly square (155×152), so a fixed pair would
+              squash it; 22px of height is what sits comfortably in a 50px row
+              and it is the axis that has to agree with the rest of the row.
+
+              The height is in the style and not only in the attribute because
+              the CSS reset sets `img { height: auto }`, which outranks a plain
+              attribute and would collapse the mark to its intrinsic size. */}
           <img
-            src="/aicoo-logo.svg"
+            src="/aicoo_logo.svg"
             alt="aicoo"
-            width={71}
+            width={22}
             height={22}
-            // In the style and not only in the attributes: the CSS reset sets
-            // `img { height: auto }`, which outranks a plain height attribute
-            // and would put the letterbox straight back.
-            style={{ width: 71, height: 22, flex: 'none', display: 'block' }}
+            style={{ height: 22, width: 'auto', flex: 'none', display: 'block' }}
           />
           <span className="h-5 w-px flex-none bg-border" />
           </>
