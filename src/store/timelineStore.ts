@@ -528,9 +528,21 @@ export const useTimelineStore = create<TimelineStore>()(
       // - IndexedDB (`planStorage.ts`) is the durable, authoritative store
       //   for the *list* of named saved plans (the multi-plan library
       //   feature) — something a single flat localStorage key can't model.
-      // `loadPlans()` reconciles the two on startup. If a product
-      // integration doesn't need multiple named plans, IndexedDB can be
-      // dropped and this `persist` config becomes the only storage layer.
+      // The two are kept level by `startAutosave` at the foot of this file —
+      // a debounced write of the working copy, and a flush when the page goes
+      // away — so IndexedDB is a second behind the screen rather than a plan
+      // boundary behind it. `loadPlans()` still reconciles them on startup,
+      // because a session can end without either event firing.
+      //
+      // One thing localStorage carries that IndexedDB does not: `comments`.
+      // They are in `partialize` and not in `SavedPlan`, so they belong to the
+      // browser rather than to a plan, and switching plans does not change
+      // them. That is a gap, not a design — but it is the same gap it was
+      // before the autosave, which writes exactly what a SavedPlan holds.
+      //
+      // If a product integration doesn't need multiple named plans, IndexedDB
+      // can be dropped and this `persist` config becomes the only storage
+      // layer.
       name: 'timeline-pptx-export-storage',
       // The same repair getAllPlans does, on the other door — and the one that
       // opens first. This mirror restores synchronously on reload, before
@@ -565,3 +577,104 @@ export const useTimelineStore = create<TimelineStore>()(
     },
   ),
 );
+
+/** How long the working copy is left alone before it is written to IndexedDB.
+ *
+ * Long enough that a sentence typed into a task name is one write rather than
+ * forty, short enough that nobody gets up from the keyboard with a second's
+ * work still only in localStorage. */
+const AUTOSAVE_DEBOUNCE_MS = 1000;
+
+/** Keeps IndexedDB level with the plan on screen.
+ *
+ * Until this existed, IndexedDB was only written at the *boundaries* of a
+ * plan's life — created, renamed, switched away from, branched, deleted,
+ * exported as JSON — and every edit in between went to localStorage alone.
+ * Nothing was ever lost, because `loadPlans` notices on startup that
+ * localStorage holds a newer copy of the active plan and pushes it back
+ * (see the reconciliation there). But the two stores disagreed for as long as
+ * a session lasted, which is a thing anyone looking at the database has to be
+ * told about before it makes sense, and being told about it is the tax.
+ *
+ * The layers themselves are unchanged and stay that way: localStorage is the
+ * synchronous mirror that paints the first frame before IndexedDB has opened,
+ * and IndexedDB is the durable record of the *list* of plans. What changes is
+ * that the durable record no longer waits for a boundary to hear about a
+ * change.
+ *
+ * **This is a rehearsal of the contract a backend will want.** In
+ * aicoo-core-dev the durable side is a server, and the shape it asks for is
+ * exactly this one: debounce a burst of edits into one request, and flush what
+ * is still pending when the page goes away. `flushedActivePlan` is already the
+ * payload builder — it is what the JSON export writes — so the seam that
+ * becomes `PATCH /plans/:id` is the one function below. Working that out now,
+ * against a store that cannot fail in interesting ways, is cheaper than
+ * working it out against a network.
+ *
+ * Two events, not one. `pagehide` is the reliable end of a page's life in
+ * every browser that has a back/forward cache; `visibilitychange` to hidden is
+ * what actually fires on a phone when the app is switched away from, which for
+ * many sessions is the last thing that ever happens. Both flush immediately,
+ * and both are safe to run twice — a flush with nothing pending does nothing.
+ *
+ * Subscribed at module scope rather than from a component: this is the store's
+ * own business, it must not depend on which screen happens to be mounted, and
+ * it must survive React remounting the tree. Guarded on `window` so importing
+ * the store headless — the export modules and the check scripts do — subscribes
+ * to nothing and registers no listeners.
+ */
+function startAutosave(): void {
+  if (typeof window === 'undefined') return;
+
+  let timer: number | undefined;
+  // Whether anything has changed since the last write. Without it every tab
+  // switch would write the plan again, unchanged, for as long as the tab lives.
+  let pending = false;
+
+  const flush = (): void => {
+    window.clearTimeout(timer);
+    timer = undefined;
+    if (!pending) return;
+    pending = false;
+
+    const plan = flushedActivePlan(useTimelineStore.getState());
+    if (!plan) return;
+
+    // The in-memory list is the mirror of what is in the database, so it moves
+    // with it — otherwise the plan's own `updatedAt` would go on reading as of
+    // the last boundary, which is the same staleness one layer up.
+    useTimelineStore.setState((current) => ({
+      savedPlans: current.savedPlans.map((saved) => (saved.id === plan.id ? plan : saved)),
+    }));
+
+    // Swallowed on purpose, and this is the one place it is safe to. A write
+    // that fails — a private window with no quota, a database blocked by
+    // another tab's upgrade — leaves the plan exactly where it already is, in
+    // localStorage, which is the copy the next load reads first anyway. There
+    // is nothing to tell anyone and nothing for them to do about it. When this
+    // becomes a request to a server that is no longer true, and the catch is
+    // where the retry and the "not saved" state will go.
+    void persistPlan(plan).catch(() => {});
+  };
+
+  useTimelineStore.subscribe((state, previous) => {
+    // A plan has to exist to be saved into. Before the first `loadPlans`
+    // resolves there is none, and the bootstrap writes its own.
+    if (state.activePlanId === null) return;
+    // Only what a SavedPlan carries. Identity comparison, because every action
+    // in this store replaces the array or the object rather than mutating it —
+    // and it is what keeps the `setState` above from re-triggering this.
+    if (state.items === previous.items && state.exportOptions === previous.exportOptions) return;
+
+    pending = true;
+    window.clearTimeout(timer);
+    timer = window.setTimeout(flush, AUTOSAVE_DEBOUNCE_MS);
+  });
+
+  window.addEventListener('pagehide', flush);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flush();
+  });
+}
+
+startAutosave();
