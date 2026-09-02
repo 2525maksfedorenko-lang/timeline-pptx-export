@@ -144,19 +144,19 @@ export function EditTaskPanel({ item, minDate, spans }: EditTaskPanelProps) {
   /* Enter and Escape, in the one place the panel's three editable fields can
    * agree about them.
    *
-   * **Enter finishes the edit it is pressed in** — and finishing is not saving,
-   * because every control here already writes to the plan as it is changed.
-   * What it means is: this edit is over. The field gives up focus, the dates
-   * run the rule that ties the pair together, and the comment — the one thing
-   * the plan has *not* been told about, since posting one is an explicit act —
-   * is posted.
+   * **Enter finishes the edit it is pressed in.** What that means differs by
+   * field, and the difference is the whole of it: the name is already in the
+   * plan, so Enter only gives up the field; a date is not, so Enter is what
+   * writes it, together with the rule that ties the pair together; and a
+   * comment is not either, so Enter posts it.
    *
-   * **Escape puts back what the field held when the edit began.** That needs a
-   * snapshot, because there is no draft to throw away: the name is written on
-   * every keystroke and so is a date once it is a whole date. The snapshot is
-   * taken on focus, which is where an edit begins, and it covers the pair
-   * rather than one date — the calendar picker settles mid-edit, so a start
-   * date can have moved by the time Escape is pressed on the deadline.
+   * **Escape puts back what the field held when the edit began.** The dates
+   * need no putting back — they were never written — but the name is written
+   * on every keystroke, so there is no draft of it to throw away and the
+   * snapshot is what stands in for one. It is taken on focus, which is where
+   * an edit begins, and it covers the pair as well as the name because the
+   * calendar picker settles mid-edit: a start date can have moved by the time
+   * Escape is pressed on the deadline.
    *
    * Escape also stops there. It does not close the panel as well: a control
    * with an edit in it owns the key while it has focus (see useDismiss), so
@@ -169,13 +169,13 @@ export function EditTaskPanel({ item, minDate, spans }: EditTaskPanelProps) {
 
   /** Closing, from wherever it is asked for — the X, a press outside, Escape.
    *
-   * Every control here writes as it is changed, with one exception that makes
-   * this more than `select(null)`: the two date fields hold a draft and settle
-   * it on blur, and settling is where the *pair* rule runs (`withStart` /
-   * `withEnd` — a deadline typed before the start pulls the start back to it).
-   * React does not fire blur on unmount, so a panel closed while a date field
-   * still had focus would take the settle with it and leave the task holding
-   * the inverted pair it was mid-edit.
+   * Most controls here write as they are changed, and the two date fields are
+   * the exception that makes this more than `select(null)`: they hold their
+   * date as a draft and write it on blur, which is also where the *pair* rule
+   * runs (`withStart` / `withEnd` — a deadline typed before the start pulls
+   * the start back to it). React does not fire blur on unmount, so a panel
+   * closed while a date field still had focus would take that write with it
+   * and throw away the date somebody had just finished typing.
    *
    * Nor does the press outside blur it for us. The canvas calls
    * `preventDefault()` on its own pointerdown to start a pan, and that cancels
@@ -196,11 +196,12 @@ export function EditTaskPanel({ item, minDate, spans }: EditTaskPanelProps) {
 
   // The pair both date fields show: the drawn span, so a date being dragged on
   // the chart reads here as it is dropped; off a drag it is the item's own two
-  // dates. With one exception — between a field's first keystroke and the end
-  // of that edit the task can hold a deadline before its start (see DateField),
-  // and previewSpans draws that clamped to one day. The clamp is what the plan
-  // can draw, not what the task says, so there the item's own dates win and
-  // each field goes on showing the date it holds.
+  // dates. With one exception — a task can hold a deadline before its start,
+  // which no edit made here can produce any more (withStart and withEnd both
+  // return an ordered pair, and nothing else writes a date) but an imported
+  // file can, and previewSpans draws that clamped to one day. The clamp is
+  // what the plan can draw, not what the task says, so there the item's own
+  // dates win and each field goes on showing the date it holds.
   const drawn = span
     ? { start: isoAtIndex(minDate, span.start), end: isoAtIndex(minDate, span.start + span.len - 1) }
     : null;
@@ -351,7 +352,6 @@ export function EditTaskPanel({ item, minDate, spans }: EditTaskPanelProps) {
             <DateField
               id={`panel-${item.id}-start`}
               value={shown.start}
-              onCommit={(start) => updateItem(item.id, { start })}
               onSettle={(start) => updateItem(item.id, withStart(item, start))}
               onEditStart={rememberBeforeEdit}
               onCancel={() => {
@@ -364,7 +364,6 @@ export function EditTaskPanel({ item, minDate, spans }: EditTaskPanelProps) {
             <DateField
               id={`panel-${item.id}-end`}
               value={shown.end}
-              onCommit={(end) => updateItem(item.id, { end })}
               onSettle={(end) => updateItem(item.id, withEnd(item, end))}
               onEditStart={rememberBeforeEdit}
               onCancel={() => {
