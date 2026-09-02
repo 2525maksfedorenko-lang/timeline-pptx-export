@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:embed": "tsc -b && vite build --base=/tools/timeline-pptx-export/",
     "lint": "oxlint",
     "preview": "vite preview",
     "check:export": "jiti scripts/checkExportCoverage.ts",
