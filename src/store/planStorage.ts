@@ -1,5 +1,5 @@
 import { openDB, type IDBPDatabase } from 'idb';
-import type { TimelineItem } from '../types/timeline';
+import type { TaskComment, TimelineItem } from '../types/timeline';
 import { normalizePlanItems } from '../utils/normalizePlanItems';
 import { repairNotice, type PlanNotice } from '../utils/planNotice';
 import type { ExportOptions } from '../types/timeline';
@@ -8,6 +8,18 @@ export interface SavedPlan {
   id: string;
   name: string;
   items: TimelineItem[];
+  /** What has been said about this plan's tasks, keyed by task id.
+   *
+   * Part of the plan, and it has to be: a comment is about a task, a task is
+   * in exactly one plan, so a comment is in exactly one plan. It lived beside
+   * the plans instead — one flat list belonging to the browser — until
+   * `fix/comments-belong-to-the-plan`, which meant switching plans left every
+   * comment on screen and a plan opened somewhere else showed none of its own.
+   *
+   * Records written before that have no such field at all. `getAllPlans`
+   * gives them one, and the store adopts the old flat list into it once; see
+   * `planIdsMissingComments` below. */
+  comments: TaskComment[];
   exportOptions: ExportOptions;
   createdAt: string;
   updatedAt: string;
@@ -39,6 +51,13 @@ export async function savePlan(plan: SavedPlan): Promise<void> {
 
 export interface LoadedPlans {
   plans: SavedPlan[];
+  /** Ids of the records that had no `comments` field — plans saved before
+   * comments belonged to a plan. Always well-formed in `plans` above, because
+   * this door is where a missing field is given its empty array; this set is
+   * only how the store knows a record predates the field, which is what tells
+   * it whether the old flat list still has to be adopted. Empty once every
+   * plan in the database has been written since. */
+  planIdsMissingComments: Set<string>;
   /** What had to be repaired to load each plan, keyed by plan id — see
    * normalizePlanItems. Kept per plan rather than pooled because only the
    * plan actually on screen is worth telling anyone about, and which one that
@@ -63,13 +82,22 @@ export async function getAllPlans(): Promise<LoadedPlans> {
   // so in its dialog, and a reload has to say so too, or the person meets a
   // plan that sorts differently than they left it with no way to find out why.
   const noticesByPlanId: Record<string, PlanNotice> = {};
+  const planIdsMissingComments = new Set<string>();
   const plans = stored.map((plan) => {
     const { items, warnings } = normalizePlanItems(plan.items);
     if (warnings.length > 0) noticesByPlanId[plan.id] = repairNotice(warnings);
-    return { ...plan, items };
+
+    // A plan older than the comments field, or one whose field is not an
+    // array because a hand-edited JSON file said so, opens as a plan with no
+    // comments rather than as an error. Nothing else in the app then has to
+    // ask whether `comments` is there.
+    const hasComments = Array.isArray(plan.comments);
+    if (!hasComments) planIdsMissingComments.add(plan.id);
+
+    return { ...plan, items, comments: hasComments ? plan.comments : [] };
   });
 
-  return { plans, noticesByPlanId };
+  return { plans, noticesByPlanId, planIdsMissingComments };
 }
 
 export async function deletePlan(id: string): Promise<void> {
