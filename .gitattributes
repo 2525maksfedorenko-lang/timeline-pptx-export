@@ -17,6 +17,15 @@
 
 design-system/** export-ignore
 
+# A blanket `**` excludes the directories on the way down as well, and a file
+# inside an excluded directory is never reached — so every folder in the path
+# of something kept has to be named back in before the file itself is.
+design-system/tokens -export-ignore
+design-system/components -export-ignore
+design-system/components/core -export-ignore
+design-system/components/forms -export-ignore
+design-system/components/overlays -export-ignore
+
 # --- kept: the stylesheet the app is actually built from -------------------
 #
 # `src/index.css` does `@import "../design-system/styles.css"`, which pulls the
@@ -24,7 +33,7 @@ design-system/** export-ignore
 # it and `vite build` fails on a missing import, and every colour, radius,
 # shadow and type step the app draws with goes with it.
 design-system/styles.css -export-ignore
-design-system/tokens/** -export-ignore
+design-system/tokens/*.css -export-ignore
 
 # --- kept: the four primitives `npm run check:design` reads -----------------
 #
