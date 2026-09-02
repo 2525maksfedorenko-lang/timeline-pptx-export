@@ -43,8 +43,19 @@ export function isGroup(items: TimelineItem[], id: string): boolean {
  *
  * This is the whole of the "one level of sub-tasks" rule, which is about
  * *creating* them: a row this returns true for offers no way to add a child.
- * It says nothing about depth already in the plan — an imported file may nest
- * as deep as it likes, and every level of it is drawn and exported as before. */
+ *
+ * **The cap is asked for, not unfinished.** The client wants a plan built on
+ * this screen to stop at task and sub-task, because a plan a slide has to
+ * carry is read at two levels — a phase and what is in it — and a third one
+ * neither the deck's bar ladder nor the task column's indents have a step for.
+ * Anyone reading `addSubtask` or the missing "+" on a sub-task row should take
+ * it as the answer, not as a level nobody got round to adding.
+ *
+ * It says nothing about depth already in the plan, which is the other half of
+ * the decision: an imported file may nest as deep as it likes, and every level
+ * of it is drawn, edited and exported as before. Files come from elsewhere and
+ * refusing what they hold would lose data; this screen's own "+" is the only
+ * thing the cap governs. See docs/nesting-depth.md. */
 export function isSubtask(items: TimelineItem[], id: string): boolean {
   const item = items.find((candidate) => candidate.id === id);
   if (item?.parentId === undefined) return false;
