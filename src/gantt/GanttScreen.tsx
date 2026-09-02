@@ -185,6 +185,31 @@ export function GanttScreen() {
     if (!isMobile) setDrawerOpen(false);
   }, [isMobile, setDrawerOpen]);
 
+  /** A phone shows one layer at a time, so opening the panel puts the drawer
+   * away.
+   *
+   * Below the breakpoint both of them are the screen — the drawer is 82vw of
+   * it and the panel is all of it — and the panel is on top. Left standing,
+   * the drawer was not a second view but a trap: adding a task from its add
+   * row selects that task, so the panel opened over the very field that was
+   * still holding focus, and the next thing typed went into an input nobody
+   * could see. Escape went to that hidden field first, so it took two presses
+   * to get out and the second took the drawer with it, and there is nothing to
+   * press outside a panel that covers the screen — which left the ✕ as the
+   * only exit anyone could find.
+   *
+   * So the drawer closes as the panel opens, and it does not come back when
+   * the panel does: opening the list is one tap on Tasks, and reopening it
+   * over a plan someone just came back to look at would be the same
+   * presumption in the other direction. The round trip is open the list, add,
+   * fill in, close — then open the list again for the next one.
+   *
+   * Above the breakpoint there is no drawer and this does nothing: the list is
+   * a column and the panel sits beside it, both visible at once. */
+  useEffect(() => {
+    if (isMobile && selectedId !== null) setDrawerOpen(false);
+  }, [isMobile, selectedId, setDrawerOpen]);
+
   // Escape closes it, as it closes every other layer in this app. A phone
   // rarely has the key; a phone-sized window on a desktop always does.
   //
