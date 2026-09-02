@@ -3,10 +3,13 @@
 Reconnaissance for `feat/export-slide-redesign`. Nothing here changes code; it records what the
 handoff fixes, what it leaves open, and what it would cost the deck we ship today.
 
-The handoff lives outside the repo, next to the plan-screen one:
+The handoff lives outside the repo, next to the plan-screen one. It is a folder
+of design files rather than anything this project builds against, so it is not
+vendored here and there is no path to give — ask whoever owns the design files
+for a copy. What it contains:
 
 ```
-/mnt/c/Users/Max/Desktop/zipclaude/design_handoff_gantt_export/
+design_handoff_gantt_export/
   README.md                     the written spec (8 KB)
   gantt-export.html             five slides, standalone prototype (1883 lines)
   Gantt Chart Slide v2.dc.html  the authored source of the same five slides
