@@ -533,10 +533,14 @@ export function GanttScreen() {
   const addSubtask = (parentId: string) => {
     const parent = items.find((item) => item.id === parentId);
     if (!parent) return null;
-    // One level deep and no further. The controls that reach this — the row's
-    // "+" and the menu's row — are already absent on a sub-task; the guard is
-    // here so the rule holds at the one place a sub-task is actually made,
-    // rather than in each control that offers to make one.
+    // One level deep and no further, because the client asked for exactly two
+    // — a task and its sub-tasks — from this screen. The controls that reach
+    // here (the row's "+" and the menu's row) are already absent on a
+    // sub-task; the guard is here so the rule holds at the one place a
+    // sub-task is actually made, rather than in each control that offers to
+    // make one. An imported plan may be as deep as its file is: the cap is on
+    // creating, not on holding. See rollup.ts's isSubtask and
+    // docs/nesting-depth.md.
     if (isSubtask(items, parentId)) return null;
 
     const span = spans.get(parentId);
