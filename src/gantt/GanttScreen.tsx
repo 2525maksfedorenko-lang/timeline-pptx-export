@@ -8,6 +8,7 @@ import { buildNewTask } from '../utils/newTask';
 import { buildBranchColors } from '../utils/branchColors';
 import { buildDepthMap } from '../utils/barNesting';
 import { buildBarStyles } from './barColor';
+import { useSiteTheme } from '../utils/siteTheme';
 import { progressForStatus } from '../utils/progressForStatus';
 import { useScrollPanes } from './useScrollPanes';
 import type { TaskStatus } from '../types/timeline';
@@ -317,9 +318,13 @@ export function GanttScreen() {
   // with it through buildBranchColors so the two can't drift. Both maps are
   // built from the whole plan, so excluding a task from the export doesn't
   // shift the palette under its neighbours.
+  // Colour is branch, not status (above) — but a *tint* is that colour mixed
+  // with the canvas, so the canvas is an input and the theme decides it. This
+  // is the one thing on the plan screen a token swap cannot carry.
+  const theme = useSiteTheme();
   const barStyleById = useMemo(
-    () => buildBarStyles(buildBranchColors(items), buildDepthMap(items)),
-    [items],
+    () => buildBarStyles(buildBranchColors(items), buildDepthMap(items), theme),
+    [items, theme],
   );
 
   const dateRangeById = useMemo(

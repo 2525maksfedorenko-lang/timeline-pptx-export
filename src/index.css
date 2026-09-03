@@ -7,6 +7,34 @@
    product's values; only colour needs bridging into Tailwind's namespace. */
 @import "../design-system/styles.css";
 
+/* Geist, the website's typeface. A deliberate exception to the design system's
+   "no webfonts" rule, argued in the file's own header; imported after the
+   system's stylesheet so the `--font-sans` override below wins over the
+   platform stack that `tokens/fonts.css` sets. */
+@import "./fonts/geist.css";
+
+:root {
+  /* The site's family in front of the design system's own stack, which stays
+     behind it as the fallback — so a blocked font request degrades to exactly
+     what this app used to look like rather than to Times. */
+  --font-sans: 'Geist', ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji",
+    "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+
+  /* What the *browser* paints, as opposed to what the stylesheet paints: the
+     scrollbars this app does not style itself (the export panel's task list),
+     the `<select>` menus in the timeframe row and their dropped-open option
+     lists, and every focus ring and form control Chromium draws natively.
+     Without this they stay light on a dark page — a white scrollbar down the
+     side of a black panel — because no CSS of ours reaches them. It belongs
+     here rather than in `design-system/`: the system has no dark page to need
+     it, and this is the file that decides there is one. */
+  color-scheme: light;
+}
+
+.dark {
+  color-scheme: dark;
+}
+
 /* The plan screen's own palette, transcribed from the Gantt design handoff —
    the one surface the design system does not cover (it owns no bar, grid,
    connector or today-band colour). See the file's header for provenance. */

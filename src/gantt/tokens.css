@@ -76,6 +76,134 @@
   --gantt-comment-avatar: #475569;
 }
 
+/* ── The same palette, dark ────────────────────────────────────────────────
+ *
+ * The handoff has no dark mode: every value above is read out of a prototype
+ * drawn on white, and there is no second prototype to read. So these are
+ * *derived*, and this comment is the derivation, so that a value can be
+ * argued with rather than guessed at.
+ *
+ * **Where the rule comes from.** The website pairs a light step with a dark
+ * one in its own components, and it does so consistently enough to count.
+ * Every `x dark:y` pair in `components/` and `app/`, tallied:
+ *
+ *     text   600 -> 400  (40x)      border 200 -> 800  (9x)
+ *     text   700 -> 300  (28x)      border 200 -> 700  (6x)
+ *     text   500 -> 400  (25x)      bg  white -> black (28x)
+ *     text 900/800 -> 100 (28x)     bg     50 -> 950   (2x)
+ *     text   400 -> 500  (3x)       bg    100 -> 900   (2x)
+ *     text   300 -> 700  (2x)       bg    200 -> 800   (2x)
+ *
+ * which is one rule with two halves: a neutral step `n` pairs with `1000 - n`,
+ * and a surface distinguished from the page is *darker* than it in light and
+ * *lighter* than it in dark. That second half is why nothing below is a
+ * mechanical inversion of the hex above it.
+ *
+ * **Which ramp.** The site is Tailwind zinc; this screen is Tailwind slate,
+ * because the handoff is (the note at the top of this file, and decision E1 in
+ * docs/design-system-map.md). The rule is theirs, the ramp is this screen's —
+ * so the pairs below are slate, and the comment on each names the step.
+ *
+ * **What is not derived.** `--gantt-lift-strong`, and only that. See it.
+ */
+.dark {
+  /* Two steps above the canvas, for the washes that in light sit just below
+     white. `--background` is the design system's own dark page ground and
+     covers the fainter of them; the stronger one has no counterpart in either
+     palette — the site has no surface between its page and its border, and the
+     handoff has no dark canvas at all — so it is a new lightness step on the
+     hue and saturation the design system's dark neutrals already use
+     (212 22-30%). It is the one invented value in this file. */
+  --gantt-lift-soft: hsl(var(--background));   /* 212 30% 11% */
+  --gantt-lift-strong: hsl(212 26% 15%);       /* new — see above */
+
+  /* Surfaces. Ranked by how far each sits below white in the light palette,
+     and re-ranked above the canvas here: `--gantt-add-row` (#fcfdfe) and
+     `--gantt-weekend` (#fafcfd) are the two faintest, `--gantt-band`
+     (#fafafa), `--gantt-weekend-head` (#f8fafc) and `--gantt-edit-bg`
+     (#f8fbff) the three stronger ones. */
+  --gantt-surface: hsl(var(--card));           /* unchanged: already flips */
+  --gantt-band: var(--gantt-lift-strong);
+  --gantt-add-row: var(--gantt-lift-soft);
+  --gantt-weekend: var(--gantt-lift-soft);
+  --gantt-weekend-head: var(--gantt-lift-strong);
+
+  /* The two blue-tinted surfaces. Light is a wash of blue-50 toward white, so
+     dark is its pair: blue-950. */
+  --gantt-row-selected: #172554;               /* blue-950 */
+  --gantt-add-button-bg: #172554;              /* blue-950 */
+  --gantt-add-button-fg: #60a5fa;              /* blue-400  (600 -> 400) */
+
+  /* Rules. 200 -> 800 is the site's own border pairing; the other two follow
+     the same rule one step in. The faintest lands just *below* the canvas
+     rather than just above it, which is correct for what it draws — the day
+     line at week zoom, which should barely exist. */
+  --gantt-rule-strong: #1e293b;                /* slate-800 (200 -> 800) */
+  --gantt-rule-soft: #0f172a;                  /* slate-900 (100 -> 900) */
+  --gantt-rule-faint: #020617;                 /* slate-950 (50  -> 950) */
+
+  /* Text. All four pairs are in the tally above, verbatim. `--gantt-rule-soft`
+     and the two tokens below that read `hsl(var(--muted))` in light are
+     overridden rather than left to flip: dark `--muted` is 212 22% 3%, which
+     is *darker* than the canvas, and a row line, a bar fill and a hover wash
+     all have to be lighter than what they sit on. */
+  --gantt-text: #cbd5e1;                       /* slate-300 (700 -> 300) */
+  --gantt-text-secondary: #94a3b8;             /* slate-400 (500 -> 400) */
+  --gantt-text-muted: #64748b;                 /* slate-500 (400 -> 500) */
+  --gantt-text-faint: #334155;                 /* slate-700 (300 -> 700) */
+
+  /* Status tones. Neither palette carries these — the site has no status
+     colour of any kind — so the same rule is applied to the ramp each tone was
+     transcribed from. Bar fills move 500 -> 400 rather than 500 -> 500,
+     because a fill has to gain contrast when its ground loses it. Note that
+     `active-bg` and `active-text` simply trade places: the light pair is
+     blue-100 on blue-900, the dark pair is blue-900 on blue-100. */
+  --gantt-done-bg: #14532d;                    /* green-900 (100 -> 900) */
+  --gantt-done-text: #bbf7d0;                  /* green-200 (800 -> 200) */
+  --gantt-done-fill: #4ade80;                  /* green-400 (500 -> 400) */
+  --gantt-active-bg: #1e3a8a;                  /* blue-900  (100 -> 900) */
+  --gantt-active-text: #dbeafe;                /* blue-100  (900 -> 100) */
+  --gantt-active-fill: #60a5fa;                /* blue-400  (500 -> 400) */
+  --gantt-todo-bg: #1e293b;                    /* slate-800 (100 -> 800) */
+  --gantt-todo-text: #94a3b8;                  /* slate-400 (600 -> 400) */
+  --gantt-todo-fill: #64748b;                  /* slate-500 (400 -> 500) */
+  --gantt-icon-todo: #334155;                  /* slate-700 (300 -> 700) */
+
+  /* The rename field and the hover wash. The field's light fill is a blue
+     tinted white; here the tint goes and the focus ring carries the blue on
+     its own, because a 4%-saturated navy at 15% lightness is a tint nobody
+     can see. The ring itself stays at blue-400 rather than pairing down to
+     blue-600: a focus ring has to gain contrast against its ground, and the
+     ground just got darker. */
+  --gantt-edit-bg: var(--gantt-lift-strong);
+  --gantt-edit-focus: #60a5fa;                 /* blue-400, unchanged */
+  --gantt-name-hover: var(--gantt-lift-strong);
+
+  /* The badge and the avatar are light chips with `--gantt-surface` as their
+     text, so they pair *up* the ramp rather than down; the badge's hover, which
+     is `--gantt-text`, then still lands one step further toward the foreground
+     exactly as it does in light. */
+  --gantt-subcount-bg: #94a3b8;                /* slate-400 (600 -> 400) */
+  --gantt-comment-avatar: #94a3b8;             /* slate-400 (600 -> 400) */
+
+  /* Today. The band works by tinting the ground, so what has to hold across
+     the two themes is how far it moves it — not the colour. Yellow-200 at 35%
+     over white is a shift of about six per cent; the same yellow over a canvas
+     at 8% lightness reaches that shift at a tenth of the alpha, and at 35% it
+     would be a solid yellow stripe. So the hue is kept and the alpha is
+     re-solved. The edge is a line rather than a wash and stays as it is. */
+  --gantt-today-fill: rgba(254, 240, 138, 0.1);
+  --gantt-today-edge: #fde047;                 /* yellow-300, unchanged */
+
+  /* Bar chrome. The two handle washes are slate-900 over a light bar; over a
+     dark one they are its pair, slate-100, at the same two alphas. The drag
+     pill is a solid with `--gantt-card` as its text, so like the badge it goes
+     up the ramp and its foreground flips on its own. */
+  --gantt-handle-hover: rgba(241, 245, 249, 0.16);
+  --gantt-handle-hover-inset: rgba(241, 245, 249, 0.35);
+  --gantt-drag-pill-bg: #cbd5e1;               /* slate-300 (700 -> 300) */
+}
+
 /* The prototype's own scrollbar, scoped to the plan canvas rather than set on
  * the document the way the prototype's page-level <style> does it.
  *

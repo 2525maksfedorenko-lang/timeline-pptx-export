@@ -1,8 +1,9 @@
-import { PanelLeft, PanelLeftClose } from 'lucide-react';
+import { ChevronLeft, PanelLeft, PanelLeftClose } from 'lucide-react';
 import { buttonBaseClass } from '../components/systemUi';
 import { PlanMenu } from '../components/PlanMenu';
 import { useTimelineStore } from '../store/timelineStore';
 import { useIsMobile } from '../utils/useIsMobile';
+import { useSiteTheme } from '../utils/siteTheme';
 import { isGroup } from './rollup';
 import { TIME_SCALE_LABELS, TIME_SCALES } from './scale';
 import { useGanttViewStore } from './viewStore';
@@ -71,6 +72,9 @@ export function GanttToolbar({ actions }: GanttToolbarProps) {
   const requestToday = useGanttViewStore((state) => state.requestToday);
 
   const isMobile = useIsMobile();
+  // Only for the mark, which is a different file in each theme. Everything
+  // else in this header changes by token.
+  const theme = useSiteTheme();
   const isTaskDrawerOpen = useGanttViewStore((state) => state.isTaskDrawerOpen);
   const toggleTaskDrawer = useGanttViewStore((state) => state.toggleTaskDrawer);
 
@@ -260,25 +264,74 @@ export function GanttToolbar({ actions }: GanttToolbarProps) {
               Running standalone there is no site to ask, so `public/` carries
               the same file under the same name — the site's mark, not a
               different variant, so what the plan screen looks like in
-              development is what it looks like embedded. */}
+              development is what it looks like embedded.
+
+              **Two files, one per theme.** The site's header picks between
+              `/aicoo_logo.svg` (black) and `/aicoo_logo_white.svg` (white) by
+              theme, and it has to: the two differ by a single `fill` and the
+              black one is invisible on a dark ground. Taking its mark means
+              taking that rule with it — one mark per domain was never one
+              *file*, it was one *pair*. `public/` carries both under the site's
+              own names so standalone has a mark in either theme, and
+              `build:embed` deletes both, so the website still receives none. */}
           {/* Gone below the breakpoint — see this component's own note. */}
           {!isMobile && (
           <>
-          {/* Sized by height, with the width left to the file. The site's
-              mark is very nearly square (155×152), so a fixed pair would
-              squash it; 22px of height is what sits comfortably in a 50px row
-              and it is the axis that has to agree with the rest of the row.
+          {/* The mark, and the way home. A link rather than a picture because
+              the tool is a page of the website now and every other page of it
+              has a logo that goes to the front — a mark that is the only
+              inert thing in a header is a mark that reads as someone else's.
 
-              The height is in the style and not only in the attribute because
-              the CSS reset sets `img { height: auto }`, which outranks a plain
-              attribute and would collapse the mark to its intrinsic size. */}
-          <img
-            src="/aicoo_logo.svg"
-            alt="aicoo"
-            width={22}
-            height={22}
-            style={{ height: 22, width: 'auto', flex: 'none', display: 'block' }}
-          />
+              `/` and `/tools` are both root-relative for the same reason the
+              logo's path is: they resolve against the origin serving the app,
+              which embedded is the site. Neither carries a locale, and that is
+              right rather than lazy — next-intl's middleware still claims both
+              paths (its matcher excludes only `tools/timeline-pptx-export`
+              itself), so it redirects each to whichever locale the visitor
+              arrived in. Hard-coding `/en` would send a German visitor home in
+              English.
+
+              Standalone there is nothing at either path. Accepted, and for the
+              third time in this comment: this app is developed in its own
+              repository, where its header is the only chrome there is. */}
+          <a
+            href="/"
+            aria-label="aicoo — home"
+            style={{ display: 'block', flex: 'none' }}
+          >
+            {/* Sized by height, with the width left to the file. The site's
+                mark is very nearly square (155×152), so a fixed pair would
+                squash it; 22px of height is what sits comfortably in a 50px row
+                and it is the axis that has to agree with the rest of the row.
+
+                The height is in the style and not only in the attribute because
+                the CSS reset sets `img { height: auto }`, which outranks a plain
+                attribute and would collapse the mark to its intrinsic size. */}
+            <img
+              src={theme === 'dark' ? '/aicoo_logo_white.svg' : '/aicoo_logo.svg'}
+              alt="aicoo"
+              width={22}
+              height={22}
+              style={{ height: 22, width: 'auto', flex: 'none', display: 'block' }}
+            />
+          </a>
+
+          {/* The way back to where this was opened from. The Tools page is the
+              only route into this tool, so it is the only back a link can
+              honestly offer — anything more would be reconstructing the site's
+              navigation inside a page of it.
+
+              Colour only on hover, per the design system, and it borrows the
+              header's own two text tokens rather than introducing a third. */}
+          <a
+            href="/tools"
+            className="flex-none whitespace-nowrap text-xs font-medium text-muted-foreground hover:text-foreground hover:no-underline"
+            style={{ display: 'flex', alignItems: 'center', gap: 2 }}
+          >
+            <ChevronLeft size={14} strokeWidth={2} aria-hidden="true" />
+            Tools
+          </a>
+
           <span className="h-5 w-px flex-none bg-border" />
           </>
           )}
