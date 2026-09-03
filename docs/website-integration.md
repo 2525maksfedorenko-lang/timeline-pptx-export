@@ -11,38 +11,38 @@ that look lazy can be read as decisions instead.
 
 | Where | What |
 | --- | --- |
-| `tools/timeline-pptx-export/` | this project — source, docs, checks, its own `package.json`; see *What is vendored and what is not* |
-| `public/tools/timeline-pptx-export/` | the built bundle, which is what is actually served |
+| `public/tools/timeline-pptx-export/` | the built bundle — eight files — which is what is actually served |
+| `public/tools/timeline-pptx-export/README.md` | how to rebuild those eight files, and from which commit they came |
 | `next.config.ts` | one rewrite, so the bare path resolves to `index.html` |
 | `middleware.ts` | one matcher exclusion, so next-intl does not claim the path |
 | `app/[locale]/tools/ToolsPageClient.tsx` | the card links out instead of saying Coming Soon |
-| `tsconfig.json` | one `exclude`, so the site's build does not try to compile this app |
 
-Two copies of the same app therefore live in the website repository: the source
-in `tools/`, and the compiled bundle in `public/`. That is the cost of the
-decision below, and it is stated here rather than discovered later.
+**Twelve files, and no source.** That is the whole of it.
 
-## What is vendored and what is not
+## No source travels
 
-The website does not need the whole workshop, and it must not carry a second
-design system — it already has one in `.ds-sync/`, and two copies of a design
-system in one repository is precisely the thing that drifts.
+An earlier version of this integration checked the whole project into the
+website at `tools/timeline-pptx-export/` — source, docs, checks, dotfiles, a
+lockfile, four tsconfigs, and the fifteen design-system files the build needs.
+129 files. The site's owner rejected it, correctly: the website's repository
+should carry what it takes to serve the tool and nothing else.
 
-So the vendoring is filtered, by `.gitattributes` in this project rather than
-by whoever runs the copy: `git archive` honours `export-ignore`, so
-`design-system/**` is dropped and the files the app genuinely needs are named
-back in. **Fourteen files stay out of 169:**
+So it carries the bundle and a README, and the README is what replaces the
+source. It names this repository, the commit the bundle was built from, the one
+command that rebuilds it, and the eight files that come out — enough to
+reproduce the folder without ever having seen this project. Keeping that commit
+hash current, when the bundle is replaced, is the whole discipline the
+arrangement asks for.
 
-| Kept | Why |
-| --- | --- |
-| `design-system/styles.css` + `design-system/tokens/*.css` (10) | a **build input**, not reference. `src/index.css` does `@import "../design-system/styles.css"`, which pulls the nine token files. Remove them and `vite build` fails on a missing import, and every colour, radius, shadow and type step goes with it |
-| `components/core/Button.jsx`, `forms/Input.jsx`, `forms/Checkbox.jsx`, `overlays/DropdownMenu.jsx` (4) | `npm run check:design` reads these four at run time to prove that `src/components/systemUi.ts` — a hand transcription of them into Tailwind — has not drifted. Without them that check cannot run, and a check that cannot run is worse than one that fails |
-| `design-system/readme.md` | one page saying what the other 155 files were, and where the real copy lives |
+Two things follow from there being no source there:
 
-Dropped: the 104 remaining primitives and their `.d.ts`/`.prompt.md`, the 19
-guideline specimens, the coordinator UI kit, the brand assets, the rebuilt
-`_ds_bundle.js` and its manifest, and the skill/thumbnail files. None of it is
-read by the app, by the build, or by any of the six checks.
+- **The design system does not travel at all.** The website already has one in
+  `.ds-sync/`, and two copies of a design system in one repository is precisely
+  the thing that drifts. Our copy is a build input here — `src/index.css` does
+  `@import "../design-system/styles.css"` — but a build input is consumed at
+  build time, in this repository, and only its output ships.
+- **The site's `tsconfig.json` needs no exclusion.** It used to need one, and
+  the next section is why.
 
 ## The decision: the built bundle is committed
 
@@ -92,27 +92,43 @@ trade.
 merged, with nothing asked of the website's CI, and everything it can break is
 inside one folder under `public/`.
 
-**What it costs, plainly.** Compiled files are in the repository. The bundle
-does not rebuild itself, so source and served output can drift — the source in
-`tools/` is *not* what serves the page. The rebuild is one command and the
-next section is how.
+None of this is a live problem any more, because no source of this app sits in
+that repository to be type-checked. It is written down because it is the reason
+the bundle is committed rather than built there, and because anyone proposing
+the other arrangement will meet it again on the first `next build`.
+
+**What committing the bundle costs, plainly.** Compiled files are in the
+repository, and they do not rebuild themselves: the served output can fall
+behind this repository without anything complaining. The README beside the
+bundle records the commit it was built from, which is the only thing that makes
+the drift visible. The rebuild is one command and the next section is how.
 
 **When to revisit.** If this app starts changing often, or if the website
 adopts workspaces for another reason, the second arrangement becomes the right
-one. Nothing here is load-bearing against it: delete the `public/` copy, drop
-the `tsconfig.json` exclusion, and add a build step.
+one. Nothing here is load-bearing against it: delete the `public/` copy and add
+a build step that produces it.
 
 ## Rebuilding the served bundle
 
-From `tools/timeline-pptx-export/`:
+From this repository:
 
 ```bash
 npm install
 npm run build:embed          # vite build --base=/tools/… , then drop our logo
-rm -rf ../../public/tools/timeline-pptx-export
-mkdir -p ../../public/tools/timeline-pptx-export
-cp -r dist/. ../../public/tools/timeline-pptx-export/
 ```
+
+Then, in the website's checkout, replace the folder's contents but keep the
+README — the built filenames carry content hashes, so clearing first is what
+stops stale assets accumulating:
+
+```bash
+cd <website>/public/tools/timeline-pptx-export
+find . -mindepth 1 ! -name README.md -delete
+cp -r <this repo>/dist/. .
+```
+
+and update the commit hash the README names, because nothing else records what
+is being served.
 
 `--base` is the part that matters and the part that is easy to forget, which
 is why it is a named script rather than a flag anyone has to remember. Without
@@ -124,14 +140,9 @@ app has a mark when it runs standalone; on this domain the site already has one
 and the app asks for that instead, so shipping ours would put a second
 `aicoo_logo.svg` on the site — see below.
 
-To refresh the **source** copy, from this project's own repository:
-
-```bash
-git archive HEAD | tar -x -C <website>/tools/timeline-pptx-export
-```
-
-`.gitattributes` does the filtering, so there is nothing to remember and
-nothing to clean up afterwards.
+The same instructions live in the website, at
+`public/tools/timeline-pptx-export/README.md`, because that is where someone
+who has only that repository will look.
 
 ## The logo: one file per domain, and it is the site's
 
@@ -163,7 +174,7 @@ width left to the file. This is a visible change from what the tool used to
 show: the old file was the orbit-plus-wordmark lockup from
 `design-system/assets/`, and the site's file is the mark alone.
 
-## The four site edits
+## The three site edits
 
 **`next.config.ts`** — a rewrite. Next serves files out of `public/` but does
 not resolve a directory to its `index.html`, so the bare path is mapped to it
@@ -182,9 +193,11 @@ stretched-link pattern the other live cards on that page use, so the whole card
 is clickable and the focus ring is drawn around the card rather than around the
 words. `ImageCard` already had the `titleContent` prop this uses.
 
-**`tsconfig.json`** — the exclusion described above. This is the one edit that
-is not about the card, and the one that is easiest to delete by accident; the
-comment in the file says what breaks if it goes.
+There is no fourth. An earlier version of this integration also changed
+`tsconfig.json`, to exclude the vendored source from the site's TypeScript
+pass. With the source gone the exclusion has nothing to exclude, and
+`next build` was run without it: *Finished TypeScript* clean. The file is back
+to what it is on `main`.
 
 ## Settled: no subdomain, no separate service
 
@@ -228,6 +241,5 @@ site.
   change: `eslint-config-next` is pinned to `^0.2.4`, which is an unrelated
   package from long before Next's own config, so `eslint.config.mjs` fails to
   resolve `eslint-config-next/core-web-vitals` and no file is linted at all.
-  That is not this integration's to fix. When it is fixed, this app's folder
-  should go into `globalIgnores` for the same reason it is excluded from
-  `tsconfig.json`.
+  That is not this integration's to fix — and nothing this integration adds is
+  lintable anyway, since `public/` is build output.
