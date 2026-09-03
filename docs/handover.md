@@ -10,12 +10,11 @@ it exists to solve is not the plan screen itself but what comes out of it — a
 slide you can actually show: a correct date grid, labels that fit inside the
 bar, status colours, wrapping, Cyrillic in the PDF.
 
-It ships in two places, from one source. It is a **standalone project** with
-its own repository, and it is also checked into the aicoo website repository at
-`tools/timeline-pptx-export/`, where the built bundle under
-`public/tools/timeline-pptx-export/` is what the Tools page's
-"Timeline → PowerPoint" card opens. See `docs/website-integration.md` for how
-that fits together and what has to be rebuilt when this app changes.
+This repository is the only place the source lives. The aicoo website carries
+a **built copy** of it under `public/tools/timeline-pptx-export/`, which is
+what the Tools page's "Timeline → PowerPoint" card opens; no source of this
+app is checked in there. See `docs/website-integration.md` for how that fits
+together and what has to be rebuilt when this app changes.
 
 It is not part of the website's build. The end goal is for
 this logic to be absorbed into the main aicoo product (`aicoo-core-dev`), not
