@@ -58,8 +58,8 @@ function DragGrip() {
  *
  * A group starts hard against the column's edge because its caret occupies
  * that space; a task starts where the caret would have ended. Both names are
- * plain text; what separates a parent from its work is weight and size, not a
- * frame around one of them. */
+ * plain text; what separates a top-level task from its work is weight and
+ * size, not a frame around one of them. */
 export function TaskListRow({
   row,
   isSelected,
@@ -79,6 +79,17 @@ export function TaskListRow({
 }: TaskListRowProps) {
   const { item, depth, isGroup, childCount, isSubtask, status } = row;
 
+  // What the weight says is "top level", not "has sub-tasks". A root that has
+  // not been given any yet is still a root and can take them at any moment,
+  // so it is set in the same semibold as one that already has them, and a
+  // group nested under a root is set plain like the rest of its level.
+  //
+  // Weight is the only thing that reads depth this way. The caret, the count
+  // badge, the row's indent and the "(rolled up)" status all still turn on
+  // having children, because each of them is about children that exist; the
+  // bar's colour already went by depth in the whole plan and is unchanged.
+  const isRoot = depth === 0;
+
   // Shared by both: one line, ellipsised, and a box for the hover wash to
   // fill. The wash is what is left of the pill — see .gantt-row-name.
   const nameBase: React.CSSProperties = {
@@ -89,15 +100,13 @@ export function TaskListRow({
     whiteSpace: 'nowrap',
     borderRadius: 6,
     boxSizing: 'border-box',
+    fontWeight: isRoot ? 600 : 400,
   };
 
   const nameStyle: React.CSSProperties = isGroup
     ? {
         ...nameBase,
         fontSize: 15,
-        // Semibold, so a parent is picked out of the column by weight. It is
-        // now the only thing that does: its children used to be framed.
-        fontWeight: 600,
         color: 'var(--gantt-text)',
         // A group's name carried no box of its own. It gets the task's, and
         // an equal negative margin on the left hands the space straight back,
