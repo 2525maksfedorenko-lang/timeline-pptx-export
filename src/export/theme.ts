@@ -7,6 +7,22 @@ import { PDF_TEXT_FONT_FAMILY } from './pdfFont';
 // These are the aicoo Coordinator design-system tokens resolved to hex, because
 // neither exporter can read CSS custom properties. Where a token exists, its
 // name is given — keep the two in step (see design-system/tokens/).
+//
+// **This palette has one theme and it is light.** The plan screen follows the
+// website's dark mode now (src/utils/siteTheme.ts); this file does not, and the
+// line between them is not an oversight to be tidied away later. A `.pptx` or a
+// `.pdf` is opened in PowerPoint, in Acrobat, on a projector and on paper, by
+// people who were not the visitor who generated it — none of whom has the
+// visitor's theme and most of whom are looking at white. A deck that came out
+// dark because whoever exported it happened to prefer dark is a deck that has
+// to be redone.
+//
+// Concretely: nothing here reads `localStorage`, `matchMedia`, or a class on
+// `<html>`, and nothing here may start to. `slideBg` stays FFFFFF. The one
+// place the screen and the deck deliberately differ is the ground a nested
+// bar's tint is flattened against — see the SURFACE table in
+// `src/gantt/barColor.ts`, which explains why the difference exists and why it
+// does not make the two disagree about colour.
 
 export const COLORS = {
   // --primary: the one navy the whole brand rests on. Off the slide's chrome

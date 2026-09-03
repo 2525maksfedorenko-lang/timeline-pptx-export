@@ -1,4 +1,5 @@
 import { COLORS } from '../export/theme';
+import type { SiteTheme } from '../utils/siteTheme';
 import { branchFillAlpha, FLAT_PLAN_COLOR, type BranchColor } from '../utils/branchColors';
 
 /**
@@ -16,10 +17,25 @@ import { branchFillAlpha, FLAT_PLAN_COLOR, type BranchColor } from '../utils/bra
  * the screen *chooses*; nothing here is chosen.
  */
 
-/** `--gantt-surface`, the canvas a bar is drawn on, as components. Written as
- * numbers rather than as a hex literal because it is an input to arithmetic
- * here, not a colour this file is picking. */
-const SURFACE = { r: 255, g: 255, b: 255 };
+/** `--gantt-surface`, the canvas a bar is drawn on, as components — one entry
+ * per theme. Written as numbers rather than as hex literals because they are
+ * an input to arithmetic here, not colours this file is picking: the light one
+ * is `--card` (white), the dark one is `--card` under `.dark` (212 22% 8%).
+ *
+ * This is the only place the theme reaches a *bar*. Everything else on the
+ * plan screen changes by swapping a token; a tint cannot, because it is
+ * computed rather than named, and a tint flattened against white and then
+ * drawn on a near-black canvas is a pale smear. Keeping the two grounds here,
+ * beside the arithmetic that uses them, is what stops that.
+ *
+ * The exporters are not in this table and must not be. A slide is printed on
+ * white whoever generated it, so `timelineExportModel.ts` composites against
+ * `COLORS.cardBg` and always will — which means that in dark mode the screen
+ * and the deck genuinely differ, for the first time, and on purpose. */
+const SURFACE: Record<SiteTheme, { r: number; g: number; b: number }> = {
+  light: { r: 255, g: 255, b: 255 },
+  dark: { r: 16, g: 21, b: 27 },
+};
 
 function toRgb(hex: string): { r: number; g: number; b: number } {
   const value = Number.parseInt(hex.replace('#', ''), 16);
@@ -49,21 +65,22 @@ function contrastRatio(a: string, b: string): number {
 
 /** The branch colour flattened against the canvas: full strength for a root,
  * the branch's tint for anything nested under it. */
-export function barFillCss(color: BranchColor, depth: number): string {
+export function barFillCss(color: BranchColor, depth: number, theme: SiteTheme): string {
   const alpha = branchFillAlpha(depth, color);
   const rgb = toRgb(color.solid);
+  const ground = SURFACE[theme];
   return toHex({
-    r: SURFACE.r + (rgb.r - SURFACE.r) * alpha,
-    g: SURFACE.g + (rgb.g - SURFACE.g) * alpha,
-    b: SURFACE.b + (rgb.b - SURFACE.b) * alpha,
+    r: ground.r + (rgb.r - ground.r) * alpha,
+    g: ground.g + (rgb.g - ground.g) * alpha,
+    b: ground.b + (rgb.b - ground.b) * alpha,
   });
 }
 
 /** The bar's own name, set on the bar. Whichever of the deck's two text
  * colours reads better on this particular fill — the pale one the export uses
  * *on* a fill, or the near-black it uses beside one. */
-export function barTextCss(color: BranchColor, depth: number): string {
-  const fill = barFillCss(color, depth);
+export function barTextCss(color: BranchColor, depth: number, theme: SiteTheme): string {
+  const fill = barFillCss(color, depth, theme);
   const onFill = `#${COLORS.textOnFill}`;
   const onSurface = `#${COLORS.textOnSurface}`;
   return contrastRatio(fill, onFill) >= contrastRatio(fill, onSurface) ? onFill : onSurface;
@@ -95,13 +112,14 @@ export interface BarStyle {
 export function buildBarStyles(
   colorById: ReadonlyMap<string, BranchColor>,
   depthById: ReadonlyMap<string, number>,
+  theme: SiteTheme,
 ): Map<string, BarStyle> {
   const styles = new Map<string, BarStyle>();
   colorById.forEach((color, id) => {
     const depth = depthById.get(id) ?? 0;
     styles.set(id, {
-      fill: barFillCss(color, depth),
-      text: barTextCss(color, depth),
+      fill: barFillCss(color, depth, theme),
+      text: barTextCss(color, depth, theme),
       ring: barRingCss(color),
     });
   });
@@ -111,9 +129,16 @@ export function buildBarStyles(
 /** What a bar falls back to if its task carries no colour. Unreachable while
  * the style map is built from the same list the rows are — kept because the
  * exporter has the same fallback, in the same colour, and a default that
- * differed between them would be a difference waiting to be found. */
+ * differed between them would be a difference waiting to be found.
+ *
+ * Pinned to the light ground, and that is the honest choice rather than an
+ * oversight: it is a module constant, so it is computed once at import and has
+ * no theme to be told about. Making it a function to serve a value nothing
+ * reads would be worse than the note. If it ever *is* reached in dark mode it
+ * will show as one pale bar, which is a legible symptom of the real bug —
+ * a task the colour map does not know about. */
 export const FALLBACK_BAR_STYLE: BarStyle = {
-  fill: barFillCss(FLAT_PLAN_COLOR, 0),
-  text: barTextCss(FLAT_PLAN_COLOR, 0),
+  fill: barFillCss(FLAT_PLAN_COLOR, 0, 'light'),
+  text: barTextCss(FLAT_PLAN_COLOR, 0, 'light'),
   ring: barRingCss(FLAT_PLAN_COLOR),
 };

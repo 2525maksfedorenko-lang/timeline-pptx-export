@@ -4,7 +4,31 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/aicoo-tab-icon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>aicoo — Timeline Export</title>
+    <title>Timeline → PowerPoint | aicoo</title>
+    <!--
+      Light or dark, before the first paint.
+
+      The website decides this in `contexts/ThemeContext.tsx` and applies it as
+      a `dark` class on <html>; embedded under /tools/timeline-pptx-export we
+      are on its origin, so the key is simply readable. The same read lives in
+      src/utils/siteTheme.ts and is what the app uses from mount onwards — this
+      copy exists only because a module runs after the first paint, and a white
+      screen that turns dark a moment later is exactly what the site's own
+      inline script in app/layout.tsx exists to prevent. Kept in step by hand:
+      it is nine lines, and a build step to share them would cost more than it
+      saves. Blocking on purpose — it must run before the body renders.
+    -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem('theme');
+          var dark =
+            stored === 'dark' ||
+            (stored !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
+          document.documentElement.classList.toggle('dark', dark);
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

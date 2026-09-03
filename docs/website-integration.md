@@ -174,6 +174,76 @@ width left to the file. This is a visible change from what the tool used to
 show: the old file was the orbit-plus-wordmark lockup from
 `design-system/assets/`, and the site's file is the mark alone.
 
+## Following the site's theme
+
+The site has a light and a dark mode, and before this the tool had neither: the
+two screenshots were byte-identical, so a visitor who had chosen dark opened
+this page into a flash of white. It follows now, and the mechanism is smaller
+than the problem sounds.
+
+**The key is `localStorage.theme`.** The site writes `'light'` or `'dark'`
+there and applies it as a `dark` class on `<html>` (`contexts/ThemeContext.tsx`);
+with nothing stored it falls back to `prefers-color-scheme`. Served from the
+site's own origin, this app just reads that key — no message passing, no API.
+`src/utils/siteTheme.ts` is the read, and it listens for two things afterwards:
+`storage`, which fires when the site's header toggles the theme in the tab this
+one was opened from, and the media query, for the visitor who never touched
+that toggle. A blocking script in `index.html` applies the class before first
+paint, for the same reason the site has one in `app/layout.tsx`.
+
+**Everything else is tokens.** `design-system/` already shipped a `.dark`
+block, and `src/index.css` had always kept its colour tokens as
+`hsl(var(--x))` references specifically so that a future class swap would work
+without touching a single utility. What was missing was the plan screen's own
+palette, which the Gantt handoff supplies for a white canvas only; that file now
+carries a dark block, derived from the pairing rule the site's own components
+use (`text-zinc-600 dark:text-zinc-400` and the two dozen others like it) and
+argued value by value in place.
+
+Two things could not be a token and are documented where they live:
+
+- **The mark is two files.** The site picks `/aicoo_logo.svg` or
+  `/aicoo_logo_white.svg` by theme, and it has to — they differ by one `fill`
+  and the black one vanishes on a dark ground. "One mark per domain" was never
+  one *file*; it was one pair, and taking the site's mark means taking its rule.
+- **A nested bar's tint is computed, not named** — the branch colour flattened
+  against the canvas, because a translucent bar would let the grid show through
+  it. So the canvas is an input, and `barColor.ts` keeps one ground per theme.
+
+**The exports do not follow, and that is deliberate.** A `.pptx` is opened in
+PowerPoint, on a projector and on paper, by people who are not the visitor who
+generated it. `src/export/theme.ts` keeps `slideBg` white whoever pressed
+Export, and nothing on the export path reads the theme. The colour-parity check
+(`npm run check:colors`) still passes, because what it compares is the branch
+colour and its tint alpha rather than the flattened result — which is the level
+the screen and the deck do still have to agree at.
+
+## The chrome, and what is deliberately not in it
+
+The tool used to contain no link at all: `document.querySelectorAll('a')`
+returned an empty list, so the only way back to the site was the browser's own
+back button. It now has two, and only two — the mark links home, and a
+`‹ Tools` link goes back to the page this was opened from.
+
+Both are root-relative and carry no locale on purpose. next-intl's middleware
+still claims `/` and `/tools` (its matcher excludes only
+`tools/timeline-pptx-export` itself), so it redirects each to whichever locale
+the visitor arrived in; hard-coding `/en` would send a German visitor home in
+English.
+
+What is **not** here is the site's header. It was asked for as "minimum
+chrome", and the site's header is 80px of navigation, a language switch, a
+theme toggle and two calls to action — rebuilt inside a page of the site it
+would be a second copy of a thing that already exists one navigation step away,
+free to drift, and it would cost a third of this tool's vertical space. The
+theme toggle in particular would be a second control writing the same
+`localStorage` key as the site's own.
+
+Below the mobile breakpoint both links go, along with the mark, which is the
+rule that was already there for the mark alone: at that width the header is two
+rows and the row this would sit on is the plan's. A phone browser's own back
+gesture is the way back there.
+
 ## The three site edits
 
 **`next.config.ts`** — a rewrite. Next serves files out of `public/` but does

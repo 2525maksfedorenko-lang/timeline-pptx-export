@@ -37,6 +37,10 @@ The rules that bite most often:
   ever carries meaning (green on-track, red delayed, orange issue, purple project, amber phase,
   blue task).
 - No webfonts, no gradients, no emoji, no backdrop blur. 14px body, 18px semibold page titles.
+  **The webfont rule now has exactly one exception:** `src/fonts/geist.css` ships Geist,
+  the aicoo website's typeface, because this app is served as a page of that site and the
+  site's owner asked for it by name. The file's header is the argument. Do not add a second
+  exception, and do not "fix" this one back.
 - lucide is the only icon system.
 - Hover changes colour only — nothing scales, bounces, or slides for decoration.
 
@@ -54,6 +58,26 @@ settings, import, exports — still follows the design system as before.
 `src/export/theme.ts` is a **separate** palette for the PPTX/PDF exporters: hex without `#`
 (pptxgenjs's format), and its grid-line/footer colours have no design-system counterpart. Keep the
 two in their own formats rather than trying to unify them.
+
+## Light and dark
+The screen follows the website's theme; the exports never do.
+
+The site keeps the choice in `localStorage.theme` and applies it as a `dark` class on `<html>`
+(`contexts/ThemeContext.tsx`). Served from its origin, this app simply reads that — see
+`src/utils/siteTheme.ts`, and the blocking script in `index.html` that applies it before first
+paint. Standalone the key is absent and `prefers-color-scheme` answers instead; one rule, both
+cases.
+
+Everything the screen draws changes by **token**, never per component: `design-system/` ships its
+own `.dark` block, and `src/gantt/tokens.css` now carries one whose derivation is argued in the
+file. The two exceptions, both documented where they live, are the mark (two files, one per
+theme — the site's own rule) and a nested bar's tint (computed against the canvas, so the canvas
+is an input: the `SURFACE` table in `src/gantt/barColor.ts`).
+
+`src/export/theme.ts` and `src/utils/statusColors.ts` are on the other side of that line and must
+stay there. A deck is opened by people who never saw the visitor's theme, so `slideBg` is white
+whoever pressed Export. Nothing on the export path may read `localStorage`, `matchMedia`, or a
+class on `<html>`.
 
 ## Порты
 5176 — постоянный порт пользователя, к нему подключён туннель cloudflared.

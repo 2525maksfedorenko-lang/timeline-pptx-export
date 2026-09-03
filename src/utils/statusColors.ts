@@ -8,6 +8,17 @@ import type { TaskStatus } from '../types/timeline';
  * `branchColors.ts`, because that is the same kind of thing: a colour rule the
  * plan screen and both exporters have to agree on, owned by neither.
  *
+ * **These are deck colours, not screen colours, and that is why they are hex.**
+ * Every reader of this file is on the export path — `timelineExportModel.ts`
+ * and `dashboardMetrics.ts`, which feeds it — and nothing the plan screen draws
+ * comes from here: a status on screen is an icon stroke out of
+ * `gantt/tone.ts`, which names a `--gantt-*` token and follows the theme with
+ * everything else. So these values are deliberately *not* lifted into CSS
+ * custom properties. They could not be read from one — pptxgenjs and jsPDF take
+ * strings, not `var()` — and a token would drag them into the dark palette,
+ * where a deck must never go. `src/export/theme.ts` argues that boundary at
+ * length; this file sits on the same side of it.
+ *
  * What deliberately did *not* come with them is `TASK_STATUS_LABELS`. Those
  * look like presentation and are not: `normalizeStatus.ts` accepts a status
  * typed as its display label ("In Progress" is a valid value in an imported
