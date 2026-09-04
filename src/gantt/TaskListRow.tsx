@@ -79,16 +79,29 @@ export function TaskListRow({
 }: TaskListRowProps) {
   const { item, depth, isGroup, childCount, isSubtask, status } = row;
 
-  // What the weight says is "top level", not "has sub-tasks". A root that has
-  // not been given any yet is still a root and can take them at any moment,
-  // so it is set in the same semibold as one that already has them, and a
-  // group nested under a root is set plain like the rest of its level.
+  // What the weight and the colour say is "top level", not "has sub-tasks". A
+  // root that has not been given any yet is still a root and can take them at
+  // any moment, so it is set in the same semibold and the same full-strength
+  // text colour as one that already has them, and a group nested under a root
+  // is set plain and muted like the rest of its level.
   //
-  // Weight is the only thing that reads depth this way. The caret, the count
-  // badge, the row's indent and the "(rolled up)" status all still turn on
-  // having children, because each of them is about children that exist; the
-  // bar's colour already went by depth in the whole plan and is unchanged.
+  // Weight and colour are the only things that read depth this way. The caret,
+  // the count badge, the row's indent and the "(rolled up)" status all still
+  // turn on having children, because each of them is about children that
+  // exist; the bar's colour already went by depth in the whole plan and is
+  // unchanged.
   const isRoot = depth === 0;
+
+  // One признак, one pair of tokens, and the tokens are what carries the two
+  // themes: `--gantt-text` and `--gantt-text-muted` swap to slate-300/500 in
+  // the dark block of tokens.css, so the contrast between a root and its
+  // sub-tasks survives the theme without either colour being written here.
+  //
+  // This replaces the older rule on tasks, where an untouched (`todo`) task
+  // was muted and a started one was not. Status is already said twice on the
+  // row — by the icon and by its title — and saying it a third time in the
+  // name's colour was what left two roots looking like different levels.
+  const nameColor = isRoot ? 'var(--gantt-text)' : 'var(--gantt-text-muted)';
 
   // Shared by both: one line, ellipsised, and a box for the hover wash to
   // fill. The wash is what is left of the pill — see .gantt-row-name.
@@ -107,7 +120,7 @@ export function TaskListRow({
     ? {
         ...nameBase,
         fontSize: 15,
-        color: 'var(--gantt-text)',
+        color: nameColor,
         // A group's name carried no box of its own. It gets the task's, and
         // an equal negative margin on the left hands the space straight back,
         // so the name stays exactly where the handoff puts it and the wash
@@ -120,9 +133,7 @@ export function TaskListRow({
     : {
         ...nameBase,
         fontSize: 14,
-        // An untouched task is set in the muted grey; anything under way or
-        // done takes the primary text colour.
-        color: status === 'todo' ? 'var(--gantt-text-muted)' : 'var(--gantt-text)',
+        color: nameColor,
         // The pill's border and fill are gone; its box is not. A transparent
         // border of the same width keeps every name on the pixel it was on,
         // and keeps the two name treatments one shape.
