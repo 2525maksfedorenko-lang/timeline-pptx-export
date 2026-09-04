@@ -81,12 +81,17 @@ export function TaskBar({
   onContextMenu,
 }: TaskBarProps) {
   const { item, depth } = row;
-  // The name on the bar carries the same weight as the name in the list, and
-  // for the same reason: a top-level task is set semibold whether or not it
-  // has sub-tasks yet. Reading `isGroup` here instead would leave the two
+  // The name on the bar carries the same weight and the same colour as the
+  // name in the list, and for the same reason: a top-level task is set
+  // semibold and full strength whether or not it has sub-tasks yet, a nested
+  // one plain and muted. Reading `isGroup` here instead would leave the two
   // panes disagreeing about which rows are roots. Nothing else about the bar
   // moves with it — its fill already goes by depth, its height by nothing.
-  const nameWeight = depth === 0 ? 600 : 400;
+  //
+  // Both colours are tokens, so the pair swaps with the theme (tokens.css).
+  const isRoot = depth === 0;
+  const nameWeight = isRoot ? 600 : 400;
+  const nameColor = isRoot ? 'var(--gantt-text)' : 'var(--gantt-text-muted)';
   const height = barHeight(ROW_HEIGHT_PX);
   const top = barOffsetY(ROW_HEIGHT_PX);
   const left = barLeft(span.start, columnWidth);
@@ -213,7 +218,7 @@ export function TaskBar({
             alignItems: 'center',
             fontSize: 14,
             fontWeight: nameWeight,
-            color: 'var(--gantt-text)',
+            color: nameColor,
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
